@@ -22,6 +22,8 @@ lemma discovery is done. Although we don't expect that this will change our
 theoretical capability, we expect there may be (significant) efficiency gains.
 Or losses...
 
+After we do this, we'll merge the history of the remaining files back in.
+
 ## Current TODOs
 
 * Everything
