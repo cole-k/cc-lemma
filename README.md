@@ -38,6 +38,8 @@ After we do this, we'll merge the history of the remaining files back in.
     having a two-phase c-vec creation process.
   - Consider not having c-vecs be stored in an e-graph and evalutaed using one,
     but instead evaluated on-demand.
+  - Can we do the blocking variable analysis as an e-graph analysis instead of
+    on the contents of the e-graph itself?
 * config.rs
   - Remove useless flags.
   - Read from a config file (use `confy`?) and have user-supplied flags override
