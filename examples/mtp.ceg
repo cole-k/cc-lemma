@@ -1,0 +1,79 @@
+(
+(data Bool (True False))
+(:: True Bool)
+(:: False Bool)
+
+(data Nat (Z S))
+(:: Z Nat)
+(:: S (-> (Nat) Nat))
+
+(:: plus (-> (Nat Nat) Nat))
+(let plus (Z ?y) ?y)
+(let plus ((S ?x) ?y) (S (plus ?x ?y)))
+
+(:: mult (-> (Nat Nat) Nat))
+(let mult (Z ?n) (Z))
+(let mult ((S ?m) ?n) (plus (mult ?m ?n) ?n))
+
+(:: max (-> (Nat Nat) Nat))
+(let max (Z ?y) ?y)
+(let max (?x Z) ?x)
+(let max ((S ?x) (S ?y)) (S (max ?x ?y)))
+
+(data List (a) (Nil Cons))
+(:: Nil  (List a))
+(:: Cons (-> (a (List a)) (List a)))
+
+(:: tails (-> ((List a)) (List (List a))))
+(let tails (Nil)      (Cons Nil Nil)             )
+(let tails ((Cons ?h ?t)) (Cons (Cons ?h ?t) (tails ?t)))
+
+(:: sum (-> ((List Nat)) Nat))
+(let sum (Nil)      Z            )
+(let sum ((Cons ?h ?t)) (plus ?h (sum ?t)))
+
+(:: product (-> ((List Nat)) Nat))
+(let product (Nil)      (S Z)            )
+(let product ((Cons ?h ?t)) (mult ?h (product ?t)))
+
+(:: mapproduct (-> ((List (List Nat))) (List Nat)))
+(let mapproduct (Nil          ) Nil                          )
+(let mapproduct ((Cons ?x ?xs)) (Cons (product ?x) (mapproduct ?xs)))
+
+(:: maximum (-> ((List Nat)) Nat))
+(let maximum (Nil)      Z                )
+(let maximum ((Cons ?h ?t)) (max ?h (maximum ?t)))
+
+(data Pair (a b) (MakePair))
+(:: MakePair (-> (a b) (Pair a b)))
+(:: fst (-> ((Pair a b)) a))
+(let fst ((MakePair ?x ?y)) ?x)
+(:: snd (-> ((Pair a b)) b))
+(let snd ((MakePair ?x ?y)) ?y)
+
+(:: map (-> ((-> (a) b) (List a)) (List b)))
+(let map (?f Nil          ) Nil                          )
+(let map (?f (Cons ?x ?xs)) (Cons ($ ?f ?x) (map ?f ?xs)))
+
+(:: fold (-> ((-> (a b) b) b (List a)) b))
+(let fold (?f ?e Nil) ?e)
+(let fold (?f ?e (Cons ?x ?xs)) ($ ($ ?f ?x) (fold ?f ?e ?xs)))
+
+(:: step (-> (Nat (Pair Nat Nat)) (Pair Nat Nat)))
+(let step (?x (MakePair ?a ?b)) (
+  MakePair
+  (max ?a (mult ?x ?b))
+  (mult ?x ?b)
+))
+
+(:: mtp (-> ((List Nat)) (Pair Nat Nat)))
+(let mtp (Nil)      (MakePair (S Z) (S Z))          )
+(let mtp ((Cons ?h ?t)) (MakePair
+    (max (fst (mtp ?t)) (mult ?h (snd (mtp ?t))))
+    (mult ?h (snd (mtp ?t)))
+))
+
+(=== mtp_optimize (xs) ((List Nat))
+    (MakePair (maximum (map product (tails xs))) (product xs)) (mtp xs)
+)
+)

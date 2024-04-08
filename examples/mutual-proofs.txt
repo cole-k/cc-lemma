@@ -1,0 +1,609 @@
+Proving begin prop_1: (mapE id e) = e
+prop_1 = VALID (0.02 sec)
+{-@prop_1::e: (Expr a)->{ (mapE id e) = e }@-}
+prop_1::(Expr a)->Proof
+prop_1 e=
+  case e of
+    (MkExpr e_30 e_31) ->
+      case e_30 of
+        (App e_30_100 e_30_101) ->
+          -- 
+          (mapE id e)
+          ==.
+          -- prop_1:e=(MkExpr e_30 e_31) =>
+          (mapE id (MkExpr e_30 e_31))
+          ==.
+          -- (mapE ?f (MkExpr ?t ?n)) =>
+          (MkExpr (mapT id e_30) e_31)
+          ==.
+          -- prop_1:e=(MkExpr e_30 e_31):e_30=(App e_30_100 e_30_101) =>
+          (MkExpr (mapT id (App e_30_100 e_30_101)) e_31)
+          ==.
+          -- (mapT ?f (App ?e1 ?e2)) =>
+          (MkExpr (App (mapE id e_30_100) (mapE id e_30_101)) e_31)
+          ==.
+          -- <= lemma-?e=(mapE id ?e)
+          (MkExpr (App e_30_100 (mapE id e_30_101)) e_31)
+          ==.
+          -- <= lemma-?e=(mapE id ?e)
+          (MkExpr (App e_30_100 e_30_101) e_31)
+          ==.
+          -- <= prop_1:e=(MkExpr e_30 e_31):e_30=(App e_30_100 e_30_101)
+          (MkExpr e_30 e_31)
+          ==.
+          -- <= prop_1:e=(MkExpr e_30 e_31)
+          e
+          ***
+          QED
+        (Cst e_30_100) ->
+          -- 
+          (mapE id e)
+          ==.
+          -- prop_1:e=(MkExpr e_30 e_31) =>
+          (mapE id (MkExpr e_30 e_31))
+          ==.
+          -- (mapE ?f (MkExpr ?t ?n)) =>
+          (MkExpr (mapT id e_30) e_31)
+          ==.
+          -- prop_1:e=(MkExpr e_30 e_31):e_30=(Cst e_30_100) =>
+          (MkExpr (mapT id (Cst e_30_100)) e_31)
+          ==.
+          -- (mapT ?f (Cst ?n)) =>
+          (MkExpr (Cst e_30_100) e_31)
+          ==.
+          -- <= prop_1:e=(MkExpr e_30 e_31):e_30=(Cst e_30_100)
+          (MkExpr e_30 e_31)
+          ==.
+          -- <= prop_1:e=(MkExpr e_30 e_31)
+          e
+          ***
+          QED
+        (Var e_30_100) ->
+          -- 
+          (mapE id e)
+          ==.
+          -- prop_1:e=(MkExpr e_30 e_31) =>
+          (mapE id (MkExpr e_30 e_31))
+          ==.
+          -- (mapE ?f (MkExpr ?t ?n)) =>
+          (MkExpr (mapT id e_30) e_31)
+          ==.
+          -- prop_1:e=(MkExpr e_30 e_31):e_30=(Var e_30_100) =>
+          (MkExpr (mapT id (Var e_30_100)) e_31)
+          ==.
+          -- (mapT ?f (Var ?x)) =>
+          (MkExpr (Var (($) id e_30_100)) e_31)
+          ==.
+          -- apply-id =>
+          (MkExpr (Var (id e_30_100)) e_31)
+          ==.
+          -- (id ?x) =>
+          (MkExpr (Var e_30_100) e_31)
+          ==.
+          -- <= prop_1:e=(MkExpr e_30 e_31):e_30=(Var e_30_100)
+          (MkExpr e_30 e_31)
+          ==.
+          -- <= prop_1:e=(MkExpr e_30 e_31)
+          e
+          ***
+          QED
+
+Proving begin prop_2: (mapE ($ ($ comp f) g) e) = (mapE f (mapE g e))
+prop_2 = VALID (0.05 sec)
+{-@prop_2::f: (-> ?b ?c)->g: (-> ?a ?b)->e: (Expr a)->{ (mapE ($ ($ comp f) g) e) = (mapE f (mapE g e)) }@-}
+prop_2::(-> ?b ?c)->(-> ?a ?b)->(Expr a)->Proof
+prop_2 f g e=
+  case e of
+    (MkExpr e_90 e_91) ->
+      case e_90 of
+        (App e_90_180 e_90_181) ->
+          -- 
+          (mapE (($) (($) comp f) g) e)
+          ==.
+          -- prop_2:e=(MkExpr e_90 e_91) =>
+          (mapE (($) (($) comp f) g) (MkExpr e_90 e_91))
+          ==.
+          -- (mapE ?f (MkExpr ?t ?n)) =>
+          (MkExpr (mapT (($) (($) comp f) g) e_90) e_91)
+          ==.
+          -- prop_2:e=(MkExpr e_90 e_91):e_90=(App e_90_180 e_90_181) =>
+          (MkExpr (mapT (($) (($) comp f) g) (App e_90_180 e_90_181)) e_91)
+          ==.
+          -- (mapT ?f (App ?e1 ?e2)) =>
+          (MkExpr (App (mapE (($) (($) comp f) g) e_90_180) (mapE (($) (($) comp f) g) e_90_181)) e_91)
+          ==.
+          -- lemma-(mapE ($ ($ comp ?f) ?g) ?e)=(mapE ?f (mapE ?g ?e)) =>
+          (MkExpr (App (mapE f (mapE g e_90_180)) (mapE (($) (($) comp f) g) e_90_181)) e_91)
+          ==.
+          -- lemma-(mapE ($ ($ comp ?f) ?g) ?e)=(mapE ?f (mapE ?g ?e)) =>
+          (MkExpr (App (mapE f (mapE g e_90_180)) (mapE f (mapE g e_90_181))) e_91)
+          ==.
+          -- <= (mapT ?f (App ?e1 ?e2))
+          (MkExpr (mapT f (App (mapE g e_90_180) (mapE g e_90_181))) e_91)
+          ==.
+          -- <= (mapT ?f (App ?e1 ?e2))
+          (MkExpr (mapT f (mapT g (App e_90_180 e_90_181))) e_91)
+          ==.
+          -- <= prop_2:e=(MkExpr e_90 e_91):e_90=(App e_90_180 e_90_181)
+          (MkExpr (mapT f (mapT g e_90)) e_91)
+          ==.
+          -- <= (mapE ?f (MkExpr ?t ?n))
+          (mapE f (MkExpr (mapT g e_90) e_91))
+          ==.
+          -- <= (mapE ?f (MkExpr ?t ?n))
+          (mapE f (mapE g (MkExpr e_90 e_91)))
+          ==.
+          -- <= prop_2:e=(MkExpr e_90 e_91)
+          (mapE f (mapE g e))
+          ***
+          QED
+        (Cst e_90_180) ->
+          -- 
+          (mapE (($) (($) comp f) g) e)
+          ==.
+          -- prop_2:e=(MkExpr e_90 e_91) =>
+          (mapE (($) (($) comp f) g) (MkExpr e_90 e_91))
+          ==.
+          -- (mapE ?f (MkExpr ?t ?n)) =>
+          (MkExpr (mapT (($) (($) comp f) g) e_90) e_91)
+          ==.
+          -- prop_2:e=(MkExpr e_90 e_91):e_90=(Cst e_90_180) =>
+          (MkExpr (mapT (($) (($) comp f) g) (Cst e_90_180)) e_91)
+          ==.
+          -- (mapT ?f (Cst ?n)) =>
+          (MkExpr (Cst e_90_180) e_91)
+          ==.
+          -- <= (mapT ?f (Cst ?n))
+          (MkExpr (mapT f (Cst e_90_180)) e_91)
+          ==.
+          -- <= (mapT ?f (Cst ?n))
+          (MkExpr (mapT f (mapT g (Cst e_90_180))) e_91)
+          ==.
+          -- <= prop_2:e=(MkExpr e_90 e_91):e_90=(Cst e_90_180)
+          (MkExpr (mapT f (mapT g e_90)) e_91)
+          ==.
+          -- <= (mapE ?f (MkExpr ?t ?n))
+          (mapE f (MkExpr (mapT g e_90) e_91))
+          ==.
+          -- <= (mapE ?f (MkExpr ?t ?n))
+          (mapE f (mapE g (MkExpr e_90 e_91)))
+          ==.
+          -- <= prop_2:e=(MkExpr e_90 e_91)
+          (mapE f (mapE g e))
+          ***
+          QED
+        (Var e_90_180) ->
+          -- 
+          (mapE (($) (($) comp f) g) e)
+          ==.
+          -- prop_2:e=(MkExpr e_90 e_91) =>
+          (mapE (($) (($) comp f) g) (MkExpr e_90 e_91))
+          ==.
+          -- (mapE ?f (MkExpr ?t ?n)) =>
+          (MkExpr (mapT (($) (($) comp f) g) e_90) e_91)
+          ==.
+          -- prop_2:e=(MkExpr e_90 e_91):e_90=(Var e_90_180) =>
+          (MkExpr (mapT (($) (($) comp f) g) (Var e_90_180)) e_91)
+          ==.
+          -- (mapT ?f (Var ?x)) =>
+          (MkExpr (Var (($) (($) (($) comp f) g) e_90_180)) e_91)
+          ==.
+          -- apply-comp =>
+          (MkExpr (Var (comp f g e_90_180)) e_91)
+          ==.
+          -- (comp ?f ?g ?x) =>
+          (MkExpr (Var (($) f (($) g e_90_180))) e_91)
+          ==.
+          -- <= (mapT ?f (Var ?x))
+          (MkExpr (mapT f (Var (($) g e_90_180))) e_91)
+          ==.
+          -- <= (mapT ?f (Var ?x))
+          (MkExpr (mapT f (mapT g (Var e_90_180))) e_91)
+          ==.
+          -- <= prop_2:e=(MkExpr e_90 e_91):e_90=(Var e_90_180)
+          (MkExpr (mapT f (mapT g e_90)) e_91)
+          ==.
+          -- <= (mapE ?f (MkExpr ?t ?n))
+          (mapE f (MkExpr (mapT g e_90) e_91))
+          ==.
+          -- <= (mapE ?f (MkExpr ?t ?n))
+          (mapE f (mapE g (MkExpr e_90 e_91)))
+          ==.
+          -- <= prop_2:e=(MkExpr e_90 e_91)
+          (mapE f (mapE g e))
+          ***
+          QED
+
+Proving begin prop_3: (argsE (mapE f e)) = (map ($ mapE f) (argsE e))
+prop_3 = VALID (0.02 sec)
+{-@prop_3::e: (Expr a)->f: (-> a b)->{ (argsE (mapE f e)) = (map ($ mapE f) (argsE e)) }@-}
+prop_3::(Expr a)->(-> a b)->Proof
+prop_3 e f=
+  case e of
+    (MkExpr e_80 e_81) ->
+      case e_80 of
+        (App e_80_150 e_80_151) ->
+          -- 
+          (argsE (mapE f e))
+          ==.
+          -- prop_3:e=(MkExpr e_80 e_81) =>
+          (argsE (mapE f (MkExpr e_80 e_81)))
+          ==.
+          -- (mapE ?f (MkExpr ?t ?n)) =>
+          (argsE (MkExpr (mapT f e_80) e_81))
+          ==.
+          -- (argsE (MkExpr ?t ?n)) =>
+          (argsT (mapT f e_80))
+          ==.
+          -- prop_3:e=(MkExpr e_80 e_81):e_80=(App e_80_150 e_80_151) =>
+          (argsT (mapT f (App e_80_150 e_80_151)))
+          ==.
+          -- (mapT ?f (App ?e1 ?e2)) =>
+          (argsT (App (mapE f e_80_150) (mapE f e_80_151)))
+          ==.
+          -- (argsT (App ?e1 ?e2)) =>
+          (Cons (mapE f e_80_151) (argsE (mapE f e_80_150)))
+          ==.
+          -- <= apply-mapE
+          (Cons (($) (($) mapE f) e_80_151) (argsE (mapE f e_80_150)))
+          ==.
+          -- lemma-(argsE (mapE ?f ?e))=(map ($ mapE ?f) (argsE ?e)) =>
+          (Cons (($) (($) mapE f) e_80_151) (map (($) mapE f) (argsE e_80_150)))
+          ==.
+          -- <= (map ?f (Cons ?x ?xs))
+          (map (($) mapE f) (Cons e_80_151 (argsE e_80_150)))
+          ==.
+          -- <= (argsT (App ?e1 ?e2))
+          (map (($) mapE f) (argsT (App e_80_150 e_80_151)))
+          ==.
+          -- <= prop_3:e=(MkExpr e_80 e_81):e_80=(App e_80_150 e_80_151)
+          (map (($) mapE f) (argsT e_80))
+          ==.
+          -- <= (argsE (MkExpr ?t ?n))
+          (map (($) mapE f) (argsE (MkExpr e_80 e_81)))
+          ==.
+          -- <= prop_3:e=(MkExpr e_80 e_81)
+          (map (($) mapE f) (argsE e))
+          ***
+          QED
+        (Cst e_80_150) ->
+          -- 
+          (argsE (mapE f e))
+          ==.
+          -- prop_3:e=(MkExpr e_80 e_81) =>
+          (argsE (mapE f (MkExpr e_80 e_81)))
+          ==.
+          -- (mapE ?f (MkExpr ?t ?n)) =>
+          (argsE (MkExpr (mapT f e_80) e_81))
+          ==.
+          -- (argsE (MkExpr ?t ?n)) =>
+          (argsT (mapT f e_80))
+          ==.
+          -- prop_3:e=(MkExpr e_80 e_81):e_80=(Cst e_80_150) =>
+          (argsT (mapT f (Cst e_80_150)))
+          ==.
+          -- (mapT ?f (Cst ?n)) =>
+          (argsT (Cst e_80_150))
+          ==.
+          -- <= prop_3:e=(MkExpr e_80 e_81):e_80=(Cst e_80_150)
+          (argsT e_80)
+          ==.
+          -- prop_3:e=(MkExpr e_80 e_81):e_80=(Cst e_80_150) =>
+          (argsT (Cst e_80_150))
+          ==.
+          -- (argsT (Cst ?n)) =>
+          Nil
+          ==.
+          -- <= (map ?f Nil)
+          (map (($) mapE f) Nil)
+          ==.
+          -- <= (argsT (Cst ?n))
+          (map (($) mapE f) (argsT (Cst e_80_150)))
+          ==.
+          -- <= prop_3:e=(MkExpr e_80 e_81):e_80=(Cst e_80_150)
+          (map (($) mapE f) (argsT e_80))
+          ==.
+          -- <= (argsE (MkExpr ?t ?n))
+          (map (($) mapE f) (argsE (MkExpr e_80 e_81)))
+          ==.
+          -- <= prop_3:e=(MkExpr e_80 e_81)
+          (map (($) mapE f) (argsE e))
+          ***
+          QED
+        (Var e_80_150) ->
+          -- 
+          (argsE (mapE f e))
+          ==.
+          -- prop_3:e=(MkExpr e_80 e_81) =>
+          (argsE (mapE f (MkExpr e_80 e_81)))
+          ==.
+          -- (mapE ?f (MkExpr ?t ?n)) =>
+          (argsE (MkExpr (mapT f e_80) e_81))
+          ==.
+          -- (argsE (MkExpr ?t ?n)) =>
+          (argsT (mapT f e_80))
+          ==.
+          -- prop_3:e=(MkExpr e_80 e_81):e_80=(Var e_80_150) =>
+          (argsT (mapT f (Var e_80_150)))
+          ==.
+          -- (mapT ?f (Var ?x)) =>
+          (argsT (Var (($) f e_80_150)))
+          ==.
+          -- (argsT (Var ?x)) =>
+          Nil
+          ==.
+          -- <= (map ?f Nil)
+          (map (($) mapE f) Nil)
+          ==.
+          -- <= (argsT (Var ?x))
+          (map (($) mapE f) (argsT (Var e_80_150)))
+          ==.
+          -- <= prop_3:e=(MkExpr e_80 e_81):e_80=(Var e_80_150)
+          (map (($) mapE f) (argsT e_80))
+          ==.
+          -- <= (argsE (MkExpr ?t ?n))
+          (map (($) mapE f) (argsE (MkExpr e_80 e_81)))
+          ==.
+          -- <= prop_3:e=(MkExpr e_80 e_81)
+          (map (($) mapE f) (argsE e))
+          ***
+          QED
+
+Proving begin prop_4: (argsT (mapT f e)) = (map ($ mapE f) (argsT e))
+prop_4 = VALID (0.03 sec)
+{-@prop_4::e: (Tm a)->f: (-> a b)->{ (argsT (mapT f e)) = (map ($ mapE f) (argsT e)) }@-}
+prop_4::(Tm a)->(-> a b)->Proof
+prop_4 e f=
+  case e of
+    (App e_80 e_81) ->
+      case e_80 of
+        (MkExpr e_80_220 e_80_221) ->
+          -- 
+          (argsT (mapT f e))
+          ==.
+          -- prop_4:e=(App e_80 e_81) =>
+          (argsT (mapT f (App e_80 e_81)))
+          ==.
+          -- (mapT ?f (App ?e1 ?e2)) =>
+          (argsT (App (mapE f e_80) (mapE f e_81)))
+          ==.
+          -- (argsT (App ?e1 ?e2)) =>
+          (Cons (mapE f e_81) (argsE (mapE f e_80)))
+          ==.
+          -- <= apply-mapE
+          (Cons (($) (($) mapE f) e_81) (argsE (mapE f e_80)))
+          ==.
+          -- prop_4:e=(App e_80 e_81):e_80=(MkExpr e_80_220 e_80_221) =>
+          (Cons (($) (($) mapE f) e_81) (argsE (mapE f (MkExpr e_80_220 e_80_221))))
+          ==.
+          -- (mapE ?f (MkExpr ?t ?n)) =>
+          (Cons (($) (($) mapE f) e_81) (argsE (MkExpr (mapT f e_80_220) e_80_221)))
+          ==.
+          -- (argsE (MkExpr ?t ?n)) =>
+          (Cons (($) (($) mapE f) e_81) (argsT (mapT f e_80_220)))
+          ==.
+          -- <= lemma-(map ($ mapE ?f) (argsT ?e))=(argsT (mapT ?f ?e))
+          (Cons (($) (($) mapE f) e_81) (map (($) mapE f) (argsT e_80_220)))
+          ==.
+          -- <= (argsE (MkExpr ?t ?n))
+          (Cons (($) (($) mapE f) e_81) (map (($) mapE f) (argsE (MkExpr e_80_220 e_80_221))))
+          ==.
+          -- <= prop_4:e=(App e_80 e_81):e_80=(MkExpr e_80_220 e_80_221)
+          (Cons (($) (($) mapE f) e_81) (map (($) mapE f) (argsE e_80)))
+          ==.
+          -- <= (map ?f (Cons ?x ?xs))
+          (map (($) mapE f) (Cons e_81 (argsE e_80)))
+          ==.
+          -- <= (argsT (App ?e1 ?e2))
+          (map (($) mapE f) (argsT (App e_80 e_81)))
+          ==.
+          -- <= prop_4:e=(App e_80 e_81)
+          (map (($) mapE f) (argsT e))
+          ***
+          QED
+    (Cst e_80) ->
+      -- 
+      (argsT (mapT f e))
+      ==.
+      -- prop_4:e=(Cst e_80) =>
+      (argsT (mapT f (Cst e_80)))
+      ==.
+      -- (mapT ?f (Cst ?n)) =>
+      (argsT (Cst e_80))
+      ==.
+      -- <= prop_4:e=(Cst e_80)
+      (argsT e)
+      ==.
+      -- prop_4:e=(Cst e_80) =>
+      (argsT (Cst e_80))
+      ==.
+      -- (argsT (Cst ?n)) =>
+      Nil
+      ==.
+      -- <= (map ?f Nil)
+      (map (($) mapE f) Nil)
+      ==.
+      -- <= (argsT (Cst ?n))
+      (map (($) mapE f) (argsT (Cst e_80)))
+      ==.
+      -- <= prop_4:e=(Cst e_80)
+      (map (($) mapE f) (argsT e))
+      ***
+      QED
+    (Var e_80) ->
+      -- 
+      (argsT (mapT f e))
+      ==.
+      -- prop_4:e=(Var e_80) =>
+      (argsT (mapT f (Var e_80)))
+      ==.
+      -- (mapT ?f (Var ?x)) =>
+      (argsT (Var (($) f e_80)))
+      ==.
+      -- (argsT (Var ?x)) =>
+      Nil
+      ==.
+      -- <= (map ?f Nil)
+      (map (($) mapE f) Nil)
+      ==.
+      -- <= (argsT (Var ?x))
+      (map (($) mapE f) (argsT (Var e_80)))
+      ==.
+      -- <= prop_4:e=(Var e_80)
+      (map (($) mapE f) (argsT e))
+      ***
+      QED
+
+Proving begin prop_5: (headE (mapE f e)) = (mapE f (headE e))
+prop_5 = VALID (0.01 sec)
+{-@prop_5::e: (Expr a)->f: (-> a b)->{ (headE (mapE f e)) = (mapE f (headE e)) }@-}
+prop_5::(Expr a)->(-> a b)->Proof
+prop_5 e f=
+  case e of
+    (MkExpr e_60 e_61) ->
+      case e_60 of
+        (App e_60_110 e_60_111) ->
+          -- 
+          (headE (mapE f e))
+          ==.
+          -- prop_5:e=(MkExpr e_60 e_61) =>
+          (headE (mapE f (MkExpr e_60 e_61)))
+          ==.
+          -- (mapE ?f (MkExpr ?t ?n)) =>
+          (headE (MkExpr (mapT f e_60) e_61))
+          ==.
+          -- prop_5:e=(MkExpr e_60 e_61):e_60=(App e_60_110 e_60_111) =>
+          (headE (MkExpr (mapT f (App e_60_110 e_60_111)) e_61))
+          ==.
+          -- (mapT ?f (App ?e1 ?e2)) =>
+          (headE (MkExpr (App (mapE f e_60_110) (mapE f e_60_111)) e_61))
+          ==.
+          -- (headE (MkExpr (App ?e1 ?e2) ?n)) =>
+          (headE (mapE f e_60_110))
+          ==.
+          -- <= lemma-(mapE ?f (headE ?e))=(headE (mapE ?f ?e))
+          (mapE f (headE e_60_110))
+          ==.
+          -- <= (headE (MkExpr (App ?e1 ?e2) ?n))
+          (mapE f (headE (MkExpr (App e_60_110 e_60_111) e_61)))
+          ==.
+          -- <= prop_5:e=(MkExpr e_60 e_61):e_60=(App e_60_110 e_60_111)
+          (mapE f (headE (MkExpr e_60 e_61)))
+          ==.
+          -- <= prop_5:e=(MkExpr e_60 e_61)
+          (mapE f (headE e))
+          ***
+          QED
+        (Cst e_60_110) ->
+          -- 
+          (headE (mapE f e))
+          ==.
+          -- prop_5:e=(MkExpr e_60 e_61) =>
+          (headE (mapE f (MkExpr e_60 e_61)))
+          ==.
+          -- (mapE ?f (MkExpr ?t ?n)) =>
+          (headE (MkExpr (mapT f e_60) e_61))
+          ==.
+          -- prop_5:e=(MkExpr e_60 e_61):e_60=(Cst e_60_110) =>
+          (headE (MkExpr (mapT f (Cst e_60_110)) e_61))
+          ==.
+          -- (mapT ?f (Cst ?n)) =>
+          (headE (MkExpr (Cst e_60_110) e_61))
+          ==.
+          -- <= prop_5:e=(MkExpr e_60 e_61):e_60=(Cst e_60_110)
+          (headE (MkExpr e_60 e_61))
+          ==.
+          -- <= prop_5:e=(MkExpr e_60 e_61)
+          (headE e)
+          ==.
+          -- prop_5:e=(MkExpr e_60 e_61) =>
+          (headE (MkExpr e_60 e_61))
+          ==.
+          -- prop_5:e=(MkExpr e_60 e_61):e_60=(Cst e_60_110) =>
+          (headE (MkExpr (Cst e_60_110) e_61))
+          ==.
+          -- (headE (MkExpr (Cst ?x) ?n)) =>
+          (MkExpr (Cst e_60_110) e_61)
+          ==.
+          -- <= prop_5:e=(MkExpr e_60 e_61):e_60=(Cst e_60_110)
+          (MkExpr e_60 e_61)
+          ==.
+          -- prop_5:e=(MkExpr e_60 e_61):e_60=(Cst e_60_110) =>
+          (MkExpr (Cst e_60_110) e_61)
+          ==.
+          -- <= (mapT ?f (Cst ?n))
+          (MkExpr (mapT f (Cst e_60_110)) e_61)
+          ==.
+          -- <= prop_5:e=(MkExpr e_60 e_61):e_60=(Cst e_60_110)
+          (MkExpr (mapT f e_60) e_61)
+          ==.
+          -- <= (mapE ?f (MkExpr ?t ?n))
+          (mapE f (MkExpr e_60 e_61))
+          ==.
+          -- <= prop_5:e=(MkExpr e_60 e_61)
+          (mapE f e)
+          ==.
+          -- prop_5:e=(MkExpr e_60 e_61) =>
+          (mapE f (MkExpr e_60 e_61))
+          ==.
+          -- prop_5:e=(MkExpr e_60 e_61):e_60=(Cst e_60_110) =>
+          (mapE f (MkExpr (Cst e_60_110) e_61))
+          ==.
+          -- <= (headE (MkExpr (Cst ?x) ?n))
+          (mapE f (headE (MkExpr (Cst e_60_110) e_61)))
+          ==.
+          -- <= prop_5:e=(MkExpr e_60 e_61):e_60=(Cst e_60_110)
+          (mapE f (headE (MkExpr e_60 e_61)))
+          ==.
+          -- <= prop_5:e=(MkExpr e_60 e_61)
+          (mapE f (headE e))
+          ***
+          QED
+        (Var e_60_110) ->
+          -- 
+          (headE (mapE f e))
+          ==.
+          -- prop_5:e=(MkExpr e_60 e_61) =>
+          (headE (mapE f (MkExpr e_60 e_61)))
+          ==.
+          -- (mapE ?f (MkExpr ?t ?n)) =>
+          (headE (MkExpr (mapT f e_60) e_61))
+          ==.
+          -- prop_5:e=(MkExpr e_60 e_61):e_60=(Var e_60_110) =>
+          (headE (MkExpr (mapT f (Var e_60_110)) e_61))
+          ==.
+          -- (mapT ?f (Var ?x)) =>
+          (headE (MkExpr (Var (($) f e_60_110)) e_61))
+          ==.
+          -- (headE (MkExpr (Var ?x) ?n)) =>
+          (MkExpr (Var (($) f e_60_110)) e_61)
+          ==.
+          -- <= (mapT ?f (Var ?x))
+          (MkExpr (mapT f (Var e_60_110)) e_61)
+          ==.
+          -- <= prop_5:e=(MkExpr e_60 e_61):e_60=(Var e_60_110)
+          (MkExpr (mapT f e_60) e_61)
+          ==.
+          -- <= (mapE ?f (MkExpr ?t ?n))
+          (mapE f (MkExpr e_60 e_61))
+          ==.
+          -- <= prop_5:e=(MkExpr e_60 e_61)
+          (mapE f e)
+          ==.
+          -- prop_5:e=(MkExpr e_60 e_61) =>
+          (mapE f (MkExpr e_60 e_61))
+          ==.
+          -- prop_5:e=(MkExpr e_60 e_61):e_60=(Var e_60_110) =>
+          (mapE f (MkExpr (Var e_60_110) e_61))
+          ==.
+          -- <= (headE (MkExpr (Var ?x) ?n))
+          (mapE f (headE (MkExpr (Var e_60_110) e_61)))
+          ==.
+          -- <= prop_5:e=(MkExpr e_60 e_61):e_60=(Var e_60_110)
+          (mapE f (headE (MkExpr e_60 e_61)))
+          ==.
+          -- <= prop_5:e=(MkExpr e_60 e_61)
+          (mapE f (headE e))
+          ***
+          QED
+

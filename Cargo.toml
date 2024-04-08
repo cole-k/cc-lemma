@@ -1,0 +1,20 @@
+[package]
+name = "cc-lemma"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+egg = "0.9.5"
+symbolic_expressions = "5.0.3"
+lazy_static = "1.4.0"
+log = "0.4.14"
+simple_logger = "2.1.0"
+clap = { version = "3.0.13", features = ["derive"] }
+colored = "2"
+itertools = "0.11.0"
+indexmap = "2.0.0"
+clippy = "0.0.302"
+rand = "0.8.5"
+petgraph = "0.6.4"

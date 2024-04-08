@@ -1,0 +1,646 @@
+(
+(data Unit (Unit))
+(:: Unit Unit)
+
+(data Bool (True False))
+(:: True Bool)
+(:: False Bool)
+
+(data Nat (Z S))
+(:: Z Nat)
+(:: S (-> (Nat) Nat))
+
+(data Pair (a b) (Pair))
+(:: Pair (-> (a b) (Pair a b)))
+
+(data List (a) (Nil Cons))
+(:: Nil  (List a)                  )
+(:: Cons (-> (a (List a)) (List a)))
+
+(data Tree (a) (Leaf Node))
+(:: Leaf (Tree a)                              )
+(:: Node (-> ((Tree a) a (Tree a)) (Tree a)))
+
+(data Tm (a) (Var Cst App))
+(:: Var (-> (a                 ) (Tm a)))
+(:: Cst (-> (Nat                ) (Tm a)))
+(:: App (-> ((Expr a) (Expr a)) (Tm a)))
+
+(data Expr (a) (MkExpr))
+(:: MkExpr (-> ((Tm a) Nat) (Expr a)))
+
+(:: id (-> (a) a))
+(let id (?x) ?x)
+
+(:: comp (-> ((-> b c) (-> a b) (a)) c))
+(let comp (?f ?g ?x) ($ ?f ($ ?g ?x)))
+
+(:: const (-> (a b) a))
+(let const (?x ?y) ?x)
+
+(:: ite (-> (Bool a a) a))
+(let ite (True ?x ?y ) ?x)
+(let ite (False ?x ?y) ?y)
+(let ite (?b    ?x ?x) ?x)
+
+(:: not (-> (Bool) Bool))
+(let not True False)
+(let not (False) True)
+
+(:: and (-> (Bool Bool) Bool))
+(let and (False ?y) False)
+(let and (?x False) False)
+(let and (True True) True)
+
+(:: plus (-> (Nat Nat) Nat))
+(let plus (Z      ?y) ?y             )
+(let plus ((S ?x) ?y) (S (plus ?x ?y)))
+
+(:: sub (-> (Nat Nat) Nat))
+(let sub (?x Z)          ?x         )
+(let sub (Z ?y)          Z          )
+(let sub ((S ?x) (S ?y)) (sub ?x ?y))
+
+(:: leq (-> (Nat Nat) Bool))
+(let leq (Z      ?y) True           )
+(let leq ((S ?x) Z ) False          )
+(let leq ((S ?x) (S ?y)) (leq ?x ?y))
+
+(:: lt (-> (Nat Nat) Bool))
+(let lt (?x     Z     ) False     )
+(let lt (Z      (S ?y)) True      )
+(let lt ((S ?x) (S ?y)) (lt ?x ?y))
+
+(:: eq (-> (Nat Nat) Bool))
+(let eq (Z      Z     ) True      )
+(let eq (Z      (S ?y)) False     )
+(let eq ((S ?x) Z     ) False     )
+(let eq ((S ?x) (S ?y)) (eq ?x ?y))
+
+(:: min (-> (Nat Nat) Nat))
+(let min (Z      ?y    ) Z              )
+(let min (?x     Z     ) Z              )
+(let min ((S ?x) (S ?y)) (S (min ?x ?y)))
+
+(:: max (-> (Nat Nat) Nat))
+(let max (Z      ?y    ) ?y             )
+(let max (?x     Z     ) ?x             )
+(let max ((S ?x) (S ?y)) (S (max ?x ?y)))
+
+(:: null (-> ((List Unit)) Bool))
+(let null (Nil          ) True)
+(let null ((Cons ?x ?xs)) False)
+
+(:: len (-> ((List Unit)) Nat))
+(let len (Nil          ) Z            )
+(let len ((Cons ?x ?xs)) (S (len ?xs)))
+
+(:: mem (-> (Nat (List Nat)) Bool))
+(let mem (?n Nil          ) False                            )
+(let mem (?n (Cons ?x ?xs)) (ite (eq ?n ?x) True (mem ?n ?xs)))
+
+(:: take (-> (Nat (List Unit)) (List Unit)))
+(let take (Z      ?xs          ) Nil                    )
+(let take ((S ?n) Nil          ) Nil                    )
+(let take ((S ?n) (Cons ?x ?xs)) (Cons ?x (take ?n ?xs)))
+
+(:: drop (-> (Nat (List Unit)) (List Unit)))
+(let drop (Z      ?xs          ) ?xs          )
+(let drop ((S ?n) Nil          ) Nil          )
+(let drop ((S ?n) (Cons ?x ?xs)) (drop ?n ?xs))
+
+(:: count (-> (Nat (List Nat)) Nat))
+(let count (?x Nil          ) Z)
+(let count (?x (Cons ?y ?ys)) (ite (eq ?x ?y) (S (count ?x ?ys)) (count ?x ?ys)))
+
+(:: append (-> ((List Unit) (List Unit)) (List Unit)))
+(let append (Nil           ?ys) ?ys                       )
+(let append ((Cons ?x ?xs) ?ys) (Cons ?x (append ?xs ?ys)))
+
+(:: last (-> ((List Unit)) a))
+(let last ((Cons ?x Nil)          ) ?x                  )
+(let last ((Cons ?x (Cons ?y ?ys))) (last (Cons ?y ?ys)))
+
+(:: lastOfTwo (-> ((List Unit) (List Unit)) a))
+(let lastOfTwo (?xs Nil          ) (last ?xs)          )
+(let lastOfTwo (?xs (Cons ?y ?ys)) (last (Cons ?y ?ys)))
+
+(:: butlast (-> ((List Unit)) (List Unit)))
+(let butlast (Nil                    ) Nil                              )
+(let butlast ((Cons ?x Nil)          ) Nil                              )
+(let butlast ((Cons ?x (Cons ?y ?ys))) (Cons ?x (butlast (Cons ?y ?ys))))
+
+(:: butlastConcat (-> ((List Unit) (List Unit)) (List Unit)))
+(let butlastConcat (?xs Nil          ) (butlast ?xs)                       )
+(let butlastConcat (?xs (Cons ?y ?ys)) (append ?xs (butlast (Cons ?y ?ys))))
+
+(:: map (-> ((-> (a) b) (List Unit)) (List b)))
+(let map (?f Nil          ) Nil                          )
+(let map (?f (Cons ?x ?xs)) (Cons ($ ?f ?x) (map ?f ?xs)))
+
+(:: filter (-> ((-> (a) Bool) (List Unit)) (List Unit)))
+(let filter (?p Nil          ) Nil                                                     )
+(let filter (?p (Cons ?x ?xs)) (ite ($ ?p ?x) (Cons ?x (filter ?p ?xs)) (filter ?p ?xs)))
+
+(:: dropWhile (-> ((-> (a) Bool) (List Unit)) (List Unit)))
+(let dropWhile (?p Nil          ) Nil                                             )
+(let dropWhile (?p (Cons ?x ?xs)) (ite ($ ?p ?x) (dropWhile ?p ?xs) (Cons ?x ?xs)))
+
+(:: takeWhile (-> ((-> (a) Bool) (List Unit)) (List Unit)))
+(let takeWhile (?p Nil          ) Nil                                             )
+(let takeWhile (?p (Cons ?x ?xs)) (ite ($ ?p ?x) (Cons ?x (takeWhile ?p ?xs)) Nil))
+
+(:: delete (-> (Nat (List Nat)) (List Nat)))
+(let delete (?n Nil          ) Nil                                                       )
+(let delete (?n (Cons ?x ?xs)) (ite (eq ?n ?x) (delete ?n ?xs) (Cons ?x (delete ?n ?xs))))
+
+(:: ins (-> (Nat (List Nat)) (List Nat)))
+(let ins (?n Nil          ) (Cons ?n Nil)                                                  )
+(let ins (?n (Cons ?x ?xs)) (ite (lt ?n ?x) (Cons ?n (Cons ?x ?xs)) (Cons ?x (ins ?n ?xs))))
+
+(// N.B. Different definition than what we use elsewhere, this is lt instead of leq)
+(:: insort (-> (Nat (List Nat)) (List Nat)))
+(let insort (?n Nil          ) (Cons ?n Nil)                                                      )
+(let insort (?n (Cons ?x ?xs)) (ite (lt ?n ?x) (Cons ?n (Cons ?x ?xs)) (Cons ?x (insort ?n ?xs))))
+
+(:: ins1 (-> (Nat (List Nat)) (List Nat)))
+(let ins1 (?n Nil          ) (Cons ?n Nil)                                                   )
+(let ins1 (?n (Cons ?x ?xs)) (ite (eq ?n ?x) (Cons ?n (Cons ?x ?xs)) (Cons ?x (ins1 ?n ?xs))))
+
+(:: sort (-> ((List Nat)) (List Nat)))
+(let sort (Nil          ) Nil                   )
+(let sort ((Cons ?x ?xs)) (insort ?x (sort ?xs)))
+
+(:: sorted (-> ((List Nat)) Bool))
+(let sorted (Nil                    ) True                                )
+(let sorted ((Cons ?x Nil)          ) True                                )
+(let sorted ((Cons ?x (Cons ?y ?ys))) (and (leq ?x ?y) (sorted (Cons ?y ?ys))))
+
+(:: zip (-> ((List Unit) (List b)) (List (Pair a b))))
+(let zip (Nil           ?ys          ) Nil                              )
+(let zip (?xs           Nil          ) Nil                              )
+(let zip ((Cons ?x ?xs) (Cons ?y ?ys)) (Cons (Pair ?x ?y) (zip ?xs ?ys)))
+
+(:: zipConcat (-> (a (List Unit) (List b)) (List (Pair a b))))
+(let zipConcat (?x ?xs Nil          ) Nil)
+(let zipConcat (?x ?xs (Cons ?y ?ys)) (Cons (Pair ?x ?y) (zip ?xs ?ys)))
+
+(:: rev (-> ((List Unit)) (List Unit)))
+(let rev (Nil          ) Nil                             )
+(let rev ((Cons ?x ?xs)) (append (rev ?xs) (Cons ?x Nil)))
+
+(:: height (-> ((Tree a)) Nat))
+(let height (Leaf           ) Z                                )
+(let height ((Node ?l ?x ?r)) (S (max (height ?l) (height ?r))))
+
+(:: mirror (-> ((Tree a)) (Tree a)))
+(let mirror (Leaf           ) Leaf                             )
+(let mirror ((Node ?l ?x ?r)) (Node (mirror ?r) ?x (mirror ?l)))
+
+(:: mapE (-> ((-> a b) (Expr a)) (Expr b)))
+(let mapE (?f (MkExpr ?t ?n)) (MkExpr (mapT ?f ?t) ?n))
+
+(:: mapT (-> ((-> a b) (Tm a)) (Tm b)))
+(let mapT (?f (Var ?x)     ) (Var ($ ?f ?x))                  )
+(let mapT (?f (Cst ?n)     ) (Cst ?n)                         )
+(let mapT (?f (App ?e1 ?e2)) (App (mapE ?f ?e1) (mapE ?f ?e2)))
+
+(:: argsE (-> ((Expr a)) (List (Expr a))))
+(let argsE ((MkExpr ?t ?n)) (argsT ?t))
+
+(:: argsT (-> ((Tm a)) (List (Expr a))))
+(let argsT ((Var ?x)     ) Nil)
+(let argsT ((Cst ?n)     ) Nil)
+(let argsT ((App ?e1 ?e2)) (Cons ?e2 (argsE ?e1)))
+
+(:: headE (-> ((Expr a)) (Expr a)))
+(let headE ((MkExpr (Var ?x) ?n)     ) (MkExpr (Var ?x) ?n))
+(let headE ((MkExpr (Cst ?x) ?n)     ) (MkExpr (Cst ?x) ?n))
+(let headE ((MkExpr (App ?e1 ?e2) ?n)) (headE ?e1)         )
+
+(:: double (-> (Nat) Nat))
+(let double (Z) Z)
+(let double ((S ?x)) (S (S (double ?x))))
+
+(:: half (-> (Nat) Nat))
+(let half (Z) Z)
+(let half ((S Z)) Z)
+(let half ((S (S ?n))) (S (half ?n)))
+
+(:: even (-> (Nat) Nat))
+(let even (Z) True)
+(let even ((S ?n)) (not (even ?n)))
+
+(:: qreva (-> ((List Unit) (List Unit)) List Unit))
+(let qreva (Nil ?acc) ?acc)
+(let qreva ((Cons ?x ?xs) ?acc) (qreva ?xs (Cons ?x ?acc)))
+
+(:: revflat (-> (Tree a) (List Unit)))
+(let revflat (Leaf) Nil)
+(let revflat ((Node ?l ?x ?r)) (append (revflat ?l) (Cons ?x (revflat ?r))))
+
+(:: qrevaflat (-> ((Tree a) (List Unit)) (List Unit)))
+(let qrevaflat (Leaf ?acc) (?acc))
+(let qrevaflat ((Node ?l ?x ?r) ?acc) (qrevaflat ?l (Cons ?x (qrevaflat ?r ?acc))))
+
+(:: rotate (-> (Nat (List Unit)) (List Unit)))
+(let rotate (Z ?x) ?x)
+(let rotate ((S ?n) Nil) Nil)
+(let rotate ((S ?n) (Cons ?x ?xs)) (rotate ?n (append ?xs (Cons ?x Nil))))
+
+(:: mult (-> (Nat Nat) Nat))
+(let mult (Z ?n) (Z))
+(let mult ((S ?m) ?n) (plus (mult ?m ?n) ?n))
+
+(:: qmult (-> (Nat Nat Nat) Nat))
+(let qmult (Z ?n ?acc) ?acc)
+(let qmult ((S ?m) ?n ?acc) (qmult ?m ?n (plus ?acc ?n)))
+
+(:: fac (-> (Nat) Nat))
+(let fac (Z) (S Z))
+(let fac ((S ?n)) (mult (fac ?n) ?n))
+
+(:: qfac (-> (Nat Nat) Nat))
+(let qfac (Z ?n) ?n)
+(let qfac ((S ?m) ?n) (qfac ?m (mult ?n ?m)))
+
+(:: exp (-> (Nat Nat) Nat))
+(// This is maybe necessary, unsure if they had it in the definition)
+(// (let exp (Z Z) Z) )
+(let exp (?m Z) (S Z))
+(let exp (?m (S ?n)) (mult (exp ?m ?n) ?m))
+
+(:: qexp (-> (Nat Nat Nat) Nat))
+(let qexp (?m Z ?acc) (?acc))
+(let qexp (?m (S ?n) ?acc) (qexp ?m ?n (mult ?acc ?m)))
+
+(=== clam_1 (x) (Nat)
+  (double x)
+  (plus x x)
+)
+
+(=== clam_2 (x y) ((List Bool) (List Bool))
+  (len (append x y))
+  (len (append y x))
+)
+
+(=== clam_3 (x y) ((List Bool) (List Bool))
+  (len (append x y))
+  (plus (len x) (len y))
+)
+
+(=== clam_4 (x) ((List Bool))
+  (len (append x x))
+  (double (len x))
+)
+
+(=== clam_5 (x) ((List Bool))
+  (len (rev x))
+  (len x)
+)
+
+(=== clam_6 (x y) ((List Bool) (List Bool))
+  (len (rev (append x y)))
+  (plus (len x) (len y))
+)
+
+(=== clam_7 (x y) ((List Bool) (List Bool))
+  (len (qreva x y))
+  (plus (len x) (len y))
+)
+
+
+(=== clam_8 (x y z) (Nat Nat (List Bool))
+  (drop x (drop y z))
+  (drop y (drop x z))
+)
+
+
+(=== clam_9 (w x y z) (Nat Nat Nat (List Bool))
+  (drop w (drop x (drop y z)))
+  (drop y (drop x (drop w z)))
+)
+
+
+(=== clam_10 (x) ((List Bool))
+  (rev (rev x))
+  x
+)
+
+
+(=== clam_11  (x y) ((List Bool) (List Bool))
+  (rev (append (rev x) (rev y)))
+  (append y x)
+)
+
+
+(=== clam_12 (x y) ((List Bool) (List Bool))
+  (qreva x y)
+  (append (rev x) y)
+)
+
+
+(=== clam_13 (x) (Nat)
+  (half (plus x x))
+  x
+)
+
+
+(// TODO: Needs conditional rewrite
+    sorted x => sorted (insort y x)
+)
+(=== clam_14 (x) ((List Bool))
+  (sorted (sort x))
+  True
+)
+
+
+(=== clam_15 (x) (Nat)
+  (plus x (S x))
+  (S (plus x x))
+)
+
+
+(=== clam_16 (x) (Nat)
+  (even (plus x x))
+  True
+)
+
+
+(=== clam_17 (x y) ((List Bool) (List Bool))
+  (rev (rev (append x y)))
+  (append (rev (rev x)) (rev (rev y)))
+)
+
+
+(=== clam_18 (x y) ((List Bool) (List Bool))
+  (rev (append (rev x) y))
+  (append (rev y) x)
+)
+
+
+(=== clam_19 (x y) ((List Bool) (List Bool))
+  (append (rev (rev x)) y)
+  (rev (rev (append x y)))
+)
+
+
+(=== clam_20 (x) ((List Bool))
+  (even (len (append x x)))
+  True
+)
+
+
+(=== clam_21 (x y) ((List Bool) (List Bool))
+  (rotate (len x) (append x y))
+  (append y x)
+)
+
+
+(// N.B. This requires the lemma
+  ((=> (even (len (append ?w ?z))) (even (len (append ?w (Cons ?x (Cons ?y ?z)))))))
+  which we cannot add because it has a free variables appearing on the RHS
+)
+(=== clam_22 (x y) ((List Bool) (List Bool))
+  (even (len (append x y)))
+  (even (len (append y x)))
+)
+
+
+(=== clam_23 (x y) ((List Bool) (List Bool))
+  (half (len (append x y)))
+  (half (len (append y x)))
+)
+
+
+(=== clam_24 (x y) (Nat Nat)
+  (even (plus x y))
+  (even (plus y x))
+)
+
+(=== clam_25 (x y) ((List Bool) (List Bool))
+  (even (len (append x y)))
+  (even (plus (len x) (len y)))
+)
+
+
+(=== clam_26 (x y) (Nat Nat)
+  (half (plus x y))
+  (half (plus y x))
+)
+
+
+(=== clam_27 (x) ((List Bool))
+  (rev x)
+  (qreva x Nil)
+)
+
+
+(=== clam_28 (x) ((Tree Bool))
+  (revflat x)
+  (qrevaflat x Nil)
+)
+
+
+(=== clam_29 (x) ((List Bool))
+  (rev (qreva x Nil))
+  x
+)
+
+
+(=== clam_30 (x) ((List Bool))
+  (rev (append (rev x) Nil))
+  x
+)
+
+
+(=== clam_31 (x) ((List Bool))
+  (qreva (qreva x Nil) Nil)
+  x
+)
+
+
+(=== clam_32 (x) ((List Bool))
+  (rotate (len x) x)
+  x
+)
+
+
+(=== clam_33 (x) (Nat)
+  (fac x)
+  (qfac x (S Z))
+)
+
+
+(=== clam_34 (x y) (Nat Nat)
+  (mult x y)
+  (qmult x y Z)
+)
+
+
+(=== clam_35 (x y) (Nat Nat)
+  (exp x y)
+  (qexp x y (S Z))
+)
+
+
+(=== clam_48 (x) ((List Bool))
+  (len (sort x))
+  (len x)
+)
+
+(// TODO: needs conditional rewrite
+    not (= x y) => (=> (mem x (insort y z)) (mem x z))
+)
+(==> clam_49 (x y) (Nat (List Nat))
+  (mem x (sort y))
+  True
+  (mem x y)
+  True
+)
+
+
+(// TODO: needs conditional rewrite
+    not (= x y) => (= (count x (insort y z)) (count x z))
+)
+(=== clam_50 (x y) (Nat (List Nat))
+  (count x (sort y))
+  (count x y)
+)
+
+
+(=== clam_75 (x y) ((List Bool) (List Bool))
+  (append (rev x) y)
+  (qreva x y)
+)
+
+
+(=== clam_76 (x y) ((Tree Bool) (List Bool))
+  (append (revflat x) y)
+  (qrevaflat x y)
+)
+
+
+(=== clam_77 (x y) ((List Bool) (List Bool))
+  (rev (qreva x y))
+  (append (rev y) x)
+)
+
+
+(=== clam_78 (x y) ((List Bool) (List Bool))
+  (rev (qreva x (rev y)))
+  (append y x)
+)
+
+
+(=== clam_79 (x y) ((List Bool) (List Bool))
+  (rev (append (rev x) y))
+  (append (rev y) x)
+)
+
+
+(=== clam_80 (x y) ((List Bool) (List Bool))
+  (rev (append (rev x) (rev y)))
+  (append y x)
+)
+
+
+(=== clam_81 (x y) ((List Bool) (List Bool))
+  (qreva (qreva x y) Nil)
+  (append (rev y) x)
+)
+
+
+(=== clam_82 (x y) ((List Bool) (List Bool))
+  (qreva (qreva x (rev y)) Nil)
+  (append y x)
+)
+
+
+(=== clam_83 (x y) ((List Bool) (List Bool))
+  (rotate (len x) (append x y))
+  (append y x)
+)
+
+
+(=== clam_84 (x y) (Nat Nat)
+  (mult (fac x) y)
+  (qfac x y)
+)
+
+
+(=== clam_85 (x y z) (Nat Nat Nat)
+  (plus (mult x y) z)
+  (qmult x y z)
+)
+
+
+(=== clam_86 (x y z) (Nat Nat Nat)
+  (mult (exp x y) z)
+  (qexp x y z)
+)
+
+(// generalized lemmas that would help solve the goal
+)
+(=== test_clam_1 (x) (Nat)
+  (S (double x))
+  (plus x (S x))
+)
+
+(=== test_clam_4 (x xs) (Bool (List Bool))
+  (S (double (len xs)))
+  (len (append xs (Cons x xs)))
+)
+
+(=== test_clam_14 (x) (Nat)
+  (plus x (S (S x)))
+  (S (plus x (S x)))
+)
+
+(=== test_clam_14_generalized (x) (Nat)
+  (plus x (S y))
+  (S (plus x y))
+)
+
+(=== test_clam_23_1 (xs) ((List Bool))
+  (append xs Nil)
+  xs
+)
+
+(=== test_clam_23_2 (x y xs ys) (Bool Bool (List Bool) (List Bool))
+  (len (append xs (Cons y ys)))
+  (len (append ys (Cons x xs)))
+)
+
+(=== test_clam_26_1 (x) (Nat)
+  (plus x Z)
+  x
+)
+
+(// Either of these need to be true)
+(=== test_clam_26_2_1 (x y) (Nat Nat)
+  (plus y (S x))
+  (plus x (S y))
+)
+
+(=== test_clam_26_2_2 (x y) (Nat Nat)
+  (plus (S x) (S y))
+  (S (plus y (S x)))
+)
+
+(// Couldn't find a lemma for the other case
+    Same lemma for clam_85 (and it also can't find a
+    lemma for the other case, too)
+)
+(=== test_clam_34_1 (x) (Nat)
+  (mult x Z)
+  Z
+)
+
+(// Couldn't find a lemma for the other case)
+(=== test_clam_86_1 (x) (Nat)
+  (exp Z x)
+  Z
+)
+
+)

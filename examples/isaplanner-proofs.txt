@@ -1,0 +1,4771 @@
+Proving begin prop_01: (append (take n xs) (drop n xs)) = xs
+prop_01 = VALID (0.01 sec)
+{-@prop_01::xs: (List a)->n: Nat->{ (append (take n xs) (drop n xs)) = xs }@-}
+prop_01::(List a)->Nat->Proof
+prop_01 xs n=
+  case n of
+    (S n_50) ->
+      case xs of
+        (Cons xs_70 xs_71) ->
+          -- 
+          (append (take n xs) (drop n xs))
+          ==.
+          -- prop_01:n=(S n_50) =>
+          (append (take (S n_50) xs) (drop n xs))
+          ==.
+          -- prop_01:n=(S n_50):xs=(Cons xs_70 xs_71) =>
+          (append (take (S n_50) (Cons xs_70 xs_71)) (drop n xs))
+          ==.
+          -- (take (S ?n) (Cons ?x ?xs)) =>
+          (append (Cons xs_70 (take n_50 xs_71)) (drop n xs))
+          ==.
+          -- (append (Cons ?x ?xs) ?ys) =>
+          (Cons xs_70 (append (take n_50 xs_71) (drop n xs)))
+          ==.
+          -- prop_01:n=(S n_50) =>
+          (Cons xs_70 (append (take n_50 xs_71) (drop (S n_50) xs)))
+          ==.
+          -- prop_01:n=(S n_50):xs=(Cons xs_70 xs_71) =>
+          (Cons xs_70 (append (take n_50 xs_71) (drop (S n_50) (Cons xs_70 xs_71))))
+          ==.
+          -- (drop (S ?n) (Cons ?x ?xs)) =>
+          (Cons xs_70 (append (take n_50 xs_71) (drop n_50 xs_71)))
+          ==.
+          -- lemma-(append (take ?n ?xs) (drop ?n ?xs))=?xs =>
+          (Cons xs_70 xs_71)
+          ==.
+          -- <= prop_01:n=(S n_50):xs=(Cons xs_70 xs_71)
+          xs
+          ***
+          QED
+        (Nil ) ->
+          -- 
+          (append (take n xs) (drop n xs))
+          ==.
+          -- prop_01:n=(S n_50) =>
+          (append (take (S n_50) xs) (drop n xs))
+          ==.
+          -- prop_01:n=(S n_50):xs=Nil =>
+          (append (take (S n_50) Nil) (drop n xs))
+          ==.
+          -- (take (S ?n) Nil) =>
+          (append Nil (drop n xs))
+          ==.
+          -- prop_01:n=(S n_50) =>
+          (append Nil (drop (S n_50) xs))
+          ==.
+          -- prop_01:n=(S n_50):xs=Nil =>
+          (append Nil (drop (S n_50) Nil))
+          ==.
+          -- (drop (S ?n) Nil) =>
+          (append Nil Nil)
+          ==.
+          -- <= prop_01:n=(S n_50):xs=Nil
+          (append Nil xs)
+          ==.
+          -- (append Nil ?ys) =>
+          xs
+          ***
+          QED
+    (Z ) ->
+      -- 
+      (append (take n xs) (drop n xs))
+      ==.
+      -- prop_01:n=Z =>
+      (append (take Z xs) (drop n xs))
+      ==.
+      -- (take Z ?xs) =>
+      (append Nil (drop n xs))
+      ==.
+      -- prop_01:n=Z =>
+      (append Nil (drop Z xs))
+      ==.
+      -- (drop Z ?xs) =>
+      (append Nil xs)
+      ==.
+      -- (append Nil ?ys) =>
+      xs
+      ***
+      QED
+
+Proving begin prop_06: (sub n (add n m)) = Z
+prop_06 = VALID (0.00 sec)
+{-@prop_06::n: Nat->m: Nat->{ (sub n (add n m)) = Z }@-}
+prop_06::Nat->Nat->Proof
+prop_06 n m=
+  case n of
+    (S n_50) ->
+      -- 
+      (sub n (add n m))
+      ==.
+      -- prop_06:n=(S n_50) =>
+      (sub (S n_50) (add n m))
+      ==.
+      -- prop_06:n=(S n_50) =>
+      (sub (S n_50) (add (S n_50) m))
+      ==.
+      -- (add (S ?x) ?y) =>
+      (sub (S n_50) (S (add n_50 m)))
+      ==.
+      -- (sub (S ?x) (S ?y)) =>
+      (sub n_50 (add n_50 m))
+      ==.
+      -- lemma-(sub ?n (add ?n ?m))=Z =>
+      Z
+      ***
+      QED
+    (Z ) ->
+      -- 
+      (sub n (add n m))
+      ==.
+      -- prop_06:n=Z =>
+      (sub Z (add n m))
+      ==.
+      -- (sub Z ?y) =>
+      Z
+      ***
+      QED
+
+Proving begin prop_07: (sub (add n m) n) = m
+prop_07 = VALID (0.00 sec)
+{-@prop_07::n: Nat->m: Nat->{ (sub (add n m) n) = m }@-}
+prop_07::Nat->Nat->Proof
+prop_07 n m=
+  case n of
+    (S n_40) ->
+      -- 
+      (sub (add n m) n)
+      ==.
+      -- prop_07:n=(S n_40) =>
+      (sub (add (S n_40) m) n)
+      ==.
+      -- (add (S ?x) ?y) =>
+      (sub (S (add n_40 m)) n)
+      ==.
+      -- prop_07:n=(S n_40) =>
+      (sub (S (add n_40 m)) (S n_40))
+      ==.
+      -- (sub (S ?x) (S ?y)) =>
+      (sub (add n_40 m) n_40)
+      ==.
+      -- lemma-(sub (add ?n ?m) ?n)=?m =>
+      m
+      ***
+      QED
+    (Z ) ->
+      -- 
+      (sub (add n m) n)
+      ==.
+      -- prop_07:n=Z =>
+      (sub (add n m) Z)
+      ==.
+      -- (sub ?x Z) =>
+      (add n m)
+      ==.
+      -- prop_07:n=Z =>
+      (add Z m)
+      ==.
+      -- (add Z ?y) =>
+      m
+      ***
+      QED
+
+Proving begin prop_08: (sub (add k m) (add k n)) = (sub m n)
+prop_08 = VALID (0.00 sec)
+{-@prop_08::m: Nat->k: Nat->n: Nat->{ (sub (add k m) (add k n)) = (sub m n) }@-}
+prop_08::Nat->Nat->Nat->Proof
+prop_08 m k n=
+  case k of
+    (S k_70) ->
+      -- 
+      (sub (add k m) (add k n))
+      ==.
+      -- prop_08:k=(S k_70) =>
+      (sub (add (S k_70) m) (add k n))
+      ==.
+      -- (add (S ?x) ?y) =>
+      (sub (S (add k_70 m)) (add k n))
+      ==.
+      -- prop_08:k=(S k_70) =>
+      (sub (S (add k_70 m)) (add (S k_70) n))
+      ==.
+      -- (add (S ?x) ?y) =>
+      (sub (S (add k_70 m)) (S (add k_70 n)))
+      ==.
+      -- (sub (S ?x) (S ?y)) =>
+      (sub (add k_70 m) (add k_70 n))
+      ==.
+      -- lemma-(sub (add ?k ?m) (add ?k ?n))=(sub ?m ?n) =>
+      (sub m n)
+      ***
+      QED
+    (Z ) ->
+      -- 
+      (sub (add k m) (add k n))
+      ==.
+      -- prop_08:k=Z =>
+      (sub (add Z m) (add k n))
+      ==.
+      -- (add Z ?y) =>
+      (sub m (add k n))
+      ==.
+      -- prop_08:k=Z =>
+      (sub m (add Z n))
+      ==.
+      -- (add Z ?y) =>
+      (sub m n)
+      ***
+      QED
+
+Proving begin prop_09: (sub (sub i j) k) = (sub i (add j k))
+prop_09 = VALID (0.01 sec)
+{-@prop_09::j: Nat->k: Nat->i: Nat->{ (sub (sub i j) k) = (sub i (add j k)) }@-}
+prop_09::Nat->Nat->Nat->Proof
+prop_09 j k i=
+  case i of
+    (S i_70) ->
+      case j of
+        (S j_90) ->
+          -- 
+          (sub (sub i j) k)
+          ==.
+          -- prop_09:i=(S i_70) =>
+          (sub (sub (S i_70) j) k)
+          ==.
+          -- prop_09:i=(S i_70):j=(S j_90) =>
+          (sub (sub (S i_70) (S j_90)) k)
+          ==.
+          -- (sub (S ?x) (S ?y)) =>
+          (sub (sub i_70 j_90) k)
+          ==.
+          -- lemma-(sub (sub ?i ?j) ?k)=(sub ?i (add ?j ?k)) =>
+          (sub i_70 (add j_90 k))
+          ==.
+          -- <= (sub (S ?x) (S ?y))
+          (sub (S i_70) (S (add j_90 k)))
+          ==.
+          -- <= prop_09:i=(S i_70)
+          (sub i (S (add j_90 k)))
+          ==.
+          -- <= (add (S ?x) ?y)
+          (sub i (add (S j_90) k))
+          ==.
+          -- <= prop_09:i=(S i_70):j=(S j_90)
+          (sub i (add j k))
+          ***
+          QED
+        (Z ) ->
+          -- 
+          (sub (sub i j) k)
+          ==.
+          -- prop_09:i=(S i_70):j=Z =>
+          (sub (sub i Z) k)
+          ==.
+          -- (sub ?x Z) =>
+          (sub i k)
+          ==.
+          -- <= (add Z ?y)
+          (sub i (add Z k))
+          ==.
+          -- <= prop_09:i=(S i_70):j=Z
+          (sub i (add j k))
+          ***
+          QED
+    (Z ) ->
+      -- 
+      (sub (sub i j) k)
+      ==.
+      -- prop_09:i=Z =>
+      (sub (sub Z j) k)
+      ==.
+      -- (sub Z ?y) =>
+      (sub Z k)
+      ==.
+      -- (sub Z ?y) =>
+      Z
+      ==.
+      -- <= (sub Z ?y)
+      (sub Z (add j k))
+      ==.
+      -- <= prop_09:i=Z
+      (sub i (add j k))
+      ***
+      QED
+
+Proving begin prop_10: (sub m m) = Z
+prop_10 = VALID (0.00 sec)
+{-@prop_10::m: Nat->{ (sub m m) = Z }@-}
+prop_10::Nat->Proof
+prop_10 m=
+  case m of
+    (S m_30) ->
+      -- 
+      (sub m m)
+      ==.
+      -- prop_10:m=(S m_30) =>
+      (sub (S m_30) m)
+      ==.
+      -- prop_10:m=(S m_30) =>
+      (sub (S m_30) (S m_30))
+      ==.
+      -- (sub (S ?x) (S ?y)) =>
+      (sub m_30 m_30)
+      ==.
+      -- lemma-(sub ?m ?m)=Z =>
+      Z
+      ***
+      QED
+    (Z ) ->
+      -- 
+      (sub m m)
+      ==.
+      -- prop_10:m=Z =>
+      (sub m Z)
+      ==.
+      -- (sub ?x Z) =>
+      m
+      ==.
+      -- prop_10:m=Z =>
+      Z
+      ***
+      QED
+
+Proving begin prop_11: (drop Z xs) = xs
+prop_11 = VALID (0.00 sec)
+{-@prop_11::xs: (List a)->{ (drop Z xs) = xs }@-}
+prop_11::(List a)->Proof
+prop_11 xs=
+  -- 
+  (drop Z xs)
+  ==.
+  -- (drop Z ?xs) =>
+  xs
+  ***
+  QED
+
+Proving begin prop_12: (drop n (map f xs)) = (map f (drop n xs))
+prop_12 = VALID (0.01 sec)
+{-@prop_12::n: Nat->f: (-> a b)->xs: (List a)->{ (drop n (map f xs)) = (map f (drop n xs)) }@-}
+prop_12::Nat->(-> a b)->(List a)->Proof
+prop_12 n f xs=
+  case n of
+    (S n_70) ->
+      case xs of
+        (Cons xs_90 xs_91) ->
+          -- 
+          (drop n (map f xs))
+          ==.
+          -- prop_12:n=(S n_70) =>
+          (drop (S n_70) (map f xs))
+          ==.
+          -- prop_12:n=(S n_70):xs=(Cons xs_90 xs_91) =>
+          (drop (S n_70) (map f (Cons xs_90 xs_91)))
+          ==.
+          -- (map ?f (Cons ?x ?xs)) =>
+          (drop (S n_70) (Cons (($) f xs_90) (map f xs_91)))
+          ==.
+          -- (drop (S ?n) (Cons ?x ?xs)) =>
+          (drop n_70 (map f xs_91))
+          ==.
+          -- <= lemma-(map ?f (drop ?n ?xs))=(drop ?n (map ?f ?xs))
+          (map f (drop n_70 xs_91))
+          ==.
+          -- <= (drop (S ?n) (Cons ?x ?xs))
+          (map f (drop (S n_70) (Cons xs_90 xs_91)))
+          ==.
+          -- <= prop_12:n=(S n_70)
+          (map f (drop n (Cons xs_90 xs_91)))
+          ==.
+          -- <= prop_12:n=(S n_70):xs=(Cons xs_90 xs_91)
+          (map f (drop n xs))
+          ***
+          QED
+        (Nil ) ->
+          -- 
+          (drop n (map f xs))
+          ==.
+          -- prop_12:n=(S n_70):xs=Nil =>
+          (drop n (map f Nil))
+          ==.
+          -- (map ?f Nil) =>
+          (drop n Nil)
+          ==.
+          -- <= prop_12:n=(S n_70):xs=Nil
+          (drop n xs)
+          ==.
+          -- prop_12:n=(S n_70) =>
+          (drop (S n_70) xs)
+          ==.
+          -- prop_12:n=(S n_70):xs=Nil =>
+          (drop (S n_70) Nil)
+          ==.
+          -- (drop (S ?n) Nil) =>
+          Nil
+          ==.
+          -- <= (map ?f Nil)
+          (map f Nil)
+          ==.
+          -- <= prop_12:n=(S n_70):xs=Nil
+          (map f xs)
+          ==.
+          -- prop_12:n=(S n_70):xs=Nil =>
+          (map f Nil)
+          ==.
+          -- <= (drop (S ?n) Nil)
+          (map f (drop (S n_70) Nil))
+          ==.
+          -- <= prop_12:n=(S n_70)
+          (map f (drop n Nil))
+          ==.
+          -- <= prop_12:n=(S n_70):xs=Nil
+          (map f (drop n xs))
+          ***
+          QED
+    (Z ) ->
+      -- 
+      (drop n (map f xs))
+      ==.
+      -- prop_12:n=Z =>
+      (drop Z (map f xs))
+      ==.
+      -- (drop Z ?xs) =>
+      (map f xs)
+      ==.
+      -- <= (drop Z ?xs)
+      (map f (drop Z xs))
+      ==.
+      -- <= prop_12:n=Z
+      (map f (drop n xs))
+      ***
+      QED
+
+Proving begin prop_13: (drop (S n) (Cons x xs)) = (drop n xs)
+prop_13 = VALID (0.00 sec)
+{-@prop_13::x: a->xs: (List a)->n: Nat->{ (drop (S n) (Cons x xs)) = (drop n xs) }@-}
+prop_13::a->(List a)->Nat->Proof
+prop_13 x xs n=
+  -- 
+  (drop (S n) (Cons x xs))
+  ==.
+  -- (drop (S ?n) (Cons ?x ?xs)) =>
+  (drop n xs)
+  ***
+  QED
+
+Proving begin prop_17: (leq n Z) = (eq n Z)
+prop_17 = VALID (0.00 sec)
+{-@prop_17::n: Nat->{ (leq n Z) = (eq n Z) }@-}
+prop_17::Nat->Proof
+prop_17 n=
+  case n of
+    (S n_40) ->
+      -- 
+      (leq n Z)
+      ==.
+      -- prop_17:n=(S n_40) =>
+      (leq (S n_40) Z)
+      ==.
+      -- (leq (S ?x) Z) =>
+      False
+      ==.
+      -- <= (eq (S ?x) Z)
+      (eq (S n_40) Z)
+      ==.
+      -- <= prop_17:n=(S n_40)
+      (eq n Z)
+      ***
+      QED
+    (Z ) ->
+      -- 
+      (leq n Z)
+      ==.
+      -- prop_17:n=Z =>
+      (leq Z Z)
+      ==.
+      -- <= prop_17:n=Z
+      (leq Z n)
+      ==.
+      -- (leq Z ?y) =>
+      True
+      ==.
+      -- <= (eq Z Z)
+      (eq Z Z)
+      ==.
+      -- <= prop_17:n=Z
+      (eq n Z)
+      ***
+      QED
+
+Proving begin prop_18: (lt i (S (add i m))) = True
+prop_18 = VALID (0.00 sec)
+{-@prop_18::i: Nat->m: Nat->{ (lt i (S (add i m))) = True }@-}
+prop_18::Nat->Nat->Proof
+prop_18 i m=
+  case i of
+    (S i_60) ->
+      -- 
+      (lt i (S (add i m)))
+      ==.
+      -- prop_18:i=(S i_60) =>
+      (lt (S i_60) (S (add i m)))
+      ==.
+      -- (lt (S ?x) (S ?y)) =>
+      (lt i_60 (add i m))
+      ==.
+      -- prop_18:i=(S i_60) =>
+      (lt i_60 (add (S i_60) m))
+      ==.
+      -- (add (S ?x) ?y) =>
+      (lt i_60 (S (add i_60 m)))
+      ==.
+      -- lemma-(lt ?i (S (add ?i ?m)))=True =>
+      True
+      ***
+      QED
+    (Z ) ->
+      -- 
+      (lt i (S (add i m)))
+      ==.
+      -- prop_18:i=Z =>
+      (lt Z (S (add i m)))
+      ==.
+      -- (lt Z (S ?y)) =>
+      True
+      ***
+      QED
+
+Proving begin prop_19: (len (drop n xs)) = (sub (len xs) n)
+prop_19 = VALID (0.01 sec)
+{-@prop_19::n: Nat->xs: (List a)->{ (len (drop n xs)) = (sub (len xs) n) }@-}
+prop_19::Nat->(List a)->Proof
+prop_19 n xs=
+  case n of
+    (S n_60) ->
+      case xs of
+        (Cons xs_80 xs_81) ->
+          -- 
+          (len (drop n xs))
+          ==.
+          -- prop_19:n=(S n_60) =>
+          (len (drop (S n_60) xs))
+          ==.
+          -- prop_19:n=(S n_60):xs=(Cons xs_80 xs_81) =>
+          (len (drop (S n_60) (Cons xs_80 xs_81)))
+          ==.
+          -- (drop (S ?n) (Cons ?x ?xs)) =>
+          (len (drop n_60 xs_81))
+          ==.
+          -- lemma-(len (drop ?n ?xs))=(sub (len ?xs) ?n) =>
+          (sub (len xs_81) n_60)
+          ==.
+          -- <= (sub (S ?x) (S ?y))
+          (sub (S (len xs_81)) (S n_60))
+          ==.
+          -- <= (len (Cons ?x ?xs))
+          (sub (len (Cons xs_80 xs_81)) (S n_60))
+          ==.
+          -- <= prop_19:n=(S n_60):xs=(Cons xs_80 xs_81)
+          (sub (len xs) (S n_60))
+          ==.
+          -- <= prop_19:n=(S n_60)
+          (sub (len xs) n)
+          ***
+          QED
+        (Nil ) ->
+          -- 
+          (len (drop n xs))
+          ==.
+          -- prop_19:n=(S n_60) =>
+          (len (drop (S n_60) xs))
+          ==.
+          -- prop_19:n=(S n_60):xs=Nil =>
+          (len (drop (S n_60) Nil))
+          ==.
+          -- (drop (S ?n) Nil) =>
+          (len Nil)
+          ==.
+          -- <= prop_19:n=(S n_60):xs=Nil
+          (len xs)
+          ==.
+          -- prop_19:n=(S n_60):xs=Nil =>
+          (len Nil)
+          ==.
+          -- (len Nil) =>
+          Z
+          ==.
+          -- <= (sub Z ?y)
+          (sub Z n)
+          ==.
+          -- <= (len Nil)
+          (sub (len Nil) n)
+          ==.
+          -- <= prop_19:n=(S n_60):xs=Nil
+          (sub (len xs) n)
+          ***
+          QED
+    (Z ) ->
+      -- 
+      (len (drop n xs))
+      ==.
+      -- prop_19:n=Z =>
+      (len (drop Z xs))
+      ==.
+      -- (drop Z ?xs) =>
+      (len xs)
+      ==.
+      -- <= (sub ?x Z)
+      (sub (len xs) Z)
+      ==.
+      -- <= prop_19:n=Z
+      (sub (len xs) n)
+      ***
+      QED
+
+Proving begin prop_21: (leq n (add n m)) = True
+prop_21 = VALID (0.00 sec)
+{-@prop_21::n: Nat->m: Nat->{ (leq n (add n m)) = True }@-}
+prop_21::Nat->Nat->Proof
+prop_21 n m=
+  case n of
+    (S n_50) ->
+      -- 
+      (leq n (add n m))
+      ==.
+      -- prop_21:n=(S n_50) =>
+      (leq (S n_50) (add n m))
+      ==.
+      -- prop_21:n=(S n_50) =>
+      (leq (S n_50) (add (S n_50) m))
+      ==.
+      -- (add (S ?x) ?y) =>
+      (leq (S n_50) (S (add n_50 m)))
+      ==.
+      -- (leq (S ?x) (S ?y)) =>
+      (leq n_50 (add n_50 m))
+      ==.
+      -- lemma-(leq ?n (add ?n ?m))=True =>
+      True
+      ***
+      QED
+    (Z ) ->
+      -- 
+      (leq n (add n m))
+      ==.
+      -- prop_21:n=Z =>
+      (leq Z (add n m))
+      ==.
+      -- (leq Z ?y) =>
+      True
+      ***
+      QED
+
+Proving begin prop_22: (max (max a b) c) = (max a (max b c))
+prop_22 = VALID (0.01 sec)
+{-@prop_22::a: Nat->b: Nat->c: Nat->{ (max (max a b) c) = (max a (max b c)) }@-}
+prop_22::Nat->Nat->Nat->Proof
+prop_22 a b c=
+  case a of
+    (S a_70) ->
+      case b of
+        (S b_90) ->
+          case c of
+            (S c_130) ->
+              -- 
+              (max (max a b) c)
+              ==.
+              -- prop_22:a=(S a_70) =>
+              (max (max (S a_70) b) c)
+              ==.
+              -- prop_22:a=(S a_70):b=(S b_90) =>
+              (max (max (S a_70) (S b_90)) c)
+              ==.
+              -- (max (S ?x) (S ?y)) =>
+              (max (S (max a_70 b_90)) c)
+              ==.
+              -- prop_22:a=(S a_70):b=(S b_90):c=(S c_130) =>
+              (max (S (max a_70 b_90)) (S c_130))
+              ==.
+              -- (max (S ?x) (S ?y)) =>
+              (S (max (max a_70 b_90) c_130))
+              ==.
+              -- lemma-(max (max ?a ?b) ?c)=(max ?a (max ?b ?c)) =>
+              (S (max a_70 (max b_90 c_130)))
+              ==.
+              -- <= (max (S ?x) (S ?y))
+              (max (S a_70) (S (max b_90 c_130)))
+              ==.
+              -- <= prop_22:a=(S a_70)
+              (max a (S (max b_90 c_130)))
+              ==.
+              -- <= (max (S ?x) (S ?y))
+              (max a (max (S b_90) (S c_130)))
+              ==.
+              -- <= prop_22:a=(S a_70):b=(S b_90)
+              (max a (max b (S c_130)))
+              ==.
+              -- <= prop_22:a=(S a_70):b=(S b_90):c=(S c_130)
+              (max a (max b c))
+              ***
+              QED
+            (Z ) ->
+              -- 
+              (max (max a b) c)
+              ==.
+              -- prop_22:a=(S a_70):b=(S b_90):c=Z =>
+              (max (max a b) Z)
+              ==.
+              -- (max ?x Z) =>
+              (max a b)
+              ==.
+              -- <= (max ?x Z)
+              (max a (max b Z))
+              ==.
+              -- <= prop_22:a=(S a_70):b=(S b_90):c=Z
+              (max a (max b c))
+              ***
+              QED
+        (Z ) ->
+          -- 
+          (max (max a b) c)
+          ==.
+          -- prop_22:a=(S a_70):b=Z =>
+          (max (max a Z) c)
+          ==.
+          -- (max ?x Z) =>
+          (max a c)
+          ==.
+          -- <= (max Z ?y)
+          (max a (max Z c))
+          ==.
+          -- <= prop_22:a=(S a_70):b=Z
+          (max a (max b c))
+          ***
+          QED
+    (Z ) ->
+      -- 
+      (max (max a b) c)
+      ==.
+      -- prop_22:a=Z =>
+      (max (max Z b) c)
+      ==.
+      -- (max Z ?y) =>
+      (max b c)
+      ==.
+      -- <= (max Z ?y)
+      (max Z (max b c))
+      ==.
+      -- <= prop_22:a=Z
+      (max a (max b c))
+      ***
+      QED
+
+Proving begin prop_23: (max a b) = (max b a)
+prop_23 = VALID (0.01 sec)
+{-@prop_23::b: Nat->a: Nat->{ (max a b) = (max b a) }@-}
+prop_23::Nat->Nat->Proof
+prop_23 b a=
+  case a of
+    (S a_40) ->
+      case b of
+        (S b_60) ->
+          -- 
+          (max a b)
+          ==.
+          -- prop_23:a=(S a_40) =>
+          (max (S a_40) b)
+          ==.
+          -- prop_23:a=(S a_40):b=(S b_60) =>
+          (max (S a_40) (S b_60))
+          ==.
+          -- (max (S ?x) (S ?y)) =>
+          (S (max a_40 b_60))
+          ==.
+          -- lemma-(max ?a ?b)=(max ?b ?a) =>
+          (S (max b_60 a_40))
+          ==.
+          -- <= (max (S ?x) (S ?y))
+          (max (S b_60) (S a_40))
+          ==.
+          -- <= prop_23:a=(S a_40):b=(S b_60)
+          (max b (S a_40))
+          ==.
+          -- <= prop_23:a=(S a_40)
+          (max b a)
+          ***
+          QED
+        (Z ) ->
+          -- 
+          (max a b)
+          ==.
+          -- prop_23:a=(S a_40):b=Z =>
+          (max a Z)
+          ==.
+          -- (max ?x Z) =>
+          a
+          ==.
+          -- <= (max Z ?y)
+          (max Z a)
+          ==.
+          -- <= prop_23:a=(S a_40):b=Z
+          (max b a)
+          ***
+          QED
+    (Z ) ->
+      -- 
+      (max a b)
+      ==.
+      -- prop_23:a=Z =>
+      (max Z b)
+      ==.
+      -- (max Z ?y) =>
+      b
+      ==.
+      -- <= (max ?x Z)
+      (max b Z)
+      ==.
+      -- <= prop_23:a=Z
+      (max b a)
+      ***
+      QED
+
+Proving begin prop_24: (eq (max a b) a) = (leq b a)
+prop_24 = VALID (0.01 sec)
+{-@prop_24::b: Nat->a: Nat->{ (eq (max a b) a) = (leq b a) }@-}
+prop_24::Nat->Nat->Proof
+prop_24 b a=
+  case a of
+    (S a_50) ->
+      case b of
+        (S b_70) ->
+          -- 
+          (eq (max a b) a)
+          ==.
+          -- prop_24:a=(S a_50) =>
+          (eq (max (S a_50) b) a)
+          ==.
+          -- prop_24:a=(S a_50):b=(S b_70) =>
+          (eq (max (S a_50) (S b_70)) a)
+          ==.
+          -- (max (S ?x) (S ?y)) =>
+          (eq (S (max a_50 b_70)) a)
+          ==.
+          -- prop_24:a=(S a_50) =>
+          (eq (S (max a_50 b_70)) (S a_50))
+          ==.
+          -- (eq (S ?x) (S ?y)) =>
+          (eq (max a_50 b_70) a_50)
+          ==.
+          -- <= lemma-(leq ?b ?a)=(eq (max ?a ?b) ?a)
+          (leq b_70 a_50)
+          ==.
+          -- <= (leq (S ?x) (S ?y))
+          (leq (S b_70) (S a_50))
+          ==.
+          -- <= prop_24:a=(S a_50):b=(S b_70)
+          (leq b (S a_50))
+          ==.
+          -- <= prop_24:a=(S a_50)
+          (leq b a)
+          ***
+          QED
+        (Z ) ->
+          case a_50 of
+            (S a_50_110) ->
+              -- 
+              (eq (max a b) a)
+              ==.
+              -- prop_24:a=(S a_50):b=Z =>
+              (eq (max a Z) a)
+              ==.
+              -- (max ?x Z) =>
+              (eq a a)
+              ==.
+              -- prop_24:a=(S a_50) =>
+              (eq (S a_50) a)
+              ==.
+              -- prop_24:a=(S a_50) =>
+              (eq (S a_50) (S a_50))
+              ==.
+              -- (eq (S ?x) (S ?y)) =>
+              (eq a_50 a_50)
+              ==.
+              -- prop_24:a=(S a_50):b=Z:a_50=(S a_50_110) =>
+              (eq (S a_50_110) a_50)
+              ==.
+              -- prop_24:a=(S a_50):b=Z:a_50=(S a_50_110) =>
+              (eq (S a_50_110) (S a_50_110))
+              ==.
+              -- lemma-(eq (S ?a_50) (S ?a_50))=True =>
+              True
+              ==.
+              -- <= (leq Z ?y)
+              (leq Z a)
+              ==.
+              -- <= prop_24:a=(S a_50):b=Z
+              (leq b a)
+              ***
+              QED
+            (Z ) ->
+              -- 
+              (eq (max a b) a)
+              ==.
+              -- prop_24:a=(S a_50):b=Z =>
+              (eq (max a Z) a)
+              ==.
+              -- (max ?x Z) =>
+              (eq a a)
+              ==.
+              -- prop_24:a=(S a_50) =>
+              (eq (S a_50) a)
+              ==.
+              -- prop_24:a=(S a_50) =>
+              (eq (S a_50) (S a_50))
+              ==.
+              -- (eq (S ?x) (S ?y)) =>
+              (eq a_50 a_50)
+              ==.
+              -- prop_24:a=(S a_50):b=Z:a_50=Z =>
+              (eq Z a_50)
+              ==.
+              -- prop_24:a=(S a_50):b=Z:a_50=Z =>
+              (eq Z Z)
+              ==.
+              -- (eq Z Z) =>
+              True
+              ==.
+              -- <= (leq Z ?y)
+              (leq Z a)
+              ==.
+              -- <= prop_24:a=(S a_50):b=Z
+              (leq b a)
+              ***
+              QED
+    (Z ) ->
+      case b of
+        (S b_70) ->
+          -- 
+          (eq (max a b) a)
+          ==.
+          -- prop_24:a=Z =>
+          (eq (max Z b) a)
+          ==.
+          -- (max Z ?y) =>
+          (eq b a)
+          ==.
+          -- prop_24:a=Z:b=(S b_70) =>
+          (eq (S b_70) a)
+          ==.
+          -- prop_24:a=Z =>
+          (eq (S b_70) Z)
+          ==.
+          -- (eq (S ?x) Z) =>
+          False
+          ==.
+          -- <= (leq (S ?x) Z)
+          (leq (S b_70) Z)
+          ==.
+          -- <= prop_24:a=Z:b=(S b_70)
+          (leq b Z)
+          ==.
+          -- <= prop_24:a=Z
+          (leq b a)
+          ***
+          QED
+        (Z ) ->
+          -- 
+          (eq (max a b) a)
+          ==.
+          -- prop_24:a=Z =>
+          (eq (max Z b) a)
+          ==.
+          -- (max Z ?y) =>
+          (eq b a)
+          ==.
+          -- prop_24:a=Z:b=Z =>
+          (eq Z a)
+          ==.
+          -- prop_24:a=Z =>
+          (eq Z Z)
+          ==.
+          -- (eq Z Z) =>
+          True
+          ==.
+          -- <= (leq Z ?y)
+          (leq Z b)
+          ==.
+          -- <= prop_24:a=Z:b=Z
+          (leq b b)
+          ==.
+          -- prop_24:a=Z:b=Z =>
+          (leq b Z)
+          ==.
+          -- <= prop_24:a=Z
+          (leq b a)
+          ***
+          QED
+
+Proving begin prop_25: (eq (max a b) b) = (leq a b)
+prop_25 = VALID (0.01 sec)
+{-@prop_25::b: Nat->a: Nat->{ (eq (max a b) b) = (leq a b) }@-}
+prop_25::Nat->Nat->Proof
+prop_25 b a=
+  case a of
+    (S a_50) ->
+      case b of
+        (S b_70) ->
+          -- 
+          (eq (max a b) b)
+          ==.
+          -- prop_25:a=(S a_50) =>
+          (eq (max (S a_50) b) b)
+          ==.
+          -- prop_25:a=(S a_50):b=(S b_70) =>
+          (eq (max (S a_50) (S b_70)) b)
+          ==.
+          -- (max (S ?x) (S ?y)) =>
+          (eq (S (max a_50 b_70)) b)
+          ==.
+          -- prop_25:a=(S a_50):b=(S b_70) =>
+          (eq (S (max a_50 b_70)) (S b_70))
+          ==.
+          -- (eq (S ?x) (S ?y)) =>
+          (eq (max a_50 b_70) b_70)
+          ==.
+          -- <= lemma-(leq ?a ?b)=(eq (max ?a ?b) ?b)
+          (leq a_50 b_70)
+          ==.
+          -- <= (leq (S ?x) (S ?y))
+          (leq (S a_50) (S b_70))
+          ==.
+          -- <= prop_25:a=(S a_50)
+          (leq a (S b_70))
+          ==.
+          -- <= prop_25:a=(S a_50):b=(S b_70)
+          (leq a b)
+          ***
+          QED
+        (Z ) ->
+          -- 
+          (eq (max a b) b)
+          ==.
+          -- prop_25:a=(S a_50):b=Z =>
+          (eq (max a Z) b)
+          ==.
+          -- (max ?x Z) =>
+          (eq a b)
+          ==.
+          -- prop_25:a=(S a_50) =>
+          (eq (S a_50) b)
+          ==.
+          -- prop_25:a=(S a_50):b=Z =>
+          (eq (S a_50) Z)
+          ==.
+          -- (eq (S ?x) Z) =>
+          False
+          ==.
+          -- <= (leq (S ?x) Z)
+          (leq (S a_50) Z)
+          ==.
+          -- <= prop_25:a=(S a_50)
+          (leq a Z)
+          ==.
+          -- <= prop_25:a=(S a_50):b=Z
+          (leq a b)
+          ***
+          QED
+    (Z ) ->
+      case b of
+        (S b_80) ->
+          -- 
+          (eq (max a b) b)
+          ==.
+          -- prop_25:a=Z =>
+          (eq (max Z b) b)
+          ==.
+          -- (max Z ?y) =>
+          (eq b b)
+          ==.
+          -- prop_25:a=Z:b=(S b_80) =>
+          (eq (S b_80) b)
+          ==.
+          -- prop_25:a=Z:b=(S b_80) =>
+          (eq (S b_80) (S b_80))
+          ==.
+          -- (eq (S ?x) (S ?y)) =>
+          (eq b_80 b_80)
+          ==.
+          -- lemma-(eq ?b ?b)=True =>
+          True
+          ==.
+          -- <= (leq Z ?y)
+          (leq Z b)
+          ==.
+          -- <= prop_25:a=Z
+          (leq a b)
+          ***
+          QED
+        (Z ) ->
+          -- 
+          (eq (max a b) b)
+          ==.
+          -- prop_25:a=Z =>
+          (eq (max Z b) b)
+          ==.
+          -- (max Z ?y) =>
+          (eq b b)
+          ==.
+          -- prop_25:a=Z:b=Z =>
+          (eq Z b)
+          ==.
+          -- prop_25:a=Z:b=Z =>
+          (eq Z Z)
+          ==.
+          -- (eq Z Z) =>
+          True
+          ==.
+          -- <= (leq Z ?y)
+          (leq Z b)
+          ==.
+          -- <= prop_25:a=Z
+          (leq a b)
+          ***
+          QED
+
+Proving begin prop_31: (min (min a b) c) = (min a (min b c))
+prop_31 = VALID (0.02 sec)
+{-@prop_31::a: Nat->c: Nat->b: Nat->{ (min (min a b) c) = (min a (min b c)) }@-}
+prop_31::Nat->Nat->Nat->Proof
+prop_31 a c b=
+  case a of
+    (S a_70) ->
+      case b of
+        (S b_90) ->
+          case c of
+            (S c_130) ->
+              -- 
+              (min (min a b) c)
+              ==.
+              -- prop_31:a=(S a_70) =>
+              (min (min (S a_70) b) c)
+              ==.
+              -- prop_31:a=(S a_70):b=(S b_90) =>
+              (min (min (S a_70) (S b_90)) c)
+              ==.
+              -- (min (S ?x) (S ?y)) =>
+              (min (S (min a_70 b_90)) c)
+              ==.
+              -- prop_31:a=(S a_70):b=(S b_90):c=(S c_130) =>
+              (min (S (min a_70 b_90)) (S c_130))
+              ==.
+              -- (min (S ?x) (S ?y)) =>
+              (S (min (min a_70 b_90) c_130))
+              ==.
+              -- lemma-(min (min ?a ?b) ?c)=(min ?a (min ?b ?c)) =>
+              (S (min a_70 (min b_90 c_130)))
+              ==.
+              -- <= (min (S ?x) (S ?y))
+              (min (S a_70) (S (min b_90 c_130)))
+              ==.
+              -- <= prop_31:a=(S a_70)
+              (min a (S (min b_90 c_130)))
+              ==.
+              -- <= (min (S ?x) (S ?y))
+              (min a (min (S b_90) (S c_130)))
+              ==.
+              -- <= prop_31:a=(S a_70):b=(S b_90)
+              (min a (min b (S c_130)))
+              ==.
+              -- <= prop_31:a=(S a_70):b=(S b_90):c=(S c_130)
+              (min a (min b c))
+              ***
+              QED
+            (Z ) ->
+              -- 
+              (min (min a b) c)
+              ==.
+              -- prop_31:a=(S a_70):b=(S b_90):c=Z =>
+              (min (min a b) Z)
+              ==.
+              -- (min ?x Z) =>
+              Z
+              ==.
+              -- <= (min ?x Z)
+              (min a Z)
+              ==.
+              -- <= (min ?x Z)
+              (min a (min b Z))
+              ==.
+              -- <= prop_31:a=(S a_70):b=(S b_90):c=Z
+              (min a (min b c))
+              ***
+              QED
+        (Z ) ->
+          -- 
+          (min (min a b) c)
+          ==.
+          -- prop_31:a=(S a_70):b=Z =>
+          (min (min a Z) c)
+          ==.
+          -- (min ?x Z) =>
+          (min Z c)
+          ==.
+          -- <= prop_31:a=(S a_70):b=Z
+          (min b c)
+          ==.
+          -- prop_31:a=(S a_70):b=Z =>
+          (min Z c)
+          ==.
+          -- (min Z ?y) =>
+          Z
+          ==.
+          -- <= (min ?x Z)
+          (min a Z)
+          ==.
+          -- <= prop_31:a=(S a_70):b=Z
+          (min a b)
+          ==.
+          -- prop_31:a=(S a_70):b=Z =>
+          (min a Z)
+          ==.
+          -- <= (min Z ?y)
+          (min a (min Z c))
+          ==.
+          -- <= prop_31:a=(S a_70):b=Z
+          (min a (min b c))
+          ***
+          QED
+    (Z ) ->
+      -- 
+      (min (min a b) c)
+      ==.
+      -- prop_31:a=Z =>
+      (min (min Z b) c)
+      ==.
+      -- (min Z ?y) =>
+      (min Z c)
+      ==.
+      -- (min Z ?y) =>
+      Z
+      ==.
+      -- <= (min Z ?y)
+      (min Z (min b c))
+      ==.
+      -- <= prop_31:a=Z
+      (min a (min b c))
+      ***
+      QED
+
+Proving begin prop_32: (min a b) = (min b a)
+prop_32 = VALID (0.00 sec)
+{-@prop_32::a: Nat->b: Nat->{ (min a b) = (min b a) }@-}
+prop_32::Nat->Nat->Proof
+prop_32 a b=
+  case a of
+    (S a_40) ->
+      case b of
+        (S b_60) ->
+          -- 
+          (min a b)
+          ==.
+          -- prop_32:a=(S a_40) =>
+          (min (S a_40) b)
+          ==.
+          -- prop_32:a=(S a_40):b=(S b_60) =>
+          (min (S a_40) (S b_60))
+          ==.
+          -- (min (S ?x) (S ?y)) =>
+          (S (min a_40 b_60))
+          ==.
+          -- lemma-(min ?a ?b)=(min ?b ?a) =>
+          (S (min b_60 a_40))
+          ==.
+          -- <= (min (S ?x) (S ?y))
+          (min (S b_60) (S a_40))
+          ==.
+          -- <= prop_32:a=(S a_40):b=(S b_60)
+          (min b (S a_40))
+          ==.
+          -- <= prop_32:a=(S a_40)
+          (min b a)
+          ***
+          QED
+        (Z ) ->
+          -- 
+          (min a b)
+          ==.
+          -- prop_32:a=(S a_40):b=Z =>
+          (min a Z)
+          ==.
+          -- (min ?x Z) =>
+          Z
+          ==.
+          -- <= (min Z ?y)
+          (min Z a)
+          ==.
+          -- <= prop_32:a=(S a_40):b=Z
+          (min b a)
+          ***
+          QED
+    (Z ) ->
+      -- 
+      (min a b)
+      ==.
+      -- prop_32:a=Z =>
+      (min Z b)
+      ==.
+      -- (min Z ?y) =>
+      Z
+      ==.
+      -- <= (min ?x Z)
+      (min b Z)
+      ==.
+      -- <= prop_32:a=Z
+      (min b a)
+      ***
+      QED
+
+Proving begin prop_33: (eq (min a b) a) = (leq a b)
+prop_33 = VALID (0.01 sec)
+{-@prop_33::a: Nat->b: Nat->{ (eq (min a b) a) = (leq a b) }@-}
+prop_33::Nat->Nat->Proof
+prop_33 a b=
+  case a of
+    (S a_50) ->
+      case b of
+        (S b_70) ->
+          -- 
+          (eq (min a b) a)
+          ==.
+          -- prop_33:a=(S a_50) =>
+          (eq (min (S a_50) b) a)
+          ==.
+          -- prop_33:a=(S a_50):b=(S b_70) =>
+          (eq (min (S a_50) (S b_70)) a)
+          ==.
+          -- (min (S ?x) (S ?y)) =>
+          (eq (S (min a_50 b_70)) a)
+          ==.
+          -- prop_33:a=(S a_50) =>
+          (eq (S (min a_50 b_70)) (S a_50))
+          ==.
+          -- (eq (S ?x) (S ?y)) =>
+          (eq (min a_50 b_70) a_50)
+          ==.
+          -- <= lemma-(leq ?a ?b)=(eq (min ?a ?b) ?a)
+          (leq a_50 b_70)
+          ==.
+          -- <= (leq (S ?x) (S ?y))
+          (leq (S a_50) (S b_70))
+          ==.
+          -- <= prop_33:a=(S a_50)
+          (leq a (S b_70))
+          ==.
+          -- <= prop_33:a=(S a_50):b=(S b_70)
+          (leq a b)
+          ***
+          QED
+        (Z ) ->
+          -- 
+          (eq (min a b) a)
+          ==.
+          -- prop_33:a=(S a_50):b=Z =>
+          (eq (min a Z) a)
+          ==.
+          -- (min ?x Z) =>
+          (eq Z a)
+          ==.
+          -- prop_33:a=(S a_50) =>
+          (eq Z (S a_50))
+          ==.
+          -- (eq Z (S ?y)) =>
+          False
+          ==.
+          -- <= (leq (S ?x) Z)
+          (leq (S a_50) Z)
+          ==.
+          -- <= prop_33:a=(S a_50)
+          (leq a Z)
+          ==.
+          -- <= prop_33:a=(S a_50):b=Z
+          (leq a b)
+          ***
+          QED
+    (Z ) ->
+      -- 
+      (eq (min a b) a)
+      ==.
+      -- prop_33:a=Z =>
+      (eq (min Z b) a)
+      ==.
+      -- (min Z ?y) =>
+      (eq Z a)
+      ==.
+      -- prop_33:a=Z =>
+      (eq Z Z)
+      ==.
+      -- (eq Z Z) =>
+      True
+      ==.
+      -- <= (leq Z ?y)
+      (leq Z b)
+      ==.
+      -- <= prop_33:a=Z
+      (leq a b)
+      ***
+      QED
+
+Proving begin prop_34: (eq (min a b) b) = (leq b a)
+prop_34 = VALID (0.01 sec)
+{-@prop_34::b: Nat->a: Nat->{ (eq (min a b) b) = (leq b a) }@-}
+prop_34::Nat->Nat->Proof
+prop_34 b a=
+  case a of
+    (S a_50) ->
+      case b of
+        (S b_70) ->
+          -- 
+          (eq (min a b) b)
+          ==.
+          -- prop_34:a=(S a_50) =>
+          (eq (min (S a_50) b) b)
+          ==.
+          -- prop_34:a=(S a_50):b=(S b_70) =>
+          (eq (min (S a_50) (S b_70)) b)
+          ==.
+          -- (min (S ?x) (S ?y)) =>
+          (eq (S (min a_50 b_70)) b)
+          ==.
+          -- prop_34:a=(S a_50):b=(S b_70) =>
+          (eq (S (min a_50 b_70)) (S b_70))
+          ==.
+          -- (eq (S ?x) (S ?y)) =>
+          (eq (min a_50 b_70) b_70)
+          ==.
+          -- <= lemma-(leq ?b ?a)=(eq (min ?a ?b) ?b)
+          (leq b_70 a_50)
+          ==.
+          -- <= (leq (S ?x) (S ?y))
+          (leq (S b_70) (S a_50))
+          ==.
+          -- <= prop_34:a=(S a_50):b=(S b_70)
+          (leq b (S a_50))
+          ==.
+          -- <= prop_34:a=(S a_50)
+          (leq b a)
+          ***
+          QED
+        (Z ) ->
+          -- 
+          (eq (min a b) b)
+          ==.
+          -- prop_34:a=(S a_50):b=Z =>
+          (eq (min a Z) b)
+          ==.
+          -- (min ?x Z) =>
+          (eq Z b)
+          ==.
+          -- prop_34:a=(S a_50):b=Z =>
+          (eq Z Z)
+          ==.
+          -- (eq Z Z) =>
+          True
+          ==.
+          -- <= (leq Z ?y)
+          (leq Z a)
+          ==.
+          -- <= prop_34:a=(S a_50):b=Z
+          (leq b a)
+          ***
+          QED
+    (Z ) ->
+      case b of
+        (S b_70) ->
+          -- 
+          (eq (min a b) b)
+          ==.
+          -- prop_34:a=Z =>
+          (eq (min Z b) b)
+          ==.
+          -- (min Z ?y) =>
+          (eq Z b)
+          ==.
+          -- prop_34:a=Z:b=(S b_70) =>
+          (eq Z (S b_70))
+          ==.
+          -- (eq Z (S ?y)) =>
+          False
+          ==.
+          -- <= (leq (S ?x) Z)
+          (leq (S b_70) Z)
+          ==.
+          -- <= prop_34:a=Z:b=(S b_70)
+          (leq b Z)
+          ==.
+          -- <= prop_34:a=Z
+          (leq b a)
+          ***
+          QED
+        (Z ) ->
+          -- 
+          (eq (min a b) b)
+          ==.
+          -- prop_34:a=Z =>
+          (eq (min Z b) b)
+          ==.
+          -- (min Z ?y) =>
+          (eq Z b)
+          ==.
+          -- prop_34:a=Z:b=Z =>
+          (eq Z Z)
+          ==.
+          -- (eq Z Z) =>
+          True
+          ==.
+          -- <= (leq Z ?y)
+          (leq Z b)
+          ==.
+          -- <= prop_34:a=Z:b=Z
+          (leq b b)
+          ==.
+          -- prop_34:a=Z:b=Z =>
+          (leq b Z)
+          ==.
+          -- <= prop_34:a=Z
+          (leq b a)
+          ***
+          QED
+
+Proving begin prop_35: (dropWhile ($ const False) xs) = xs
+prop_35 = VALID (0.01 sec)
+{-@prop_35::xs: (List a)->{ (dropWhile ($ const False) xs) = xs }@-}
+prop_35::(List a)->Proof
+prop_35 xs=
+  case xs of
+    (Cons xs_50 xs_51) ->
+      -- 
+      (dropWhile (($) const False) xs)
+      ==.
+      -- prop_35:xs=(Cons xs_50 xs_51) =>
+      (dropWhile (($) const False) (Cons xs_50 xs_51))
+      ==.
+      -- (dropWhile ?p (Cons ?x ?xs)) =>
+      (ite (($) (($) const False) xs_50) (dropWhile (($) const False) xs_51) (Cons xs_50 xs_51))
+      ==.
+      -- <= prop_35:xs=(Cons xs_50 xs_51)
+      (ite (($) (($) const False) xs_50) (dropWhile (($) const False) xs_51) xs)
+      ==.
+      -- apply-const =>
+      (ite (const False xs_50) (dropWhile (($) const False) xs_51) xs)
+      ==.
+      -- (const ?x ?y) =>
+      (ite False (dropWhile (($) const False) xs_51) xs)
+      ==.
+      -- <= lemma-?xs=(dropWhile ($ const False) ?xs)
+      (ite False xs_51 xs)
+      ==.
+      -- (ite False ?x ?y) =>
+      xs
+      ***
+      QED
+    (Nil ) ->
+      -- 
+      (dropWhile (($) const False) xs)
+      ==.
+      -- prop_35:xs=Nil =>
+      (dropWhile (($) const False) Nil)
+      ==.
+      -- (dropWhile ?p Nil) =>
+      Nil
+      ==.
+      -- <= prop_35:xs=Nil
+      xs
+      ***
+      QED
+
+Proving begin prop_36: (takeWhile ($ const True) xs) = xs
+prop_36 = VALID (0.01 sec)
+{-@prop_36::xs: (List a)->{ (takeWhile ($ const True) xs) = xs }@-}
+prop_36::(List a)->Proof
+prop_36 xs=
+  case xs of
+    (Cons xs_50 xs_51) ->
+      -- 
+      (takeWhile (($) const True) xs)
+      ==.
+      -- prop_36:xs=(Cons xs_50 xs_51) =>
+      (takeWhile (($) const True) (Cons xs_50 xs_51))
+      ==.
+      -- (takeWhile ?p (Cons ?x ?xs)) =>
+      (ite (($) (($) const True) xs_50) (Cons xs_50 (takeWhile (($) const True) xs_51)) Nil)
+      ==.
+      -- apply-const =>
+      (ite (const True xs_50) (Cons xs_50 (takeWhile (($) const True) xs_51)) Nil)
+      ==.
+      -- (const ?x ?y) =>
+      (ite True (Cons xs_50 (takeWhile (($) const True) xs_51)) Nil)
+      ==.
+      -- <= lemma-?xs=(takeWhile ($ const True) ?xs)
+      (ite True (Cons xs_50 xs_51) Nil)
+      ==.
+      -- <= prop_36:xs=(Cons xs_50 xs_51)
+      (ite True xs Nil)
+      ==.
+      -- (ite True ?x ?y) =>
+      xs
+      ***
+      QED
+    (Nil ) ->
+      -- 
+      (takeWhile (($) const True) xs)
+      ==.
+      -- prop_36:xs=Nil =>
+      (takeWhile (($) const True) Nil)
+      ==.
+      -- (takeWhile ?p Nil) =>
+      Nil
+      ==.
+      -- <= prop_36:xs=Nil
+      xs
+      ***
+      QED
+
+Proving begin prop_40: (take Z xs) = Nil
+prop_40 = VALID (0.00 sec)
+{-@prop_40::xs: List->{ (take Z xs) = Nil }@-}
+prop_40::List->Proof
+prop_40 xs=
+  -- 
+  (take Z xs)
+  ==.
+  -- (take Z ?xs) =>
+  Nil
+  ***
+  QED
+
+Proving begin prop_41: (take n (map f xs)) = (map f (take n xs))
+prop_41 = VALID (0.01 sec)
+{-@prop_41::n: Nat->f: (-> a b)->xs: (List a)->{ (take n (map f xs)) = (map f (take n xs)) }@-}
+prop_41::Nat->(-> a b)->(List a)->Proof
+prop_41 n f xs=
+  case n of
+    (S n_70) ->
+      case xs of
+        (Cons xs_90 xs_91) ->
+          -- 
+          (take n (map f xs))
+          ==.
+          -- prop_41:n=(S n_70) =>
+          (take (S n_70) (map f xs))
+          ==.
+          -- prop_41:n=(S n_70):xs=(Cons xs_90 xs_91) =>
+          (take (S n_70) (map f (Cons xs_90 xs_91)))
+          ==.
+          -- (map ?f (Cons ?x ?xs)) =>
+          (take (S n_70) (Cons (($) f xs_90) (map f xs_91)))
+          ==.
+          -- (take (S ?n) (Cons ?x ?xs)) =>
+          (Cons (($) f xs_90) (take n_70 (map f xs_91)))
+          ==.
+          -- lemma-(take ?n (map ?f ?xs))=(map ?f (take ?n ?xs)) =>
+          (Cons (($) f xs_90) (map f (take n_70 xs_91)))
+          ==.
+          -- <= (map ?f (Cons ?x ?xs))
+          (map f (Cons xs_90 (take n_70 xs_91)))
+          ==.
+          -- <= (take (S ?n) (Cons ?x ?xs))
+          (map f (take (S n_70) (Cons xs_90 xs_91)))
+          ==.
+          -- <= prop_41:n=(S n_70)
+          (map f (take n (Cons xs_90 xs_91)))
+          ==.
+          -- <= prop_41:n=(S n_70):xs=(Cons xs_90 xs_91)
+          (map f (take n xs))
+          ***
+          QED
+        (Nil ) ->
+          -- 
+          (take n (map f xs))
+          ==.
+          -- prop_41:n=(S n_70):xs=Nil =>
+          (take n (map f Nil))
+          ==.
+          -- (map ?f Nil) =>
+          (take n Nil)
+          ==.
+          -- <= prop_41:n=(S n_70):xs=Nil
+          (take n xs)
+          ==.
+          -- prop_41:n=(S n_70) =>
+          (take (S n_70) xs)
+          ==.
+          -- prop_41:n=(S n_70):xs=Nil =>
+          (take (S n_70) Nil)
+          ==.
+          -- (take (S ?n) Nil) =>
+          Nil
+          ==.
+          -- <= (map ?f Nil)
+          (map f Nil)
+          ==.
+          -- <= prop_41:n=(S n_70):xs=Nil
+          (map f xs)
+          ==.
+          -- prop_41:n=(S n_70):xs=Nil =>
+          (map f Nil)
+          ==.
+          -- <= (take (S ?n) Nil)
+          (map f (take (S n_70) Nil))
+          ==.
+          -- <= prop_41:n=(S n_70)
+          (map f (take n Nil))
+          ==.
+          -- <= prop_41:n=(S n_70):xs=Nil
+          (map f (take n xs))
+          ***
+          QED
+    (Z ) ->
+      -- 
+      (take n (map f xs))
+      ==.
+      -- prop_41:n=Z =>
+      (take Z (map f xs))
+      ==.
+      -- (take Z ?xs) =>
+      Nil
+      ==.
+      -- <= (map ?f Nil)
+      (map f Nil)
+      ==.
+      -- <= (take Z ?xs)
+      (map f (take Z xs))
+      ==.
+      -- <= prop_41:n=Z
+      (map f (take n xs))
+      ***
+      QED
+
+Proving begin prop_42: (take (S n) (Cons x xs)) = (Cons x (take n xs))
+prop_42 = VALID (0.00 sec)
+{-@prop_42::n: Nat->x: a->xs: (List a)->{ (take (S n) (Cons x xs)) = (Cons x (take n xs)) }@-}
+prop_42::Nat->a->(List a)->Proof
+prop_42 n x xs=
+  -- 
+  (take (S n) (Cons x xs))
+  ==.
+  -- (take (S ?n) (Cons ?x ?xs)) =>
+  (Cons x (take n xs))
+  ***
+  QED
+
+Proving begin prop_44: (zip (Cons x xs) ys) = (zipConcat x xs ys)
+prop_44 = VALID (0.01 sec)
+{-@prop_44::x: a->xs: (List a)->ys: (List a)->{ (zip (Cons x xs) ys) = (zipConcat x xs ys) }@-}
+prop_44::a->(List a)->(List a)->Proof
+prop_44 x xs ys=
+  case xs of
+    (Cons xs_60 xs_61) ->
+      case ys of
+        (Cons ys_90 ys_91) ->
+          -- 
+          (zip (Cons x xs) ys)
+          ==.
+          -- prop_44:xs=(Cons xs_60 xs_61):ys=(Cons ys_90 ys_91) =>
+          (zip (Cons x xs) (Cons ys_90 ys_91))
+          ==.
+          -- (zip (Cons ?x ?xs) (Cons ?y ?ys)) =>
+          (Cons (Pair x ys_90) (zip xs ys_91))
+          ==.
+          -- <= (zipConcat ?x ?xs (Cons ?y ?ys))
+          (zipConcat x xs (Cons ys_90 ys_91))
+          ==.
+          -- <= prop_44:xs=(Cons xs_60 xs_61):ys=(Cons ys_90 ys_91)
+          (zipConcat x xs ys)
+          ***
+          QED
+        (Nil ) ->
+          -- 
+          (zip (Cons x xs) ys)
+          ==.
+          -- prop_44:xs=(Cons xs_60 xs_61):ys=Nil =>
+          (zip (Cons x xs) Nil)
+          ==.
+          -- (zip ?xs Nil) =>
+          Nil
+          ==.
+          -- <= (zipConcat ?x ?xs Nil)
+          (zipConcat x xs Nil)
+          ==.
+          -- <= prop_44:xs=(Cons xs_60 xs_61):ys=Nil
+          (zipConcat x xs ys)
+          ***
+          QED
+    (Nil ) ->
+      case ys of
+        (Cons ys_70 ys_71) ->
+          -- 
+          (zip (Cons x xs) ys)
+          ==.
+          -- prop_44:xs=Nil:ys=(Cons ys_70 ys_71) =>
+          (zip (Cons x xs) (Cons ys_70 ys_71))
+          ==.
+          -- (zip (Cons ?x ?xs) (Cons ?y ?ys)) =>
+          (Cons (Pair x ys_70) (zip xs ys_71))
+          ==.
+          -- <= (zipConcat ?x ?xs (Cons ?y ?ys))
+          (zipConcat x xs (Cons ys_70 ys_71))
+          ==.
+          -- <= prop_44:xs=Nil:ys=(Cons ys_70 ys_71)
+          (zipConcat x xs ys)
+          ***
+          QED
+        (Nil ) ->
+          -- 
+          (zip (Cons x xs) ys)
+          ==.
+          -- prop_44:xs=Nil:ys=Nil =>
+          (zip (Cons x xs) Nil)
+          ==.
+          -- (zip ?xs Nil) =>
+          Nil
+          ==.
+          -- <= (zipConcat ?x ?xs Nil)
+          (zipConcat x ys Nil)
+          ==.
+          -- prop_44:xs=Nil:ys=Nil =>
+          (zipConcat x Nil Nil)
+          ==.
+          -- <= prop_44:xs=Nil
+          (zipConcat x xs Nil)
+          ==.
+          -- <= prop_44:xs=Nil:ys=Nil
+          (zipConcat x xs ys)
+          ***
+          QED
+
+Proving begin prop_45: (zip (Cons x xs) (Cons y ys)) = (Cons (Pair x y) (zip xs ys))
+prop_45 = VALID (0.00 sec)
+{-@prop_45::y: b->ys: (List b)->x: a->xs: (List a)->{ (zip (Cons x xs) (Cons y ys)) = (Cons (Pair x y) (zip xs ys)) }@-}
+prop_45::b->(List b)->a->(List a)->Proof
+prop_45 y ys x xs=
+  -- 
+  (zip (Cons x xs) (Cons y ys))
+  ==.
+  -- (zip (Cons ?x ?xs) (Cons ?y ?ys)) =>
+  (Cons (Pair x y) (zip xs ys))
+  ***
+  QED
+
+Proving begin prop_46: (zip Nil xs) = Nil
+prop_46 = VALID (0.00 sec)
+{-@prop_46::xs: (List a)->{ (zip Nil xs) = Nil }@-}
+prop_46::(List a)->Proof
+prop_46 xs=
+  -- 
+  (zip Nil xs)
+  ==.
+  -- (zip Nil ?ys) =>
+  Nil
+  ***
+  QED
+
+Proving begin prop_49: (butlast (append xs ys)) = (butlastConcat xs ys)
+prop_49 = VALID (0.04 sec)
+{-@prop_49::xs: (List a)->ys: (List a)->{ (butlast (append xs ys)) = (butlastConcat xs ys) }@-}
+prop_49::(List a)->(List a)->Proof
+prop_49 xs ys=
+  case xs of
+    (Cons xs_50 xs_51) ->
+      case ys of
+        (Cons ys_100 ys_101) ->
+          case xs_51 of
+            (Cons xs_51_170 xs_51_171) ->
+              -- 
+              (butlast (append xs ys))
+              ==.
+              -- prop_49:xs=(Cons xs_50 xs_51) =>
+              (butlast (append (Cons xs_50 xs_51) ys))
+              ==.
+              -- (append (Cons ?x ?xs) ?ys) =>
+              (butlast (Cons xs_50 (append xs_51 ys)))
+              ==.
+              -- prop_49:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101):xs_51=(Cons xs_51_170 xs_51_171) =>
+              (butlast (Cons xs_50 (append (Cons xs_51_170 xs_51_171) ys)))
+              ==.
+              -- (append (Cons ?x ?xs) ?ys) =>
+              (butlast (Cons xs_50 (Cons xs_51_170 (append xs_51_171 ys))))
+              ==.
+              -- (butlast (Cons ?x (Cons ?y ?ys))) =>
+              (Cons xs_50 (butlast (Cons xs_51_170 (append xs_51_171 ys))))
+              ==.
+              -- prop_49:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101) =>
+              (Cons xs_50 (butlast (Cons xs_51_170 (append xs_51_171 (Cons ys_100 ys_101)))))
+              ==.
+              -- <= lemma-(append (Cons ?xs_50 ?xs_51) (butlast (Cons ?ys_100 ?ys_101)))=(butlast (Cons ?xs_50 (append ?xs_51 (Cons ?ys_100 ?ys_101))))
+              (Cons xs_50 (append (Cons xs_51_170 xs_51_171) (butlast (Cons ys_100 ys_101))))
+              ==.
+              -- <= prop_49:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101):xs_51=(Cons xs_51_170 xs_51_171)
+              (Cons xs_50 (append xs_51 (butlast (Cons ys_100 ys_101))))
+              ==.
+              -- <= prop_49:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101)
+              (Cons xs_50 (append xs_51 (butlast ys)))
+              ==.
+              -- <= (append (Cons ?x ?xs) ?ys)
+              (append (Cons xs_50 xs_51) (butlast ys))
+              ==.
+              -- <= prop_49:xs=(Cons xs_50 xs_51)
+              (append xs (butlast ys))
+              ==.
+              -- prop_49:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101) =>
+              (append xs (butlast (Cons ys_100 ys_101)))
+              ==.
+              -- <= (butlastConcat ?xs (Cons ?y ?ys))
+              (butlastConcat xs (Cons ys_100 ys_101))
+              ==.
+              -- <= prop_49:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101)
+              (butlastConcat xs ys)
+              ***
+              QED
+            (Nil ) ->
+              -- 
+              (butlast (append xs ys))
+              ==.
+              -- prop_49:xs=(Cons xs_50 xs_51) =>
+              (butlast (append (Cons xs_50 xs_51) ys))
+              ==.
+              -- (append (Cons ?x ?xs) ?ys) =>
+              (butlast (Cons xs_50 (append xs_51 ys)))
+              ==.
+              -- prop_49:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101):xs_51=Nil =>
+              (butlast (Cons xs_50 (append Nil ys)))
+              ==.
+              -- (append Nil ?ys) =>
+              (butlast (Cons xs_50 ys))
+              ==.
+              -- prop_49:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101) =>
+              (butlast (Cons xs_50 (Cons ys_100 ys_101)))
+              ==.
+              -- (butlast (Cons ?x (Cons ?y ?ys))) =>
+              (Cons xs_50 (butlast (Cons ys_100 ys_101)))
+              ==.
+              -- <= prop_49:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101)
+              (Cons xs_50 (butlast ys))
+              ==.
+              -- <= (append Nil ?ys)
+              (Cons xs_50 (append Nil (butlast ys)))
+              ==.
+              -- <= prop_49:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101):xs_51=Nil
+              (Cons xs_50 (append xs_51 (butlast ys)))
+              ==.
+              -- <= (append (Cons ?x ?xs) ?ys)
+              (append (Cons xs_50 xs_51) (butlast ys))
+              ==.
+              -- <= prop_49:xs=(Cons xs_50 xs_51)
+              (append xs (butlast ys))
+              ==.
+              -- prop_49:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101) =>
+              (append xs (butlast (Cons ys_100 ys_101)))
+              ==.
+              -- <= (butlastConcat ?xs (Cons ?y ?ys))
+              (butlastConcat xs (Cons ys_100 ys_101))
+              ==.
+              -- <= prop_49:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101)
+              (butlastConcat xs ys)
+              ***
+              QED
+        (Nil ) ->
+          case xs_51 of
+            (Cons xs_51_120 xs_51_121) ->
+              -- 
+              (butlast (append xs ys))
+              ==.
+              -- prop_49:xs=(Cons xs_50 xs_51) =>
+              (butlast (append (Cons xs_50 xs_51) ys))
+              ==.
+              -- (append (Cons ?x ?xs) ?ys) =>
+              (butlast (Cons xs_50 (append xs_51 ys)))
+              ==.
+              -- prop_49:xs=(Cons xs_50 xs_51):ys=Nil:xs_51=(Cons xs_51_120 xs_51_121) =>
+              (butlast (Cons xs_50 (append (Cons xs_51_120 xs_51_121) ys)))
+              ==.
+              -- (append (Cons ?x ?xs) ?ys) =>
+              (butlast (Cons xs_50 (Cons xs_51_120 (append xs_51_121 ys))))
+              ==.
+              -- (butlast (Cons ?x (Cons ?y ?ys))) =>
+              (Cons xs_50 (butlast (Cons xs_51_120 (append xs_51_121 ys))))
+              ==.
+              -- <= (append (Cons ?x ?xs) ?ys)
+              (Cons xs_50 (butlast (append (Cons xs_51_120 xs_51_121) ys)))
+              ==.
+              -- <= prop_49:xs=(Cons xs_50 xs_51):ys=Nil:xs_51=(Cons xs_51_120 xs_51_121)
+              (Cons xs_50 (butlast (append xs_51 ys)))
+              ==.
+              -- prop_49:xs=(Cons xs_50 xs_51):ys=Nil:xs_51=(Cons xs_51_120 xs_51_121) =>
+              (Cons xs_50 (butlast (append (Cons xs_51_120 xs_51_121) ys)))
+              ==.
+              -- (append (Cons ?x ?xs) ?ys) =>
+              (Cons xs_50 (butlast (Cons xs_51_120 (append xs_51_121 ys))))
+              ==.
+              -- prop_49:xs=(Cons xs_50 xs_51):ys=Nil =>
+              (Cons xs_50 (butlast (Cons xs_51_120 (append xs_51_121 Nil))))
+              ==.
+              -- <= lemma-(butlast (Cons ?xs_50 ?xs_51))=(butlast (Cons ?xs_50 (append ?xs_51 Nil)))
+              (Cons xs_50 (butlast (Cons xs_51_120 xs_51_121)))
+              ==.
+              -- <= prop_49:xs=(Cons xs_50 xs_51):ys=Nil:xs_51=(Cons xs_51_120 xs_51_121)
+              (Cons xs_50 (butlast xs_51))
+              ==.
+              -- prop_49:xs=(Cons xs_50 xs_51):ys=Nil:xs_51=(Cons xs_51_120 xs_51_121) =>
+              (Cons xs_50 (butlast (Cons xs_51_120 xs_51_121)))
+              ==.
+              -- <= (butlast (Cons ?x (Cons ?y ?ys)))
+              (butlast (Cons xs_50 (Cons xs_51_120 xs_51_121)))
+              ==.
+              -- <= prop_49:xs=(Cons xs_50 xs_51):ys=Nil:xs_51=(Cons xs_51_120 xs_51_121)
+              (butlast (Cons xs_50 xs_51))
+              ==.
+              -- <= prop_49:xs=(Cons xs_50 xs_51)
+              (butlast xs)
+              ==.
+              -- <= (butlastConcat ?xs Nil)
+              (butlastConcat xs Nil)
+              ==.
+              -- <= prop_49:xs=(Cons xs_50 xs_51):ys=Nil
+              (butlastConcat xs ys)
+              ***
+              QED
+            (Nil ) ->
+              -- 
+              (butlast (append xs ys))
+              ==.
+              -- prop_49:xs=(Cons xs_50 xs_51) =>
+              (butlast (append (Cons xs_50 xs_51) ys))
+              ==.
+              -- (append (Cons ?x ?xs) ?ys) =>
+              (butlast (Cons xs_50 (append xs_51 ys)))
+              ==.
+              -- prop_49:xs=(Cons xs_50 xs_51):ys=Nil:xs_51=Nil =>
+              (butlast (Cons xs_50 (append Nil ys)))
+              ==.
+              -- (append Nil ?ys) =>
+              (butlast (Cons xs_50 ys))
+              ==.
+              -- prop_49:xs=(Cons xs_50 xs_51):ys=Nil =>
+              (butlast (Cons xs_50 Nil))
+              ==.
+              -- <= prop_49:xs=(Cons xs_50 xs_51):ys=Nil:xs_51=Nil
+              (butlast (Cons xs_50 xs_51))
+              ==.
+              -- <= prop_49:xs=(Cons xs_50 xs_51)
+              (butlast xs)
+              ==.
+              -- <= (butlastConcat ?xs Nil)
+              (butlastConcat xs Nil)
+              ==.
+              -- <= prop_49:xs=(Cons xs_50 xs_51):ys=Nil
+              (butlastConcat xs ys)
+              ***
+              QED
+    (Nil ) ->
+      case ys of
+        (Cons ys_70 ys_71) ->
+          -- 
+          (butlast (append xs ys))
+          ==.
+          -- <= (append Nil ?ys)
+          (append Nil (butlast (append xs ys)))
+          ==.
+          -- <= prop_49:xs=Nil
+          (append xs (butlast (append xs ys)))
+          ==.
+          -- prop_49:xs=Nil =>
+          (append xs (butlast (append Nil ys)))
+          ==.
+          -- (append Nil ?ys) =>
+          (append xs (butlast ys))
+          ==.
+          -- prop_49:xs=Nil:ys=(Cons ys_70 ys_71) =>
+          (append xs (butlast (Cons ys_70 ys_71)))
+          ==.
+          -- <= (butlastConcat ?xs (Cons ?y ?ys))
+          (butlastConcat xs (Cons ys_70 ys_71))
+          ==.
+          -- <= prop_49:xs=Nil:ys=(Cons ys_70 ys_71)
+          (butlastConcat xs ys)
+          ***
+          QED
+        (Nil ) ->
+          -- 
+          (butlast (append xs ys))
+          ==.
+          -- prop_49:xs=Nil =>
+          (butlast (append Nil ys))
+          ==.
+          -- (append Nil ?ys) =>
+          (butlast ys)
+          ==.
+          -- <= (butlastConcat ?xs Nil)
+          (butlastConcat ys Nil)
+          ==.
+          -- prop_49:xs=Nil:ys=Nil =>
+          (butlastConcat Nil Nil)
+          ==.
+          -- <= prop_49:xs=Nil
+          (butlastConcat xs Nil)
+          ==.
+          -- <= prop_49:xs=Nil:ys=Nil
+          (butlastConcat xs ys)
+          ***
+          QED
+
+Proving begin prop_50: (butlast xs) = (take (sub (len xs) (S Z)) xs)
+prop_50 = VALID (0.01 sec)
+{-@prop_50::xs: (List a)->{ (butlast xs) = (take (sub (len xs) (S Z)) xs) }@-}
+prop_50::(List a)->Proof
+prop_50 xs=
+  case xs of
+    (Cons xs_70 xs_71) ->
+      case xs_71 of
+        (Cons xs_71_140 xs_71_141) ->
+          -- 
+          (butlast xs)
+          ==.
+          -- prop_50:xs=(Cons xs_70 xs_71) =>
+          (butlast (Cons xs_70 xs_71))
+          ==.
+          -- prop_50:xs=(Cons xs_70 xs_71):xs_71=(Cons xs_71_140 xs_71_141) =>
+          (butlast (Cons xs_70 (Cons xs_71_140 xs_71_141)))
+          ==.
+          -- (butlast (Cons ?x (Cons ?y ?ys))) =>
+          (Cons xs_70 (butlast (Cons xs_71_140 xs_71_141)))
+          ==.
+          -- <= prop_50:xs=(Cons xs_70 xs_71):xs_71=(Cons xs_71_140 xs_71_141)
+          (Cons xs_70 (butlast xs_71))
+          ==.
+          -- prop_50:xs=(Cons xs_70 xs_71):xs_71=(Cons xs_71_140 xs_71_141) =>
+          (Cons xs_70 (butlast (Cons xs_71_140 xs_71_141)))
+          ==.
+          -- lemma-(butlast (Cons ?xs_70 ?xs_71))=(take (len ?xs_71) (Cons ?xs_70 ?xs_71)) =>
+          (Cons xs_70 (take (len xs_71_141) (Cons xs_71_140 xs_71_141)))
+          ==.
+          -- <= prop_50:xs=(Cons xs_70 xs_71):xs_71=(Cons xs_71_140 xs_71_141)
+          (Cons xs_70 (take (len xs_71_141) xs_71))
+          ==.
+          -- <= (take (S ?n) (Cons ?x ?xs))
+          (take (S (len xs_71_141)) (Cons xs_70 xs_71))
+          ==.
+          -- <= (len (Cons ?x ?xs))
+          (take (len (Cons xs_71_140 xs_71_141)) (Cons xs_70 xs_71))
+          ==.
+          -- <= prop_50:xs=(Cons xs_70 xs_71):xs_71=(Cons xs_71_140 xs_71_141)
+          (take (len xs_71) (Cons xs_70 xs_71))
+          ==.
+          -- <= (sub ?x Z)
+          (take (sub (len xs_71) Z) (Cons xs_70 xs_71))
+          ==.
+          -- <= (sub (S ?x) (S ?y))
+          (take (sub (S (len xs_71)) (S Z)) (Cons xs_70 xs_71))
+          ==.
+          -- <= (len (Cons ?x ?xs))
+          (take (sub (len (Cons xs_70 xs_71)) (S Z)) (Cons xs_70 xs_71))
+          ==.
+          -- <= prop_50:xs=(Cons xs_70 xs_71)
+          (take (sub (len xs) (S Z)) (Cons xs_70 xs_71))
+          ==.
+          -- <= prop_50:xs=(Cons xs_70 xs_71)
+          (take (sub (len xs) (S Z)) xs)
+          ***
+          QED
+        (Nil ) ->
+          -- 
+          (butlast xs)
+          ==.
+          -- prop_50:xs=(Cons xs_70 xs_71) =>
+          (butlast (Cons xs_70 xs_71))
+          ==.
+          -- prop_50:xs=(Cons xs_70 xs_71):xs_71=Nil =>
+          (butlast (Cons xs_70 Nil))
+          ==.
+          -- (butlast (Cons ?x Nil)) =>
+          Nil
+          ==.
+          -- <= (take Z ?xs)
+          (take Z xs)
+          ==.
+          -- <= (len Nil)
+          (take (len Nil) xs)
+          ==.
+          -- <= prop_50:xs=(Cons xs_70 xs_71):xs_71=Nil
+          (take (len xs_71) xs)
+          ==.
+          -- <= (sub ?x Z)
+          (take (sub (len xs_71) Z) xs)
+          ==.
+          -- <= (sub (S ?x) (S ?y))
+          (take (sub (S (len xs_71)) (S Z)) xs)
+          ==.
+          -- <= (len (Cons ?x ?xs))
+          (take (sub (len (Cons xs_70 xs_71)) (S Z)) xs)
+          ==.
+          -- <= prop_50:xs=(Cons xs_70 xs_71)
+          (take (sub (len xs) (S Z)) xs)
+          ***
+          QED
+    (Nil ) ->
+      -- 
+      (butlast xs)
+      ==.
+      -- prop_50:xs=Nil =>
+      (butlast Nil)
+      ==.
+      -- (butlast Nil) =>
+      Nil
+      ==.
+      -- <= (take Z ?xs)
+      (take Z xs)
+      ==.
+      -- <= (sub Z ?y)
+      (take (sub Z (S Z)) xs)
+      ==.
+      -- <= (len Nil)
+      (take (sub (len Nil) (S Z)) xs)
+      ==.
+      -- <= prop_50:xs=Nil
+      (take (sub (len xs) (S Z)) xs)
+      ***
+      QED
+
+Proving begin prop_51: (butlast (append xs (Cons x Nil))) = xs
+prop_51 = VALID (0.01 sec)
+{-@prop_51::xs: (List a)->x: a->{ (butlast (append xs (Cons x Nil))) = xs }@-}
+prop_51::(List a)->a->Proof
+prop_51 xs x=
+  case xs of
+    (Cons xs_60 xs_61) ->
+      case xs_61 of
+        (Cons xs_61_110 xs_61_111) ->
+          -- 
+          (butlast (append xs (Cons x Nil)))
+          ==.
+          -- prop_51:xs=(Cons xs_60 xs_61) =>
+          (butlast (append (Cons xs_60 xs_61) (Cons x Nil)))
+          ==.
+          -- (append (Cons ?x ?xs) ?ys) =>
+          (butlast (Cons xs_60 (append xs_61 (Cons x Nil))))
+          ==.
+          -- prop_51:xs=(Cons xs_60 xs_61):xs_61=(Cons xs_61_110 xs_61_111) =>
+          (butlast (Cons xs_60 (append (Cons xs_61_110 xs_61_111) (Cons x Nil))))
+          ==.
+          -- (append (Cons ?x ?xs) ?ys) =>
+          (butlast (Cons xs_60 (Cons xs_61_110 (append xs_61_111 (Cons x Nil)))))
+          ==.
+          -- (butlast (Cons ?x (Cons ?y ?ys))) =>
+          (Cons xs_60 (butlast (Cons xs_61_110 (append xs_61_111 (Cons x Nil)))))
+          ==.
+          -- <= (append (Cons ?x ?xs) ?ys)
+          (Cons xs_60 (butlast (append (Cons xs_61_110 xs_61_111) (Cons x Nil))))
+          ==.
+          -- <= prop_51:xs=(Cons xs_60 xs_61):xs_61=(Cons xs_61_110 xs_61_111)
+          (Cons xs_60 (butlast (append xs_61 (Cons x Nil))))
+          ==.
+          -- prop_51:xs=(Cons xs_60 xs_61):xs_61=(Cons xs_61_110 xs_61_111) =>
+          (Cons xs_60 (butlast (append (Cons xs_61_110 xs_61_111) (Cons x Nil))))
+          ==.
+          -- (append (Cons ?x ?xs) ?ys) =>
+          (Cons xs_60 (butlast (Cons xs_61_110 (append xs_61_111 (Cons x Nil)))))
+          ==.
+          -- lemma-(butlast (Cons ?xs_60 (append ?xs_61 (Cons ?x Nil))))=(Cons ?xs_60 ?xs_61) =>
+          (Cons xs_60 (Cons xs_61_110 xs_61_111))
+          ==.
+          -- <= prop_51:xs=(Cons xs_60 xs_61):xs_61=(Cons xs_61_110 xs_61_111)
+          (Cons xs_60 xs_61)
+          ==.
+          -- <= prop_51:xs=(Cons xs_60 xs_61)
+          xs
+          ***
+          QED
+        (Nil ) ->
+          -- 
+          (butlast (append xs (Cons x Nil)))
+          ==.
+          -- prop_51:xs=(Cons xs_60 xs_61) =>
+          (butlast (append (Cons xs_60 xs_61) (Cons x Nil)))
+          ==.
+          -- (append (Cons ?x ?xs) ?ys) =>
+          (butlast (Cons xs_60 (append xs_61 (Cons x Nil))))
+          ==.
+          -- prop_51:xs=(Cons xs_60 xs_61):xs_61=Nil =>
+          (butlast (Cons xs_60 (append Nil (Cons x Nil))))
+          ==.
+          -- (append Nil ?ys) =>
+          (butlast (Cons xs_60 (Cons x Nil)))
+          ==.
+          -- <= prop_51:xs=(Cons xs_60 xs_61):xs_61=Nil
+          (butlast (Cons xs_60 (Cons x xs_61)))
+          ==.
+          -- (butlast (Cons ?x (Cons ?y ?ys))) =>
+          (Cons xs_60 (butlast (Cons x xs_61)))
+          ==.
+          -- prop_51:xs=(Cons xs_60 xs_61):xs_61=Nil =>
+          (Cons xs_60 (butlast (Cons x Nil)))
+          ==.
+          -- (butlast (Cons ?x Nil)) =>
+          (Cons xs_60 Nil)
+          ==.
+          -- <= prop_51:xs=(Cons xs_60 xs_61):xs_61=Nil
+          (Cons xs_60 xs_61)
+          ==.
+          -- <= prop_51:xs=(Cons xs_60 xs_61)
+          xs
+          ***
+          QED
+    (Nil ) ->
+      -- 
+      (butlast (append xs (Cons x Nil)))
+      ==.
+      -- prop_51:xs=Nil =>
+      (butlast (append Nil (Cons x Nil)))
+      ==.
+      -- (append Nil ?ys) =>
+      (butlast (Cons x Nil))
+      ==.
+      -- (butlast (Cons ?x Nil)) =>
+      Nil
+      ==.
+      -- <= prop_51:xs=Nil
+      xs
+      ***
+      QED
+
+Proving begin prop_55: (drop n (append xs ys)) = (append (drop n xs) (drop (sub n (len xs)) ys))
+prop_55 = VALID (0.01 sec)
+{-@prop_55::n: Nat->xs: (List a)->ys: (List a)->{ (drop n (append xs ys)) = (append (drop n xs) (drop (sub n (len xs)) ys)) }@-}
+prop_55::Nat->(List a)->(List a)->Proof
+prop_55 n xs ys=
+  case n of
+    (S n_100) ->
+      case xs of
+        (Cons xs_120 xs_121) ->
+          -- 
+          (drop n (append xs ys))
+          ==.
+          -- prop_55:n=(S n_100) =>
+          (drop (S n_100) (append xs ys))
+          ==.
+          -- prop_55:n=(S n_100):xs=(Cons xs_120 xs_121) =>
+          (drop (S n_100) (append (Cons xs_120 xs_121) ys))
+          ==.
+          -- (append (Cons ?x ?xs) ?ys) =>
+          (drop (S n_100) (Cons xs_120 (append xs_121 ys)))
+          ==.
+          -- (drop (S ?n) (Cons ?x ?xs)) =>
+          (drop n_100 (append xs_121 ys))
+          ==.
+          -- lemma-(drop ?n (append ?xs ?ys))=(append (drop ?n ?xs) (drop (sub ?n (len ?xs)) ?ys)) =>
+          (append (drop n_100 xs_121) (drop (sub n_100 (len xs_121)) ys))
+          ==.
+          -- <= (drop (S ?n) (Cons ?x ?xs))
+          (append (drop (S n_100) (Cons xs_120 xs_121)) (drop (sub n_100 (len xs_121)) ys))
+          ==.
+          -- <= prop_55:n=(S n_100)
+          (append (drop n (Cons xs_120 xs_121)) (drop (sub n_100 (len xs_121)) ys))
+          ==.
+          -- <= prop_55:n=(S n_100):xs=(Cons xs_120 xs_121)
+          (append (drop n xs) (drop (sub n_100 (len xs_121)) ys))
+          ==.
+          -- <= (sub (S ?x) (S ?y))
+          (append (drop n xs) (drop (sub (S n_100) (S (len xs_121))) ys))
+          ==.
+          -- <= prop_55:n=(S n_100)
+          (append (drop n xs) (drop (sub n (S (len xs_121))) ys))
+          ==.
+          -- <= (len (Cons ?x ?xs))
+          (append (drop n xs) (drop (sub n (len (Cons xs_120 xs_121))) ys))
+          ==.
+          -- <= prop_55:n=(S n_100):xs=(Cons xs_120 xs_121)
+          (append (drop n xs) (drop (sub n (len xs)) ys))
+          ***
+          QED
+        (Nil ) ->
+          -- 
+          (drop n (append xs ys))
+          ==.
+          -- <= (sub ?x Z)
+          (drop (sub n Z) (append xs ys))
+          ==.
+          -- <= (len Nil)
+          (drop (sub n (len Nil)) (append xs ys))
+          ==.
+          -- <= prop_55:n=(S n_100):xs=Nil
+          (drop (sub n (len xs)) (append xs ys))
+          ==.
+          -- prop_55:n=(S n_100):xs=Nil =>
+          (drop (sub n (len xs)) (append Nil ys))
+          ==.
+          -- (append Nil ?ys) =>
+          (drop (sub n (len xs)) ys)
+          ==.
+          -- <= (append Nil ?ys)
+          (append Nil (drop (sub n (len xs)) ys))
+          ==.
+          -- <= (drop (S ?n) Nil)
+          (append (drop (S n_100) Nil) (drop (sub n (len xs)) ys))
+          ==.
+          -- <= prop_55:n=(S n_100)
+          (append (drop n Nil) (drop (sub n (len xs)) ys))
+          ==.
+          -- <= prop_55:n=(S n_100):xs=Nil
+          (append (drop n xs) (drop (sub n (len xs)) ys))
+          ***
+          QED
+    (Z ) ->
+      -- 
+      (drop n (append xs ys))
+      ==.
+      -- prop_55:n=Z =>
+      (drop Z (append xs ys))
+      ==.
+      -- (drop Z ?xs) =>
+      (append xs ys)
+      ==.
+      -- <= (drop Z ?xs)
+      (append (drop Z xs) ys)
+      ==.
+      -- <= prop_55:n=Z
+      (append (drop n xs) ys)
+      ==.
+      -- <= (drop Z ?xs)
+      (append (drop n xs) (drop Z ys))
+      ==.
+      -- <= (sub Z ?y)
+      (append (drop n xs) (drop (sub Z (len xs)) ys))
+      ==.
+      -- <= prop_55:n=Z
+      (append (drop n xs) (drop (sub n (len xs)) ys))
+      ***
+      QED
+
+Proving begin prop_56: (drop n (drop m xs)) = (drop (add n m) xs)
+prop_56 = VALID (0.79 sec)
+{-@prop_56::n: Nat->m: Nat->xs: (List a)->{ (drop n (drop m xs)) = (drop (add n m) xs) }@-}
+prop_56::Nat->Nat->(List a)->Proof
+prop_56 n m xs=
+  case n of
+    (S n_70) ->
+      case m of
+        (S m_110) ->
+          case xs of
+            (Cons xs_130 xs_131) ->
+              case n_70 of
+                (S n_70_230) ->
+                  case m_110 of
+                    (S m_110_310) ->
+                      case xs_131 of
+                        (Cons xs_131_330 xs_131_331) ->
+                          -- 
+                          (drop n (drop m xs))
+                          ==.
+                          -- prop_56:n=(S n_70) =>
+                          (drop (S n_70) (drop m xs))
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230) =>
+                          (drop (S (S n_70_230)) (drop m xs))
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110) =>
+                          (drop (S (S n_70_230)) (drop (S m_110) xs))
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131) =>
+                          (drop (S (S n_70_230)) (drop (S m_110) (Cons xs_130 xs_131)))
+                          ==.
+                          -- (drop (S ?n) (Cons ?x ?xs)) =>
+                          (drop (S (S n_70_230)) (drop m_110 xs_131))
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230):m_110=(S m_110_310) =>
+                          (drop (S (S n_70_230)) (drop (S m_110_310) xs_131))
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230):m_110=(S m_110_310):xs_131=(Cons xs_131_330 xs_131_331) =>
+                          (drop (S (S n_70_230)) (drop (S m_110_310) (Cons xs_131_330 xs_131_331)))
+                          ==.
+                          -- lemma-(drop (S (S ?n_70_230)) (drop (S ?m_110) (Cons ?xs_130 ?xs_131)))=(drop (S ?n_70_230) (drop (S ?m_110) ?xs_131)) =>
+                          (drop (S n_70_230) (drop (S m_110_310) xs_131_331))
+                          ==.
+                          -- <= prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230)
+                          (drop n_70 (drop (S m_110_310) xs_131_331))
+                          ==.
+                          -- <= prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230):m_110=(S m_110_310)
+                          (drop n_70 (drop m_110 xs_131_331))
+                          ==.
+                          -- <= (drop (S ?n) (Cons ?x ?xs))
+                          (drop n_70 (drop (S m_110) (Cons xs_131_330 xs_131_331)))
+                          ==.
+                          -- <= prop_56:n=(S n_70):m=(S m_110)
+                          (drop n_70 (drop m (Cons xs_131_330 xs_131_331)))
+                          ==.
+                          -- <= prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230):m_110=(S m_110_310):xs_131=(Cons xs_131_330 xs_131_331)
+                          (drop n_70 (drop m xs_131))
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230) =>
+                          (drop (S n_70_230) (drop m xs_131))
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110) =>
+                          (drop (S n_70_230) (drop (S m_110) xs_131))
+                          ==.
+                          -- <= lemma-(drop (add (S ?n_70) (S ?m_110)) ?xs)=(drop (S ?n_70) (drop (S ?m_110) ?xs))
+                          (drop (add (S n_70_230) (S m_110)) xs_131)
+                          ==.
+                          -- <= prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230)
+                          (drop (add n_70 (S m_110)) xs_131)
+                          ==.
+                          -- <= prop_56:n=(S n_70):m=(S m_110)
+                          (drop (add n_70 m) xs_131)
+                          ==.
+                          -- <= (drop (S ?n) (Cons ?x ?xs))
+                          (drop (S (add n_70 m)) (Cons xs_130 xs_131))
+                          ==.
+                          -- <= (add (S ?x) ?y)
+                          (drop (add (S n_70) m) (Cons xs_130 xs_131))
+                          ==.
+                          -- <= prop_56:n=(S n_70)
+                          (drop (add n m) (Cons xs_130 xs_131))
+                          ==.
+                          -- <= prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131)
+                          (drop (add n m) xs)
+                          ***
+                          QED
+                        (Nil ) ->
+                          -- 
+                          (drop n (drop m xs))
+                          ==.
+                          -- prop_56:n=(S n_70) =>
+                          (drop (S n_70) (drop m xs))
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110) =>
+                          (drop (S n_70) (drop (S m_110) xs))
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131) =>
+                          (drop (S n_70) (drop (S m_110) (Cons xs_130 xs_131)))
+                          ==.
+                          -- (drop (S ?n) (Cons ?x ?xs)) =>
+                          (drop (S n_70) (drop m_110 xs_131))
+                          ==.
+                          -- lemma-(drop (S ?n_70) (drop ?m ?xs))=(drop (S (add ?n_70 ?m)) ?xs) =>
+                          (drop (S (add n_70 m_110)) xs_131)
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230):m_110=(S m_110_310):xs_131=Nil =>
+                          (drop (S (add n_70 m_110)) Nil)
+                          ==.
+                          -- (drop (S ?n) Nil) =>
+                          Nil
+                          ==.
+                          -- <= (drop (S ?n) Nil)
+                          (drop (S (add n_70_230 m)) Nil)
+                          ==.
+                          -- <= (add (S ?x) ?y)
+                          (drop (add (S n_70_230) m) Nil)
+                          ==.
+                          -- <= prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230)
+                          (drop (add n_70 m) Nil)
+                          ==.
+                          -- <= prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230):m_110=(S m_110_310):xs_131=Nil
+                          (drop (add n_70 m) xs_131)
+                          ==.
+                          -- <= (drop (S ?n) (Cons ?x ?xs))
+                          (drop (S (add n_70 m)) (Cons xs_130 xs_131))
+                          ==.
+                          -- <= (add (S ?x) ?y)
+                          (drop (add (S n_70) m) (Cons xs_130 xs_131))
+                          ==.
+                          -- <= prop_56:n=(S n_70)
+                          (drop (add n m) (Cons xs_130 xs_131))
+                          ==.
+                          -- <= prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131)
+                          (drop (add n m) xs)
+                          ***
+                          QED
+                    (Z ) ->
+                      case xs_131 of
+                        (Cons xs_131_330 xs_131_331) ->
+                          -- 
+                          (drop n (drop m xs))
+                          ==.
+                          -- prop_56:n=(S n_70) =>
+                          (drop (S n_70) (drop m xs))
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110) =>
+                          (drop (S n_70) (drop (S m_110) xs))
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131) =>
+                          (drop (S n_70) (drop (S m_110) (Cons xs_130 xs_131)))
+                          ==.
+                          -- (drop (S ?n) (Cons ?x ?xs)) =>
+                          (drop (S n_70) (drop m_110 xs_131))
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230):m_110=Z =>
+                          (drop (S n_70) (drop Z xs_131))
+                          ==.
+                          -- (drop Z ?xs) =>
+                          (drop (S n_70) xs_131)
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230):m_110=Z:xs_131=(Cons xs_131_330 xs_131_331) =>
+                          (drop (S n_70) (Cons xs_131_330 xs_131_331))
+                          ==.
+                          -- (drop (S ?n) (Cons ?x ?xs)) =>
+                          (drop n_70 xs_131_331)
+                          ==.
+                          -- <= (drop Z ?xs)
+                          (drop n_70 (drop Z xs_131_331))
+                          ==.
+                          -- <= prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230):m_110=Z
+                          (drop n_70 (drop m_110 xs_131_331))
+                          ==.
+                          -- <= (drop (S ?n) (Cons ?x ?xs))
+                          (drop n_70 (drop (S m_110) (Cons xs_131_330 xs_131_331)))
+                          ==.
+                          -- <= prop_56:n=(S n_70):m=(S m_110)
+                          (drop n_70 (drop m (Cons xs_131_330 xs_131_331)))
+                          ==.
+                          -- <= prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230):m_110=Z:xs_131=(Cons xs_131_330 xs_131_331)
+                          (drop n_70 (drop m xs_131))
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230) =>
+                          (drop (S n_70_230) (drop m xs_131))
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110) =>
+                          (drop (S n_70_230) (drop (S m_110) xs_131))
+                          ==.
+                          -- <= lemma-(drop (add (S ?n_70) (S ?m_110)) ?xs)=(drop (S ?n_70) (drop (S ?m_110) ?xs))
+                          (drop (add (S n_70_230) (S m_110)) xs_131)
+                          ==.
+                          -- <= prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230)
+                          (drop (add n_70 (S m_110)) xs_131)
+                          ==.
+                          -- <= prop_56:n=(S n_70):m=(S m_110)
+                          (drop (add n_70 m) xs_131)
+                          ==.
+                          -- <= (drop (S ?n) (Cons ?x ?xs))
+                          (drop (S (add n_70 m)) (Cons xs_130 xs_131))
+                          ==.
+                          -- <= (add (S ?x) ?y)
+                          (drop (add (S n_70) m) (Cons xs_130 xs_131))
+                          ==.
+                          -- <= prop_56:n=(S n_70)
+                          (drop (add n m) (Cons xs_130 xs_131))
+                          ==.
+                          -- <= prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131)
+                          (drop (add n m) xs)
+                          ***
+                          QED
+                        (Nil ) ->
+                          -- 
+                          (drop n (drop m xs))
+                          ==.
+                          -- prop_56:n=(S n_70) =>
+                          (drop (S n_70) (drop m xs))
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110) =>
+                          (drop (S n_70) (drop (S m_110) xs))
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131) =>
+                          (drop (S n_70) (drop (S m_110) (Cons xs_130 xs_131)))
+                          ==.
+                          -- (drop (S ?n) (Cons ?x ?xs)) =>
+                          (drop (S n_70) (drop m_110 xs_131))
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230):m_110=Z =>
+                          (drop (S n_70) (drop Z xs_131))
+                          ==.
+                          -- (drop Z ?xs) =>
+                          (drop (S n_70) xs_131)
+                          ==.
+                          -- prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230):m_110=Z:xs_131=Nil =>
+                          (drop (S n_70) Nil)
+                          ==.
+                          -- (drop (S ?n) Nil) =>
+                          Nil
+                          ==.
+                          -- <= (drop (S ?n) Nil)
+                          (drop (S (add n_70_230 m)) Nil)
+                          ==.
+                          -- <= (add (S ?x) ?y)
+                          (drop (add (S n_70_230) m) Nil)
+                          ==.
+                          -- <= prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230)
+                          (drop (add n_70 m) Nil)
+                          ==.
+                          -- <= prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=(S n_70_230):m_110=Z:xs_131=Nil
+                          (drop (add n_70 m) xs_131)
+                          ==.
+                          -- <= (drop (S ?n) (Cons ?x ?xs))
+                          (drop (S (add n_70 m)) (Cons xs_130 xs_131))
+                          ==.
+                          -- <= (add (S ?x) ?y)
+                          (drop (add (S n_70) m) (Cons xs_130 xs_131))
+                          ==.
+                          -- <= prop_56:n=(S n_70)
+                          (drop (add n m) (Cons xs_130 xs_131))
+                          ==.
+                          -- <= prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131)
+                          (drop (add n m) xs)
+                          ***
+                          QED
+                (Z ) ->
+                  -- 
+                  (drop n (drop m xs))
+                  ==.
+                  -- prop_56:n=(S n_70) =>
+                  (drop (S n_70) (drop m xs))
+                  ==.
+                  -- prop_56:n=(S n_70):m=(S m_110) =>
+                  (drop (S n_70) (drop (S m_110) xs))
+                  ==.
+                  -- prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131) =>
+                  (drop (S n_70) (drop (S m_110) (Cons xs_130 xs_131)))
+                  ==.
+                  -- (drop (S ?n) (Cons ?x ?xs)) =>
+                  (drop (S n_70) (drop m_110 xs_131))
+                  ==.
+                  -- lemma-(drop (S ?n_70) (drop ?m ?xs))=(drop (S (add ?n_70 ?m)) ?xs) =>
+                  (drop (S (add n_70 m_110)) xs_131)
+                  ==.
+                  -- prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=Z =>
+                  (drop (S (add Z m_110)) xs_131)
+                  ==.
+                  -- (add Z ?y) =>
+                  (drop (S m_110) xs_131)
+                  ==.
+                  -- <= prop_56:n=(S n_70):m=(S m_110)
+                  (drop m xs_131)
+                  ==.
+                  -- <= (add Z ?y)
+                  (drop (add Z m) xs_131)
+                  ==.
+                  -- <= prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131):n_70=Z
+                  (drop (add n_70 m) xs_131)
+                  ==.
+                  -- <= (drop (S ?n) (Cons ?x ?xs))
+                  (drop (S (add n_70 m)) (Cons xs_130 xs_131))
+                  ==.
+                  -- <= (add (S ?x) ?y)
+                  (drop (add (S n_70) m) (Cons xs_130 xs_131))
+                  ==.
+                  -- <= prop_56:n=(S n_70)
+                  (drop (add n m) (Cons xs_130 xs_131))
+                  ==.
+                  -- <= prop_56:n=(S n_70):m=(S m_110):xs=(Cons xs_130 xs_131)
+                  (drop (add n m) xs)
+                  ***
+                  QED
+            (Nil ) ->
+              -- 
+              (drop n (drop m xs))
+              ==.
+              -- prop_56:n=(S n_70) =>
+              (drop (S n_70) (drop m xs))
+              ==.
+              -- prop_56:n=(S n_70):m=(S m_110) =>
+              (drop (S n_70) (drop (S m_110) xs))
+              ==.
+              -- prop_56:n=(S n_70):m=(S m_110):xs=Nil =>
+              (drop (S n_70) (drop (S m_110) Nil))
+              ==.
+              -- (drop (S ?n) Nil) =>
+              (drop (S n_70) Nil)
+              ==.
+              -- (drop (S ?n) Nil) =>
+              Nil
+              ==.
+              -- <= (drop (S ?n) Nil)
+              (drop (S (add n_70 m)) Nil)
+              ==.
+              -- <= (add (S ?x) ?y)
+              (drop (add (S n_70) m) Nil)
+              ==.
+              -- <= prop_56:n=(S n_70)
+              (drop (add n m) Nil)
+              ==.
+              -- <= prop_56:n=(S n_70):m=(S m_110):xs=Nil
+              (drop (add n m) xs)
+              ***
+              QED
+        (Z ) ->
+          case xs of
+            (Cons xs_130 xs_131) ->
+              case n_70 of
+                (S n_70_180) ->
+                  -- 
+                  (drop n (drop m xs))
+                  ==.
+                  -- prop_56:n=(S n_70) =>
+                  (drop (S n_70) (drop m xs))
+                  ==.
+                  -- prop_56:n=(S n_70):m=Z =>
+                  (drop (S n_70) (drop Z xs))
+                  ==.
+                  -- (drop Z ?xs) =>
+                  (drop (S n_70) xs)
+                  ==.
+                  -- prop_56:n=(S n_70):m=Z:xs=(Cons xs_130 xs_131) =>
+                  (drop (S n_70) (Cons xs_130 xs_131))
+                  ==.
+                  -- (drop (S ?n) (Cons ?x ?xs)) =>
+                  (drop n_70 xs_131)
+                  ==.
+                  -- prop_56:n=(S n_70):m=Z:xs=(Cons xs_130 xs_131):n_70=(S n_70_180) =>
+                  (drop (S n_70_180) xs_131)
+                  ==.
+                  -- lemma-(drop (S ?n_70) ?xs)=(drop (add (S ?n_70) Z) ?xs) =>
+                  (drop (add (S n_70_180) Z) xs_131)
+                  ==.
+                  -- <= prop_56:n=(S n_70):m=Z:xs=(Cons xs_130 xs_131):n_70=(S n_70_180)
+                  (drop (add n_70 Z) xs_131)
+                  ==.
+                  -- <= prop_56:n=(S n_70):m=Z
+                  (drop (add n_70 m) xs_131)
+                  ==.
+                  -- <= (drop (S ?n) (Cons ?x ?xs))
+                  (drop (S (add n_70 m)) (Cons xs_130 xs_131))
+                  ==.
+                  -- <= (add (S ?x) ?y)
+                  (drop (add (S n_70) m) (Cons xs_130 xs_131))
+                  ==.
+                  -- <= prop_56:n=(S n_70)
+                  (drop (add n m) (Cons xs_130 xs_131))
+                  ==.
+                  -- <= prop_56:n=(S n_70):m=Z:xs=(Cons xs_130 xs_131)
+                  (drop (add n m) xs)
+                  ***
+                  QED
+                (Z ) ->
+                  -- 
+                  (drop n (drop m xs))
+                  ==.
+                  -- prop_56:n=(S n_70) =>
+                  (drop (S n_70) (drop m xs))
+                  ==.
+                  -- prop_56:n=(S n_70):m=Z =>
+                  (drop (S n_70) (drop Z xs))
+                  ==.
+                  -- (drop Z ?xs) =>
+                  (drop (S n_70) xs)
+                  ==.
+                  -- prop_56:n=(S n_70):m=Z:xs=(Cons xs_130 xs_131) =>
+                  (drop (S n_70) (Cons xs_130 xs_131))
+                  ==.
+                  -- (drop (S ?n) (Cons ?x ?xs)) =>
+                  (drop n_70 xs_131)
+                  ==.
+                  -- <= (add Z ?y)
+                  (drop (add Z n_70) xs_131)
+                  ==.
+                  -- <= prop_56:n=(S n_70):m=Z:xs=(Cons xs_130 xs_131):n_70=Z
+                  (drop (add n_70 n_70) xs_131)
+                  ==.
+                  -- prop_56:n=(S n_70):m=Z:xs=(Cons xs_130 xs_131):n_70=Z =>
+                  (drop (add n_70 Z) xs_131)
+                  ==.
+                  -- <= prop_56:n=(S n_70):m=Z
+                  (drop (add n_70 m) xs_131)
+                  ==.
+                  -- <= (drop (S ?n) (Cons ?x ?xs))
+                  (drop (S (add n_70 m)) (Cons xs_130 xs_131))
+                  ==.
+                  -- <= (add (S ?x) ?y)
+                  (drop (add (S n_70) m) (Cons xs_130 xs_131))
+                  ==.
+                  -- <= prop_56:n=(S n_70)
+                  (drop (add n m) (Cons xs_130 xs_131))
+                  ==.
+                  -- <= prop_56:n=(S n_70):m=Z:xs=(Cons xs_130 xs_131)
+                  (drop (add n m) xs)
+                  ***
+                  QED
+            (Nil ) ->
+              -- 
+              (drop n (drop m xs))
+              ==.
+              -- prop_56:n=(S n_70) =>
+              (drop (S n_70) (drop m xs))
+              ==.
+              -- prop_56:n=(S n_70):m=Z =>
+              (drop (S n_70) (drop Z xs))
+              ==.
+              -- (drop Z ?xs) =>
+              (drop (S n_70) xs)
+              ==.
+              -- prop_56:n=(S n_70):m=Z:xs=Nil =>
+              (drop (S n_70) Nil)
+              ==.
+              -- (drop (S ?n) Nil) =>
+              Nil
+              ==.
+              -- <= (drop (S ?n) Nil)
+              (drop (S (add n_70 m)) Nil)
+              ==.
+              -- <= (add (S ?x) ?y)
+              (drop (add (S n_70) m) Nil)
+              ==.
+              -- <= prop_56:n=(S n_70)
+              (drop (add n m) Nil)
+              ==.
+              -- <= prop_56:n=(S n_70):m=Z:xs=Nil
+              (drop (add n m) xs)
+              ***
+              QED
+    (Z ) ->
+      -- 
+      (drop n (drop m xs))
+      ==.
+      -- prop_56:n=Z =>
+      (drop Z (drop m xs))
+      ==.
+      -- (drop Z ?xs) =>
+      (drop m xs)
+      ==.
+      -- <= (add Z ?y)
+      (drop (add Z m) xs)
+      ==.
+      -- <= prop_56:n=Z
+      (drop (add n m) xs)
+      ***
+      QED
+
+Proving begin prop_57: (drop n (take m xs)) = (take (sub m n) (drop n xs))
+prop_57 = VALID (0.03 sec)
+{-@prop_57::n: Nat->m: Nat->xs: (List a)->{ (drop n (take m xs)) = (take (sub m n) (drop n xs)) }@-}
+prop_57::Nat->Nat->(List a)->Proof
+prop_57 n m xs=
+  case n of
+    (S n_80) ->
+      case m of
+        (S m_100) ->
+          case xs of
+            (Cons xs_130 xs_131) ->
+              -- 
+              (drop n (take m xs))
+              ==.
+              -- prop_57:n=(S n_80) =>
+              (drop (S n_80) (take m xs))
+              ==.
+              -- prop_57:n=(S n_80):m=(S m_100) =>
+              (drop (S n_80) (take (S m_100) xs))
+              ==.
+              -- prop_57:n=(S n_80):m=(S m_100):xs=(Cons xs_130 xs_131) =>
+              (drop (S n_80) (take (S m_100) (Cons xs_130 xs_131)))
+              ==.
+              -- (take (S ?n) (Cons ?x ?xs)) =>
+              (drop (S n_80) (Cons xs_130 (take m_100 xs_131)))
+              ==.
+              -- (drop (S ?n) (Cons ?x ?xs)) =>
+              (drop n_80 (take m_100 xs_131))
+              ==.
+              -- <= lemma-(take (sub ?m ?n) (drop ?n ?xs))=(drop ?n (take ?m ?xs))
+              (take (sub m_100 n_80) (drop n_80 xs_131))
+              ==.
+              -- <= (sub (S ?x) (S ?y))
+              (take (sub (S m_100) (S n_80)) (drop n_80 xs_131))
+              ==.
+              -- <= prop_57:n=(S n_80):m=(S m_100)
+              (take (sub m (S n_80)) (drop n_80 xs_131))
+              ==.
+              -- <= prop_57:n=(S n_80)
+              (take (sub m n) (drop n_80 xs_131))
+              ==.
+              -- <= (drop (S ?n) (Cons ?x ?xs))
+              (take (sub m n) (drop (S n_80) (Cons xs_130 xs_131)))
+              ==.
+              -- <= prop_57:n=(S n_80)
+              (take (sub m n) (drop n (Cons xs_130 xs_131)))
+              ==.
+              -- <= prop_57:n=(S n_80):m=(S m_100):xs=(Cons xs_130 xs_131)
+              (take (sub m n) (drop n xs))
+              ***
+              QED
+            (Nil ) ->
+              case n_80 of
+                (S n_80_150) ->
+                  case m_100 of
+                    (S m_100_170) ->
+                      -- 
+                      (drop n (take m xs))
+                      ==.
+                      -- prop_57:n=(S n_80):m=(S m_100) =>
+                      (drop n (take (S m_100) xs))
+                      ==.
+                      -- prop_57:n=(S n_80):m=(S m_100):xs=Nil =>
+                      (drop n (take (S m_100) Nil))
+                      ==.
+                      -- (take (S ?n) Nil) =>
+                      (drop n Nil)
+                      ==.
+                      -- <= prop_57:n=(S n_80):m=(S m_100):xs=Nil
+                      (drop n xs)
+                      ==.
+                      -- prop_57:n=(S n_80) =>
+                      (drop (S n_80) xs)
+                      ==.
+                      -- prop_57:n=(S n_80):m=(S m_100):xs=Nil =>
+                      (drop (S n_80) Nil)
+                      ==.
+                      -- (drop (S ?n) Nil) =>
+                      Nil
+                      ==.
+                      -- <= lemma-(take (sub (S ?m_100) (S ?n_80)) Nil)=Nil
+                      (take (sub (S m_100_170) (S n_80_150)) Nil)
+                      ==.
+                      -- <= prop_57:n=(S n_80):m=(S m_100):xs=Nil:n_80=(S n_80_150):m_100=(S m_100_170)
+                      (take (sub m_100 (S n_80_150)) Nil)
+                      ==.
+                      -- <= prop_57:n=(S n_80):m=(S m_100):xs=Nil:n_80=(S n_80_150)
+                      (take (sub m_100 n_80) Nil)
+                      ==.
+                      -- <= (sub (S ?x) (S ?y))
+                      (take (sub (S m_100) (S n_80)) Nil)
+                      ==.
+                      -- <= prop_57:n=(S n_80):m=(S m_100)
+                      (take (sub m (S n_80)) Nil)
+                      ==.
+                      -- <= prop_57:n=(S n_80)
+                      (take (sub m n) Nil)
+                      ==.
+                      -- <= (drop (S ?n) Nil)
+                      (take (sub m n) (drop (S n_80) Nil))
+                      ==.
+                      -- <= prop_57:n=(S n_80)
+                      (take (sub m n) (drop n Nil))
+                      ==.
+                      -- <= prop_57:n=(S n_80):m=(S m_100):xs=Nil
+                      (take (sub m n) (drop n xs))
+                      ***
+                      QED
+                    (Z ) ->
+                      -- 
+                      (drop n (take m xs))
+                      ==.
+                      -- prop_57:n=(S n_80):m=(S m_100) =>
+                      (drop n (take (S m_100) xs))
+                      ==.
+                      -- prop_57:n=(S n_80):m=(S m_100):xs=Nil =>
+                      (drop n (take (S m_100) Nil))
+                      ==.
+                      -- (take (S ?n) Nil) =>
+                      (drop n Nil)
+                      ==.
+                      -- <= prop_57:n=(S n_80):m=(S m_100):xs=Nil
+                      (drop n xs)
+                      ==.
+                      -- prop_57:n=(S n_80) =>
+                      (drop (S n_80) xs)
+                      ==.
+                      -- prop_57:n=(S n_80):m=(S m_100):xs=Nil =>
+                      (drop (S n_80) Nil)
+                      ==.
+                      -- (drop (S ?n) Nil) =>
+                      Nil
+                      ==.
+                      -- <= (take Z ?xs)
+                      (take Z xs)
+                      ==.
+                      -- <= (sub Z ?y)
+                      (take (sub Z n_80) xs)
+                      ==.
+                      -- <= prop_57:n=(S n_80):m=(S m_100):xs=Nil:n_80=(S n_80_150):m_100=Z
+                      (take (sub m_100 n_80) xs)
+                      ==.
+                      -- <= (sub (S ?x) (S ?y))
+                      (take (sub (S m_100) (S n_80)) xs)
+                      ==.
+                      -- <= prop_57:n=(S n_80):m=(S m_100)
+                      (take (sub m (S n_80)) xs)
+                      ==.
+                      -- <= prop_57:n=(S n_80)
+                      (take (sub m n) xs)
+                      ==.
+                      -- prop_57:n=(S n_80):m=(S m_100):xs=Nil =>
+                      (take (sub m n) Nil)
+                      ==.
+                      -- <= (drop (S ?n) Nil)
+                      (take (sub m n) (drop (S n_80) Nil))
+                      ==.
+                      -- <= prop_57:n=(S n_80)
+                      (take (sub m n) (drop n Nil))
+                      ==.
+                      -- <= prop_57:n=(S n_80):m=(S m_100):xs=Nil
+                      (take (sub m n) (drop n xs))
+                      ***
+                      QED
+                (Z ) ->
+                  case m_100 of
+                    (S m_100_170) ->
+                      -- 
+                      (drop n (take m xs))
+                      ==.
+                      -- prop_57:n=(S n_80):m=(S m_100) =>
+                      (drop n (take (S m_100) xs))
+                      ==.
+                      -- prop_57:n=(S n_80):m=(S m_100):xs=Nil =>
+                      (drop n (take (S m_100) Nil))
+                      ==.
+                      -- (take (S ?n) Nil) =>
+                      (drop n Nil)
+                      ==.
+                      -- <= prop_57:n=(S n_80):m=(S m_100):xs=Nil
+                      (drop n xs)
+                      ==.
+                      -- prop_57:n=(S n_80) =>
+                      (drop (S n_80) xs)
+                      ==.
+                      -- prop_57:n=(S n_80):m=(S m_100):xs=Nil =>
+                      (drop (S n_80) Nil)
+                      ==.
+                      -- (drop (S ?n) Nil) =>
+                      Nil
+                      ==.
+                      -- <= (take (S ?n) Nil)
+                      (take (S m_100_170) Nil)
+                      ==.
+                      -- <= prop_57:n=(S n_80):m=(S m_100):xs=Nil:n_80=Z:m_100=(S m_100_170)
+                      (take m_100 Nil)
+                      ==.
+                      -- <= (sub ?x Z)
+                      (take (sub m_100 Z) Nil)
+                      ==.
+                      -- <= prop_57:n=(S n_80):m=(S m_100):xs=Nil:n_80=Z
+                      (take (sub m_100 n_80) Nil)
+                      ==.
+                      -- <= (sub (S ?x) (S ?y))
+                      (take (sub (S m_100) (S n_80)) Nil)
+                      ==.
+                      -- <= prop_57:n=(S n_80):m=(S m_100)
+                      (take (sub m (S n_80)) Nil)
+                      ==.
+                      -- <= prop_57:n=(S n_80)
+                      (take (sub m n) Nil)
+                      ==.
+                      -- <= (drop (S ?n) Nil)
+                      (take (sub m n) (drop (S n_80) Nil))
+                      ==.
+                      -- <= prop_57:n=(S n_80)
+                      (take (sub m n) (drop n Nil))
+                      ==.
+                      -- <= prop_57:n=(S n_80):m=(S m_100):xs=Nil
+                      (take (sub m n) (drop n xs))
+                      ***
+                      QED
+                    (Z ) ->
+                      -- 
+                      (drop n (take m xs))
+                      ==.
+                      -- prop_57:n=(S n_80):m=(S m_100) =>
+                      (drop n (take (S m_100) xs))
+                      ==.
+                      -- prop_57:n=(S n_80):m=(S m_100):xs=Nil =>
+                      (drop n (take (S m_100) Nil))
+                      ==.
+                      -- (take (S ?n) Nil) =>
+                      (drop n Nil)
+                      ==.
+                      -- <= prop_57:n=(S n_80):m=(S m_100):xs=Nil
+                      (drop n xs)
+                      ==.
+                      -- prop_57:n=(S n_80) =>
+                      (drop (S n_80) xs)
+                      ==.
+                      -- prop_57:n=(S n_80):m=(S m_100):xs=Nil =>
+                      (drop (S n_80) Nil)
+                      ==.
+                      -- (drop (S ?n) Nil) =>
+                      Nil
+                      ==.
+                      -- <= (take Z ?xs)
+                      (take Z xs)
+                      ==.
+                      -- <= prop_57:n=(S n_80):m=(S m_100):xs=Nil:n_80=Z:m_100=Z
+                      (take m_100 xs)
+                      ==.
+                      -- <= (sub ?x Z)
+                      (take (sub m_100 Z) xs)
+                      ==.
+                      -- <= prop_57:n=(S n_80):m=(S m_100):xs=Nil:n_80=Z
+                      (take (sub m_100 n_80) xs)
+                      ==.
+                      -- <= (sub (S ?x) (S ?y))
+                      (take (sub (S m_100) (S n_80)) xs)
+                      ==.
+                      -- <= prop_57:n=(S n_80):m=(S m_100)
+                      (take (sub m (S n_80)) xs)
+                      ==.
+                      -- <= prop_57:n=(S n_80)
+                      (take (sub m n) xs)
+                      ==.
+                      -- prop_57:n=(S n_80):m=(S m_100):xs=Nil =>
+                      (take (sub m n) Nil)
+                      ==.
+                      -- <= (drop (S ?n) Nil)
+                      (take (sub m n) (drop (S n_80) Nil))
+                      ==.
+                      -- <= prop_57:n=(S n_80)
+                      (take (sub m n) (drop n Nil))
+                      ==.
+                      -- <= prop_57:n=(S n_80):m=(S m_100):xs=Nil
+                      (take (sub m n) (drop n xs))
+                      ***
+                      QED
+        (Z ) ->
+          -- 
+          (drop n (take m xs))
+          ==.
+          -- prop_57:n=(S n_80) =>
+          (drop (S n_80) (take m xs))
+          ==.
+          -- prop_57:n=(S n_80):m=Z =>
+          (drop (S n_80) (take Z xs))
+          ==.
+          -- (take Z ?xs) =>
+          (drop (S n_80) Nil)
+          ==.
+          -- (drop (S ?n) Nil) =>
+          Nil
+          ==.
+          -- <= (take Z ?xs)
+          (take Z (drop n xs))
+          ==.
+          -- <= (sub Z ?y)
+          (take (sub Z n) (drop n xs))
+          ==.
+          -- <= prop_57:n=(S n_80):m=Z
+          (take (sub m n) (drop n xs))
+          ***
+          QED
+    (Z ) ->
+      -- 
+      (drop n (take m xs))
+      ==.
+      -- prop_57:n=Z =>
+      (drop Z (take m xs))
+      ==.
+      -- (drop Z ?xs) =>
+      (take m xs)
+      ==.
+      -- <= (sub ?x Z)
+      (take (sub m Z) xs)
+      ==.
+      -- <= prop_57:n=Z
+      (take (sub m n) xs)
+      ==.
+      -- <= (drop Z ?xs)
+      (take (sub m n) (drop Z xs))
+      ==.
+      -- <= prop_57:n=Z
+      (take (sub m n) (drop n xs))
+      ***
+      QED
+
+Proving begin prop_58: (drop n (zip xs ys)) = (zip (drop n xs) (drop n ys))
+prop_58 = VALID (0.01 sec)
+{-@prop_58::ys: (List a)->n: Nat->xs: (List a)->{ (drop n (zip xs ys)) = (zip (drop n xs) (drop n ys)) }@-}
+prop_58::(List a)->Nat->(List a)->Proof
+prop_58 ys n xs=
+  case n of
+    (S n_80) ->
+      case xs of
+        (Cons xs_100 xs_101) ->
+          case ys of
+            (Cons ys_140 ys_141) ->
+              -- 
+              (drop n (zip xs ys))
+              ==.
+              -- prop_58:n=(S n_80) =>
+              (drop (S n_80) (zip xs ys))
+              ==.
+              -- prop_58:n=(S n_80):xs=(Cons xs_100 xs_101) =>
+              (drop (S n_80) (zip (Cons xs_100 xs_101) ys))
+              ==.
+              -- prop_58:n=(S n_80):xs=(Cons xs_100 xs_101):ys=(Cons ys_140 ys_141) =>
+              (drop (S n_80) (zip (Cons xs_100 xs_101) (Cons ys_140 ys_141)))
+              ==.
+              -- (zip (Cons ?x ?xs) (Cons ?y ?ys)) =>
+              (drop (S n_80) (Cons (Pair xs_100 ys_140) (zip xs_101 ys_141)))
+              ==.
+              -- (drop (S ?n) (Cons ?x ?xs)) =>
+              (drop n_80 (zip xs_101 ys_141))
+              ==.
+              -- <= lemma-(zip (drop ?n ?xs) (drop ?n ?ys))=(drop ?n (zip ?xs ?ys))
+              (zip (drop n_80 xs_101) (drop n_80 ys_141))
+              ==.
+              -- <= (drop (S ?n) (Cons ?x ?xs))
+              (zip (drop (S n_80) (Cons xs_100 xs_101)) (drop n_80 ys_141))
+              ==.
+              -- <= prop_58:n=(S n_80)
+              (zip (drop n (Cons xs_100 xs_101)) (drop n_80 ys_141))
+              ==.
+              -- <= prop_58:n=(S n_80):xs=(Cons xs_100 xs_101)
+              (zip (drop n xs) (drop n_80 ys_141))
+              ==.
+              -- <= (drop (S ?n) (Cons ?x ?xs))
+              (zip (drop n xs) (drop (S n_80) (Cons ys_140 ys_141)))
+              ==.
+              -- <= prop_58:n=(S n_80)
+              (zip (drop n xs) (drop n (Cons ys_140 ys_141)))
+              ==.
+              -- <= prop_58:n=(S n_80):xs=(Cons xs_100 xs_101):ys=(Cons ys_140 ys_141)
+              (zip (drop n xs) (drop n ys))
+              ***
+              QED
+            (Nil ) ->
+              -- 
+              (drop n (zip xs ys))
+              ==.
+              -- prop_58:n=(S n_80):xs=(Cons xs_100 xs_101):ys=Nil =>
+              (drop n (zip xs Nil))
+              ==.
+              -- (zip ?xs Nil) =>
+              (drop n Nil)
+              ==.
+              -- <= prop_58:n=(S n_80):xs=(Cons xs_100 xs_101):ys=Nil
+              (drop n ys)
+              ==.
+              -- prop_58:n=(S n_80) =>
+              (drop (S n_80) ys)
+              ==.
+              -- prop_58:n=(S n_80):xs=(Cons xs_100 xs_101):ys=Nil =>
+              (drop (S n_80) Nil)
+              ==.
+              -- (drop (S ?n) Nil) =>
+              Nil
+              ==.
+              -- <= (zip ?xs Nil)
+              (zip (drop n xs) Nil)
+              ==.
+              -- <= (drop (S ?n) Nil)
+              (zip (drop n xs) (drop (S n_80) Nil))
+              ==.
+              -- <= prop_58:n=(S n_80)
+              (zip (drop n xs) (drop n Nil))
+              ==.
+              -- <= prop_58:n=(S n_80):xs=(Cons xs_100 xs_101):ys=Nil
+              (zip (drop n xs) (drop n ys))
+              ***
+              QED
+        (Nil ) ->
+          -- 
+          (drop n (zip xs ys))
+          ==.
+          -- prop_58:n=(S n_80):xs=Nil =>
+          (drop n (zip Nil ys))
+          ==.
+          -- (zip Nil ?ys) =>
+          (drop n Nil)
+          ==.
+          -- <= prop_58:n=(S n_80):xs=Nil
+          (drop n xs)
+          ==.
+          -- prop_58:n=(S n_80) =>
+          (drop (S n_80) xs)
+          ==.
+          -- prop_58:n=(S n_80):xs=Nil =>
+          (drop (S n_80) Nil)
+          ==.
+          -- (drop (S ?n) Nil) =>
+          Nil
+          ==.
+          -- <= (zip Nil ?ys)
+          (zip Nil (drop n ys))
+          ==.
+          -- <= (drop (S ?n) Nil)
+          (zip (drop (S n_80) Nil) (drop n ys))
+          ==.
+          -- <= prop_58:n=(S n_80)
+          (zip (drop n Nil) (drop n ys))
+          ==.
+          -- <= prop_58:n=(S n_80):xs=Nil
+          (zip (drop n xs) (drop n ys))
+          ***
+          QED
+    (Z ) ->
+      -- 
+      (drop n (zip xs ys))
+      ==.
+      -- prop_58:n=Z =>
+      (drop Z (zip xs ys))
+      ==.
+      -- (drop Z ?xs) =>
+      (zip xs ys)
+      ==.
+      -- <= (drop Z ?xs)
+      (zip (drop Z xs) ys)
+      ==.
+      -- <= prop_58:n=Z
+      (zip (drop n xs) ys)
+      ==.
+      -- <= (drop Z ?xs)
+      (zip (drop n xs) (drop Z ys))
+      ==.
+      -- <= prop_58:n=Z
+      (zip (drop n xs) (drop n ys))
+      ***
+      QED
+
+Proving begin prop_61: (last (append xs ys)) = (lastOfTwo xs ys)
+prop_61 = VALID (0.03 sec)
+{-@prop_61::ys: (List a)->xs: (List a)->{ (last (append xs ys)) = (lastOfTwo xs ys) }@-}
+prop_61::(List a)->(List a)->Proof
+prop_61 ys xs=
+  case xs of
+    (Cons xs_50 xs_51) ->
+      case ys of
+        (Cons ys_100 ys_101) ->
+          case xs_51 of
+            (Cons xs_51_140 xs_51_141) ->
+              -- 
+              (last (append xs ys))
+              ==.
+              -- prop_61:xs=(Cons xs_50 xs_51) =>
+              (last (append (Cons xs_50 xs_51) ys))
+              ==.
+              -- (append (Cons ?x ?xs) ?ys) =>
+              (last (Cons xs_50 (append xs_51 ys)))
+              ==.
+              -- prop_61:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101):xs_51=(Cons xs_51_140 xs_51_141) =>
+              (last (Cons xs_50 (append (Cons xs_51_140 xs_51_141) ys)))
+              ==.
+              -- (append (Cons ?x ?xs) ?ys) =>
+              (last (Cons xs_50 (Cons xs_51_140 (append xs_51_141 ys))))
+              ==.
+              -- (last (Cons ?x (Cons ?y ?ys))) =>
+              (last (Cons xs_51_140 (append xs_51_141 ys)))
+              ==.
+              -- <= (append (Cons ?x ?xs) ?ys)
+              (last (append (Cons xs_51_140 xs_51_141) ys))
+              ==.
+              -- <= prop_61:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101):xs_51=(Cons xs_51_140 xs_51_141)
+              (last (append xs_51 ys))
+              ==.
+              -- prop_61:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101):xs_51=(Cons xs_51_140 xs_51_141) =>
+              (last (append (Cons xs_51_140 xs_51_141) ys))
+              ==.
+              -- (append (Cons ?x ?xs) ?ys) =>
+              (last (Cons xs_51_140 (append xs_51_141 ys)))
+              ==.
+              -- prop_61:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101) =>
+              (last (Cons xs_51_140 (append xs_51_141 (Cons ys_100 ys_101))))
+              ==.
+              -- lemma-(last (Cons ?xs_50 (append ?xs_51 (Cons ?ys_100 ?ys_101))))=(last (Cons ?ys_100 ?ys_101)) =>
+              (last (Cons ys_100 ys_101))
+              ==.
+              -- <= (lastOfTwo ?xs (Cons ?y ?ys))
+              (lastOfTwo xs (Cons ys_100 ys_101))
+              ==.
+              -- <= prop_61:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101)
+              (lastOfTwo xs ys)
+              ***
+              QED
+            (Nil ) ->
+              -- 
+              (last (append xs ys))
+              ==.
+              -- prop_61:xs=(Cons xs_50 xs_51) =>
+              (last (append (Cons xs_50 xs_51) ys))
+              ==.
+              -- (append (Cons ?x ?xs) ?ys) =>
+              (last (Cons xs_50 (append xs_51 ys)))
+              ==.
+              -- prop_61:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101):xs_51=Nil =>
+              (last (Cons xs_50 (append Nil ys)))
+              ==.
+              -- (append Nil ?ys) =>
+              (last (Cons xs_50 ys))
+              ==.
+              -- prop_61:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101) =>
+              (last (Cons xs_50 (Cons ys_100 ys_101)))
+              ==.
+              -- (last (Cons ?x (Cons ?y ?ys))) =>
+              (last (Cons ys_100 ys_101))
+              ==.
+              -- <= (lastOfTwo ?xs (Cons ?y ?ys))
+              (lastOfTwo xs (Cons ys_100 ys_101))
+              ==.
+              -- <= prop_61:xs=(Cons xs_50 xs_51):ys=(Cons ys_100 ys_101)
+              (lastOfTwo xs ys)
+              ***
+              QED
+        (Nil ) ->
+          case xs_51 of
+            (Cons xs_51_120 xs_51_121) ->
+              -- 
+              (last (append xs ys))
+              ==.
+              -- prop_61:xs=(Cons xs_50 xs_51) =>
+              (last (append (Cons xs_50 xs_51) ys))
+              ==.
+              -- (append (Cons ?x ?xs) ?ys) =>
+              (last (Cons xs_50 (append xs_51 ys)))
+              ==.
+              -- prop_61:xs=(Cons xs_50 xs_51):ys=Nil:xs_51=(Cons xs_51_120 xs_51_121) =>
+              (last (Cons xs_50 (append (Cons xs_51_120 xs_51_121) ys)))
+              ==.
+              -- (append (Cons ?x ?xs) ?ys) =>
+              (last (Cons xs_50 (Cons xs_51_120 (append xs_51_121 ys))))
+              ==.
+              -- (last (Cons ?x (Cons ?y ?ys))) =>
+              (last (Cons xs_51_120 (append xs_51_121 ys)))
+              ==.
+              -- <= (append (Cons ?x ?xs) ?ys)
+              (last (append (Cons xs_51_120 xs_51_121) ys))
+              ==.
+              -- <= prop_61:xs=(Cons xs_50 xs_51):ys=Nil:xs_51=(Cons xs_51_120 xs_51_121)
+              (last (append xs_51 ys))
+              ==.
+              -- prop_61:xs=(Cons xs_50 xs_51):ys=Nil:xs_51=(Cons xs_51_120 xs_51_121) =>
+              (last (append (Cons xs_51_120 xs_51_121) ys))
+              ==.
+              -- (append (Cons ?x ?xs) ?ys) =>
+              (last (Cons xs_51_120 (append xs_51_121 ys)))
+              ==.
+              -- prop_61:xs=(Cons xs_50 xs_51):ys=Nil =>
+              (last (Cons xs_51_120 (append xs_51_121 Nil)))
+              ==.
+              -- <= lemma-(last (Cons ?xs_50 ?xs_51))=(last (Cons ?xs_50 (append ?xs_51 Nil)))
+              (last (Cons xs_51_120 xs_51_121))
+              ==.
+              -- <= (last (Cons ?x (Cons ?y ?ys)))
+              (last (Cons xs_50 (Cons xs_51_120 xs_51_121)))
+              ==.
+              -- <= prop_61:xs=(Cons xs_50 xs_51):ys=Nil:xs_51=(Cons xs_51_120 xs_51_121)
+              (last (Cons xs_50 xs_51))
+              ==.
+              -- <= prop_61:xs=(Cons xs_50 xs_51)
+              (last xs)
+              ==.
+              -- <= (lastOfTwo ?xs Nil)
+              (lastOfTwo xs Nil)
+              ==.
+              -- <= prop_61:xs=(Cons xs_50 xs_51):ys=Nil
+              (lastOfTwo xs ys)
+              ***
+              QED
+            (Nil ) ->
+              -- 
+              (last (append xs ys))
+              ==.
+              -- prop_61:xs=(Cons xs_50 xs_51) =>
+              (last (append (Cons xs_50 xs_51) ys))
+              ==.
+              -- (append (Cons ?x ?xs) ?ys) =>
+              (last (Cons xs_50 (append xs_51 ys)))
+              ==.
+              -- prop_61:xs=(Cons xs_50 xs_51):ys=Nil:xs_51=Nil =>
+              (last (Cons xs_50 (append Nil ys)))
+              ==.
+              -- (append Nil ?ys) =>
+              (last (Cons xs_50 ys))
+              ==.
+              -- prop_61:xs=(Cons xs_50 xs_51):ys=Nil =>
+              (last (Cons xs_50 Nil))
+              ==.
+              -- <= prop_61:xs=(Cons xs_50 xs_51):ys=Nil:xs_51=Nil
+              (last (Cons xs_50 xs_51))
+              ==.
+              -- <= prop_61:xs=(Cons xs_50 xs_51)
+              (last xs)
+              ==.
+              -- <= (lastOfTwo ?xs Nil)
+              (lastOfTwo xs Nil)
+              ==.
+              -- <= prop_61:xs=(Cons xs_50 xs_51):ys=Nil
+              (lastOfTwo xs ys)
+              ***
+              QED
+    (Nil ) ->
+      case ys of
+        (Cons ys_70 ys_71) ->
+          -- 
+          (last (append xs ys))
+          ==.
+          -- prop_61:xs=Nil =>
+          (last (append Nil ys))
+          ==.
+          -- (append Nil ?ys) =>
+          (last ys)
+          ==.
+          -- prop_61:xs=Nil:ys=(Cons ys_70 ys_71) =>
+          (last (Cons ys_70 ys_71))
+          ==.
+          -- <= (lastOfTwo ?xs (Cons ?y ?ys))
+          (lastOfTwo xs (Cons ys_70 ys_71))
+          ==.
+          -- <= prop_61:xs=Nil:ys=(Cons ys_70 ys_71)
+          (lastOfTwo xs ys)
+          ***
+          QED
+        (Nil ) ->
+          -- 
+          (last (append xs ys))
+          ==.
+          -- prop_61:xs=Nil =>
+          (last (append Nil ys))
+          ==.
+          -- (append Nil ?ys) =>
+          (last ys)
+          ==.
+          -- <= (lastOfTwo ?xs Nil)
+          (lastOfTwo ys Nil)
+          ==.
+          -- prop_61:xs=Nil:ys=Nil =>
+          (lastOfTwo Nil Nil)
+          ==.
+          -- <= prop_61:xs=Nil
+          (lastOfTwo xs Nil)
+          ==.
+          -- <= prop_61:xs=Nil:ys=Nil
+          (lastOfTwo xs ys)
+          ***
+          QED
+
+Proving begin prop_64: (last (append xs (Cons x Nil))) = x
+prop_64 = VALID (0.01 sec)
+{-@prop_64::xs: (List a)->x: a->{ (last (append xs (Cons x Nil))) = x }@-}
+prop_64::(List a)->a->Proof
+prop_64 xs x=
+  case xs of
+    (Cons xs_60 xs_61) ->
+      case xs_61 of
+        (Cons xs_61_110 xs_61_111) ->
+          -- 
+          (last (append xs (Cons x Nil)))
+          ==.
+          -- prop_64:xs=(Cons xs_60 xs_61) =>
+          (last (append (Cons xs_60 xs_61) (Cons x Nil)))
+          ==.
+          -- (append (Cons ?x ?xs) ?ys) =>
+          (last (Cons xs_60 (append xs_61 (Cons x Nil))))
+          ==.
+          -- prop_64:xs=(Cons xs_60 xs_61):xs_61=(Cons xs_61_110 xs_61_111) =>
+          (last (Cons xs_60 (append (Cons xs_61_110 xs_61_111) (Cons x Nil))))
+          ==.
+          -- (append (Cons ?x ?xs) ?ys) =>
+          (last (Cons xs_60 (Cons xs_61_110 (append xs_61_111 (Cons x Nil)))))
+          ==.
+          -- (last (Cons ?x (Cons ?y ?ys))) =>
+          (last (Cons xs_61_110 (append xs_61_111 (Cons x Nil))))
+          ==.
+          -- lemma-(last (Cons ?xs_60 (append ?xs_61 (Cons ?x Nil))))=?x =>
+          x
+          ***
+          QED
+        (Nil ) ->
+          -- 
+          (last (append xs (Cons x Nil)))
+          ==.
+          -- prop_64:xs=(Cons xs_60 xs_61) =>
+          (last (append (Cons xs_60 xs_61) (Cons x Nil)))
+          ==.
+          -- (append (Cons ?x ?xs) ?ys) =>
+          (last (Cons xs_60 (append xs_61 (Cons x Nil))))
+          ==.
+          -- prop_64:xs=(Cons xs_60 xs_61):xs_61=Nil =>
+          (last (Cons xs_60 (append Nil (Cons x Nil))))
+          ==.
+          -- (append Nil ?ys) =>
+          (last (Cons xs_60 (Cons x Nil)))
+          ==.
+          -- <= prop_64:xs=(Cons xs_60 xs_61):xs_61=Nil
+          (last (Cons xs_60 (Cons x xs_61)))
+          ==.
+          -- (last (Cons ?x (Cons ?y ?ys))) =>
+          (last (Cons x xs_61))
+          ==.
+          -- prop_64:xs=(Cons xs_60 xs_61):xs_61=Nil =>
+          (last (Cons x Nil))
+          ==.
+          -- (last (Cons ?x Nil)) =>
+          x
+          ***
+          QED
+    (Nil ) ->
+      -- 
+      (last (append xs (Cons x Nil)))
+      ==.
+      -- prop_64:xs=Nil =>
+      (last (append Nil (Cons x Nil)))
+      ==.
+      -- (append Nil ?ys) =>
+      (last (Cons x Nil))
+      ==.
+      -- (last (Cons ?x Nil)) =>
+      x
+      ***
+      QED
+
+Proving begin prop_67: (len (butlast xs)) = (sub (len xs) (S Z))
+prop_67 = VALID (0.01 sec)
+{-@prop_67::xs: (List a)->{ (len (butlast xs)) = (sub (len xs) (S Z)) }@-}
+prop_67::(List a)->Proof
+prop_67 xs=
+  case xs of
+    (Cons xs_70 xs_71) ->
+      case xs_71 of
+        (Cons xs_71_130 xs_71_131) ->
+          -- 
+          (len (butlast xs))
+          ==.
+          -- prop_67:xs=(Cons xs_70 xs_71) =>
+          (len (butlast (Cons xs_70 xs_71)))
+          ==.
+          -- prop_67:xs=(Cons xs_70 xs_71):xs_71=(Cons xs_71_130 xs_71_131) =>
+          (len (butlast (Cons xs_70 (Cons xs_71_130 xs_71_131))))
+          ==.
+          -- (butlast (Cons ?x (Cons ?y ?ys))) =>
+          (len (Cons xs_70 (butlast (Cons xs_71_130 xs_71_131))))
+          ==.
+          -- <= prop_67:xs=(Cons xs_70 xs_71):xs_71=(Cons xs_71_130 xs_71_131)
+          (len (Cons xs_70 (butlast xs_71)))
+          ==.
+          -- (len (Cons ?x ?xs)) =>
+          (S (len (butlast xs_71)))
+          ==.
+          -- prop_67:xs=(Cons xs_70 xs_71):xs_71=(Cons xs_71_130 xs_71_131) =>
+          (S (len (butlast (Cons xs_71_130 xs_71_131))))
+          ==.
+          -- lemma-(len (butlast (Cons ?xs_70 ?xs_71)))=(len ?xs_71) =>
+          (S (len xs_71_131))
+          ==.
+          -- <= (len (Cons ?x ?xs))
+          (len (Cons xs_71_130 xs_71_131))
+          ==.
+          -- <= prop_67:xs=(Cons xs_70 xs_71):xs_71=(Cons xs_71_130 xs_71_131)
+          (len xs_71)
+          ==.
+          -- <= (sub ?x Z)
+          (sub (len xs_71) Z)
+          ==.
+          -- <= (sub (S ?x) (S ?y))
+          (sub (S (len xs_71)) (S Z))
+          ==.
+          -- <= (len (Cons ?x ?xs))
+          (sub (len (Cons xs_70 xs_71)) (S Z))
+          ==.
+          -- <= prop_67:xs=(Cons xs_70 xs_71)
+          (sub (len xs) (S Z))
+          ***
+          QED
+        (Nil ) ->
+          -- 
+          (len (butlast xs))
+          ==.
+          -- prop_67:xs=(Cons xs_70 xs_71) =>
+          (len (butlast (Cons xs_70 xs_71)))
+          ==.
+          -- prop_67:xs=(Cons xs_70 xs_71):xs_71=Nil =>
+          (len (butlast (Cons xs_70 Nil)))
+          ==.
+          -- (butlast (Cons ?x Nil)) =>
+          (len Nil)
+          ==.
+          -- <= prop_67:xs=(Cons xs_70 xs_71):xs_71=Nil
+          (len xs_71)
+          ==.
+          -- <= (sub ?x Z)
+          (sub (len xs_71) Z)
+          ==.
+          -- <= (sub (S ?x) (S ?y))
+          (sub (S (len xs_71)) (S Z))
+          ==.
+          -- <= (len (Cons ?x ?xs))
+          (sub (len (Cons xs_70 xs_71)) (S Z))
+          ==.
+          -- <= prop_67:xs=(Cons xs_70 xs_71)
+          (sub (len xs) (S Z))
+          ***
+          QED
+    (Nil ) ->
+      -- 
+      (len (butlast xs))
+      ==.
+      -- prop_67:xs=Nil =>
+      (len (butlast Nil))
+      ==.
+      -- (butlast Nil) =>
+      (len Nil)
+      ==.
+      -- <= prop_67:xs=Nil
+      (len xs)
+      ==.
+      -- prop_67:xs=Nil =>
+      (len Nil)
+      ==.
+      -- (len Nil) =>
+      Z
+      ==.
+      -- <= (sub Z ?y)
+      (sub Z (S Z))
+      ==.
+      -- <= (len Nil)
+      (sub (len Nil) (S Z))
+      ==.
+      -- <= prop_67:xs=Nil
+      (sub (len xs) (S Z))
+      ***
+      QED
+
+Proving begin prop_79: (sub (sub (S m) n) (S k)) = (sub (sub m n) k)
+prop_79 = VALID (0.01 sec)
+{-@prop_79::k: Nat->n: Nat->m: Nat->{ (sub (sub (S m) n) (S k)) = (sub (sub m n) k) }@-}
+prop_79::Nat->Nat->Nat->Proof
+prop_79 k n m=
+  case n of
+    (S n_90) ->
+      case m of
+        (S m_120) ->
+          -- 
+          (sub (sub (S m) n) (S k))
+          ==.
+          -- prop_79:n=(S n_90) =>
+          (sub (sub (S m) (S n_90)) (S k))
+          ==.
+          -- (sub (S ?x) (S ?y)) =>
+          (sub (sub m n_90) (S k))
+          ==.
+          -- prop_79:n=(S n_90):m=(S m_120) =>
+          (sub (sub (S m_120) n_90) (S k))
+          ==.
+          -- lemma-(sub (sub (S ?m) ?n) (S ?k))=(sub (sub ?m ?n) ?k) =>
+          (sub (sub m_120 n_90) k)
+          ==.
+          -- <= (sub (S ?x) (S ?y))
+          (sub (sub (S m_120) (S n_90)) k)
+          ==.
+          -- <= prop_79:n=(S n_90):m=(S m_120)
+          (sub (sub m (S n_90)) k)
+          ==.
+          -- <= prop_79:n=(S n_90)
+          (sub (sub m n) k)
+          ***
+          QED
+        (Z ) ->
+          -- 
+          (sub (sub (S m) n) (S k))
+          ==.
+          -- prop_79:n=(S n_90) =>
+          (sub (sub (S m) (S n_90)) (S k))
+          ==.
+          -- (sub (S ?x) (S ?y)) =>
+          (sub (sub m n_90) (S k))
+          ==.
+          -- prop_79:n=(S n_90):m=Z =>
+          (sub (sub Z n_90) (S k))
+          ==.
+          -- (sub Z ?y) =>
+          (sub Z (S k))
+          ==.
+          -- (sub Z ?y) =>
+          Z
+          ==.
+          -- <= (sub Z ?y)
+          (sub Z k)
+          ==.
+          -- <= (sub Z ?y)
+          (sub (sub Z n) k)
+          ==.
+          -- <= prop_79:n=(S n_90):m=Z
+          (sub (sub m n) k)
+          ***
+          QED
+    (Z ) ->
+      -- 
+      (sub (sub (S m) n) (S k))
+      ==.
+      -- prop_79:n=Z =>
+      (sub (sub (S m) Z) (S k))
+      ==.
+      -- (sub ?x Z) =>
+      (sub (S m) (S k))
+      ==.
+      -- (sub (S ?x) (S ?y)) =>
+      (sub m k)
+      ==.
+      -- <= (sub ?x Z)
+      (sub (sub m Z) k)
+      ==.
+      -- <= prop_79:n=Z
+      (sub (sub m n) k)
+      ***
+      QED
+
+Proving begin prop_80: (take n (append xs ys)) = (append (take n xs) (take (sub n (len xs)) ys))
+prop_80 = VALID (0.01 sec)
+{-@prop_80::n: Nat->xs: (List a)->ys: (List a)->{ (take n (append xs ys)) = (append (take n xs) (take (sub n (len xs)) ys)) }@-}
+prop_80::Nat->(List a)->(List a)->Proof
+prop_80 n xs ys=
+  case n of
+    (S n_100) ->
+      case xs of
+        (Cons xs_120 xs_121) ->
+          -- 
+          (take n (append xs ys))
+          ==.
+          -- prop_80:n=(S n_100) =>
+          (take (S n_100) (append xs ys))
+          ==.
+          -- prop_80:n=(S n_100):xs=(Cons xs_120 xs_121) =>
+          (take (S n_100) (append (Cons xs_120 xs_121) ys))
+          ==.
+          -- (append (Cons ?x ?xs) ?ys) =>
+          (take (S n_100) (Cons xs_120 (append xs_121 ys)))
+          ==.
+          -- (take (S ?n) (Cons ?x ?xs)) =>
+          (Cons xs_120 (take n_100 (append xs_121 ys)))
+          ==.
+          -- lemma-(take ?n (append ?xs ?ys))=(append (take ?n ?xs) (take (sub ?n (len ?xs)) ?ys)) =>
+          (Cons xs_120 (append (take n_100 xs_121) (take (sub n_100 (len xs_121)) ys)))
+          ==.
+          -- <= (sub (S ?x) (S ?y))
+          (Cons xs_120 (append (take n_100 xs_121) (take (sub (S n_100) (S (len xs_121))) ys)))
+          ==.
+          -- <= prop_80:n=(S n_100)
+          (Cons xs_120 (append (take n_100 xs_121) (take (sub n (S (len xs_121))) ys)))
+          ==.
+          -- <= (len (Cons ?x ?xs))
+          (Cons xs_120 (append (take n_100 xs_121) (take (sub n (len (Cons xs_120 xs_121))) ys)))
+          ==.
+          -- <= prop_80:n=(S n_100):xs=(Cons xs_120 xs_121)
+          (Cons xs_120 (append (take n_100 xs_121) (take (sub n (len xs)) ys)))
+          ==.
+          -- <= (append (Cons ?x ?xs) ?ys)
+          (append (Cons xs_120 (take n_100 xs_121)) (take (sub n (len xs)) ys))
+          ==.
+          -- <= (take (S ?n) (Cons ?x ?xs))
+          (append (take (S n_100) (Cons xs_120 xs_121)) (take (sub n (len xs)) ys))
+          ==.
+          -- <= prop_80:n=(S n_100)
+          (append (take n (Cons xs_120 xs_121)) (take (sub n (len xs)) ys))
+          ==.
+          -- <= prop_80:n=(S n_100):xs=(Cons xs_120 xs_121)
+          (append (take n xs) (take (sub n (len xs)) ys))
+          ***
+          QED
+        (Nil ) ->
+          -- 
+          (take n (append xs ys))
+          ==.
+          -- <= (sub ?x Z)
+          (take (sub n Z) (append xs ys))
+          ==.
+          -- <= (len Nil)
+          (take (sub n (len Nil)) (append xs ys))
+          ==.
+          -- <= prop_80:n=(S n_100):xs=Nil
+          (take (sub n (len xs)) (append xs ys))
+          ==.
+          -- prop_80:n=(S n_100):xs=Nil =>
+          (take (sub n (len xs)) (append Nil ys))
+          ==.
+          -- (append Nil ?ys) =>
+          (take (sub n (len xs)) ys)
+          ==.
+          -- <= (append Nil ?ys)
+          (append Nil (take (sub n (len xs)) ys))
+          ==.
+          -- <= (take (S ?n) Nil)
+          (append (take (S n_100) Nil) (take (sub n (len xs)) ys))
+          ==.
+          -- <= prop_80:n=(S n_100)
+          (append (take n Nil) (take (sub n (len xs)) ys))
+          ==.
+          -- <= prop_80:n=(S n_100):xs=Nil
+          (append (take n xs) (take (sub n (len xs)) ys))
+          ***
+          QED
+    (Z ) ->
+      -- 
+      (take n (append xs ys))
+      ==.
+      -- prop_80:n=Z =>
+      (take Z (append xs ys))
+      ==.
+      -- (take Z ?xs) =>
+      Nil
+      ==.
+      -- <= (take Z ?xs)
+      (take Z ys)
+      ==.
+      -- <= (sub Z ?y)
+      (take (sub Z (len xs)) ys)
+      ==.
+      -- <= prop_80:n=Z
+      (take (sub n (len xs)) ys)
+      ==.
+      -- <= (append Nil ?ys)
+      (append Nil (take (sub n (len xs)) ys))
+      ==.
+      -- <= (take Z ?xs)
+      (append (take Z xs) (take (sub n (len xs)) ys))
+      ==.
+      -- <= prop_80:n=Z
+      (append (take n xs) (take (sub n (len xs)) ys))
+      ***
+      QED
+
+Proving begin prop_82: (take n (zip xs ys)) = (zip (take n xs) (take n ys))
+prop_82 = VALID (0.02 sec)
+{-@prop_82::xs: (List a)->ys: (List a)->n: Nat->{ (take n (zip xs ys)) = (zip (take n xs) (take n ys)) }@-}
+prop_82::(List a)->(List a)->Nat->Proof
+prop_82 xs ys n=
+  case n of
+    (S n_80) ->
+      case xs of
+        (Cons xs_100 xs_101) ->
+          case ys of
+            (Cons ys_150 ys_151) ->
+              -- 
+              (take n (zip xs ys))
+              ==.
+              -- prop_82:n=(S n_80) =>
+              (take (S n_80) (zip xs ys))
+              ==.
+              -- prop_82:n=(S n_80):xs=(Cons xs_100 xs_101) =>
+              (take (S n_80) (zip (Cons xs_100 xs_101) ys))
+              ==.
+              -- prop_82:n=(S n_80):xs=(Cons xs_100 xs_101):ys=(Cons ys_150 ys_151) =>
+              (take (S n_80) (zip (Cons xs_100 xs_101) (Cons ys_150 ys_151)))
+              ==.
+              -- (zip (Cons ?x ?xs) (Cons ?y ?ys)) =>
+              (take (S n_80) (Cons (Pair xs_100 ys_150) (zip xs_101 ys_151)))
+              ==.
+              -- (take (S ?n) (Cons ?x ?xs)) =>
+              (Cons (Pair xs_100 ys_150) (take n_80 (zip xs_101 ys_151)))
+              ==.
+              -- lemma-(take ?n (zip ?xs ?ys))=(zip (take ?n ?xs) (take ?n ?ys)) =>
+              (Cons (Pair xs_100 ys_150) (zip (take n_80 xs_101) (take n_80 ys_151)))
+              ==.
+              -- <= (zip (Cons ?x ?xs) (Cons ?y ?ys))
+              (zip (Cons xs_100 (take n_80 xs_101)) (Cons ys_150 (take n_80 ys_151)))
+              ==.
+              -- <= (take (S ?n) (Cons ?x ?xs))
+              (zip (take (S n_80) (Cons xs_100 xs_101)) (Cons ys_150 (take n_80 ys_151)))
+              ==.
+              -- <= prop_82:n=(S n_80)
+              (zip (take n (Cons xs_100 xs_101)) (Cons ys_150 (take n_80 ys_151)))
+              ==.
+              -- <= prop_82:n=(S n_80):xs=(Cons xs_100 xs_101)
+              (zip (take n xs) (Cons ys_150 (take n_80 ys_151)))
+              ==.
+              -- <= (take (S ?n) (Cons ?x ?xs))
+              (zip (take n xs) (take (S n_80) (Cons ys_150 ys_151)))
+              ==.
+              -- <= prop_82:n=(S n_80)
+              (zip (take n xs) (take n (Cons ys_150 ys_151)))
+              ==.
+              -- <= prop_82:n=(S n_80):xs=(Cons xs_100 xs_101):ys=(Cons ys_150 ys_151)
+              (zip (take n xs) (take n ys))
+              ***
+              QED
+            (Nil ) ->
+              -- 
+              (take n (zip xs ys))
+              ==.
+              -- prop_82:n=(S n_80):xs=(Cons xs_100 xs_101):ys=Nil =>
+              (take n (zip xs Nil))
+              ==.
+              -- (zip ?xs Nil) =>
+              (take n Nil)
+              ==.
+              -- <= prop_82:n=(S n_80):xs=(Cons xs_100 xs_101):ys=Nil
+              (take n ys)
+              ==.
+              -- prop_82:n=(S n_80) =>
+              (take (S n_80) ys)
+              ==.
+              -- prop_82:n=(S n_80):xs=(Cons xs_100 xs_101):ys=Nil =>
+              (take (S n_80) Nil)
+              ==.
+              -- (take (S ?n) Nil) =>
+              Nil
+              ==.
+              -- <= (zip ?xs Nil)
+              (zip (take n xs) Nil)
+              ==.
+              -- <= (take (S ?n) Nil)
+              (zip (take n xs) (take (S n_80) Nil))
+              ==.
+              -- <= prop_82:n=(S n_80)
+              (zip (take n xs) (take n Nil))
+              ==.
+              -- <= prop_82:n=(S n_80):xs=(Cons xs_100 xs_101):ys=Nil
+              (zip (take n xs) (take n ys))
+              ***
+              QED
+        (Nil ) ->
+          -- 
+          (take n (zip xs ys))
+          ==.
+          -- prop_82:n=(S n_80):xs=Nil =>
+          (take n (zip Nil ys))
+          ==.
+          -- (zip Nil ?ys) =>
+          (take n Nil)
+          ==.
+          -- <= prop_82:n=(S n_80):xs=Nil
+          (take n xs)
+          ==.
+          -- prop_82:n=(S n_80) =>
+          (take (S n_80) xs)
+          ==.
+          -- prop_82:n=(S n_80):xs=Nil =>
+          (take (S n_80) Nil)
+          ==.
+          -- (take (S ?n) Nil) =>
+          Nil
+          ==.
+          -- <= (zip Nil ?ys)
+          (zip Nil (take n ys))
+          ==.
+          -- <= (take (S ?n) Nil)
+          (zip (take (S n_80) Nil) (take n ys))
+          ==.
+          -- <= prop_82:n=(S n_80)
+          (zip (take n Nil) (take n ys))
+          ==.
+          -- <= prop_82:n=(S n_80):xs=Nil
+          (zip (take n xs) (take n ys))
+          ***
+          QED
+    (Z ) ->
+      -- 
+      (take n (zip xs ys))
+      ==.
+      -- prop_82:n=Z =>
+      (take Z (zip xs ys))
+      ==.
+      -- (take Z ?xs) =>
+      Nil
+      ==.
+      -- <= (zip Nil ?ys)
+      (zip Nil (take n ys))
+      ==.
+      -- <= (take Z ?xs)
+      (zip (take Z xs) (take n ys))
+      ==.
+      -- <= prop_82:n=Z
+      (zip (take n xs) (take n ys))
+      ***
+      QED
+
+Proving begin prop_83: (zip (append xs ys) zs) = (append (zip xs (take (len xs) zs)) (zip ys (drop (len xs) zs)))
+prop_83 = VALID (0.37 sec)
+{-@prop_83::ys: (List a)->zs: (List a)->xs: (List a)->{ (zip (append xs ys) zs) = (append (zip xs (take (len xs) zs)) (zip ys (drop (len xs) zs))) }@-}
+prop_83::(List a)->(List a)->(List a)->Proof
+prop_83 ys zs xs=
+  case xs of
+    (Cons xs_110 xs_111) ->
+      case ys of
+        (Cons ys_180 ys_181) ->
+          case zs of
+            (Cons zs_210 zs_211) ->
+              case xs_111 of
+                (Cons xs_111_340 xs_111_341) ->
+                  -- 
+                  (zip (append xs ys) zs)
+                  ==.
+                  -- prop_83:xs=(Cons xs_110 xs_111) =>
+                  (zip (append (Cons xs_110 xs_111) ys) zs)
+                  ==.
+                  -- (append (Cons ?x ?xs) ?ys) =>
+                  (zip (Cons xs_110 (append xs_111 ys)) zs)
+                  ==.
+                  -- prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181):zs=(Cons zs_210 zs_211) =>
+                  (zip (Cons xs_110 (append xs_111 ys)) (Cons zs_210 zs_211))
+                  ==.
+                  -- (zip (Cons ?x ?xs) (Cons ?y ?ys)) =>
+                  (Cons (Pair xs_110 zs_210) (zip (append xs_111 ys) zs_211))
+                  ==.
+                  -- prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181):zs=(Cons zs_210 zs_211):xs_111=(Cons xs_111_340 xs_111_341) =>
+                  (Cons (Pair xs_110 zs_210) (zip (append (Cons xs_111_340 xs_111_341) ys) zs_211))
+                  ==.
+                  -- prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181) =>
+                  (Cons (Pair xs_110 zs_210) (zip (append (Cons xs_111_340 xs_111_341) (Cons ys_180 ys_181)) zs_211))
+                  ==.
+                  -- lemma-(zip (append (Cons ?xs_110 ?xs_111) (Cons ?ys_180 ?ys_181)) ?zs)=(append (zip (Cons ?xs_110 ?xs_111) (take (len (Cons ?xs_110 ?xs_111)) ?zs)) (zip (Cons ?ys_180 ?ys_181) (drop (len (Cons ?xs_110 ?xs_111)) ?zs))) =>
+                  (Cons (Pair xs_110 zs_210) (append (zip (Cons xs_111_340 xs_111_341) (take (len (Cons xs_111_340 xs_111_341)) zs_211)) (zip (Cons ys_180 ys_181) (drop (len (Cons xs_111_340 xs_111_341)) zs_211))))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181):zs=(Cons zs_210 zs_211):xs_111=(Cons xs_111_340 xs_111_341)
+                  (Cons (Pair xs_110 zs_210) (append (zip xs_111 (take (len (Cons xs_111_340 xs_111_341)) zs_211)) (zip (Cons ys_180 ys_181) (drop (len (Cons xs_111_340 xs_111_341)) zs_211))))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181):zs=(Cons zs_210 zs_211):xs_111=(Cons xs_111_340 xs_111_341)
+                  (Cons (Pair xs_110 zs_210) (append (zip xs_111 (take (len xs_111) zs_211)) (zip (Cons ys_180 ys_181) (drop (len (Cons xs_111_340 xs_111_341)) zs_211))))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181)
+                  (Cons (Pair xs_110 zs_210) (append (zip xs_111 (take (len xs_111) zs_211)) (zip ys (drop (len (Cons xs_111_340 xs_111_341)) zs_211))))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181):zs=(Cons zs_210 zs_211):xs_111=(Cons xs_111_340 xs_111_341)
+                  (Cons (Pair xs_110 zs_210) (append (zip xs_111 (take (len xs_111) zs_211)) (zip ys (drop (len xs_111) zs_211))))
+                  ==.
+                  -- <= (drop (S ?n) (Cons ?x ?xs))
+                  (Cons (Pair xs_110 zs_210) (append (zip xs_111 (take (len xs_111) zs_211)) (zip ys (drop (S (len xs_111)) (Cons zs_210 zs_211)))))
+                  ==.
+                  -- <= (len (Cons ?x ?xs))
+                  (Cons (Pair xs_110 zs_210) (append (zip xs_111 (take (len xs_111) zs_211)) (zip ys (drop (len (Cons xs_110 xs_111)) (Cons zs_210 zs_211)))))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111)
+                  (Cons (Pair xs_110 zs_210) (append (zip xs_111 (take (len xs_111) zs_211)) (zip ys (drop (len xs) (Cons zs_210 zs_211)))))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181):zs=(Cons zs_210 zs_211)
+                  (Cons (Pair xs_110 zs_210) (append (zip xs_111 (take (len xs_111) zs_211)) (zip ys (drop (len xs) zs))))
+                  ==.
+                  -- <= (append (Cons ?x ?xs) ?ys)
+                  (append (Cons (Pair xs_110 zs_210) (zip xs_111 (take (len xs_111) zs_211))) (zip ys (drop (len xs) zs)))
+                  ==.
+                  -- <= (zip (Cons ?x ?xs) (Cons ?y ?ys))
+                  (append (zip (Cons xs_110 xs_111) (Cons zs_210 (take (len xs_111) zs_211))) (zip ys (drop (len xs) zs)))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111)
+                  (append (zip xs (Cons zs_210 (take (len xs_111) zs_211))) (zip ys (drop (len xs) zs)))
+                  ==.
+                  -- <= (take (S ?n) (Cons ?x ?xs))
+                  (append (zip xs (take (S (len xs_111)) (Cons zs_210 zs_211))) (zip ys (drop (len xs) zs)))
+                  ==.
+                  -- <= (len (Cons ?x ?xs))
+                  (append (zip xs (take (len (Cons xs_110 xs_111)) (Cons zs_210 zs_211))) (zip ys (drop (len xs) zs)))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111)
+                  (append (zip xs (take (len xs) (Cons zs_210 zs_211))) (zip ys (drop (len xs) zs)))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181):zs=(Cons zs_210 zs_211)
+                  (append (zip xs (take (len xs) zs)) (zip ys (drop (len xs) zs)))
+                  ***
+                  QED
+                (Nil ) ->
+                  -- 
+                  (zip (append xs ys) zs)
+                  ==.
+                  -- prop_83:xs=(Cons xs_110 xs_111) =>
+                  (zip (append (Cons xs_110 xs_111) ys) zs)
+                  ==.
+                  -- (append (Cons ?x ?xs) ?ys) =>
+                  (zip (Cons xs_110 (append xs_111 ys)) zs)
+                  ==.
+                  -- prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181):zs=(Cons zs_210 zs_211) =>
+                  (zip (Cons xs_110 (append xs_111 ys)) (Cons zs_210 zs_211))
+                  ==.
+                  -- (zip (Cons ?x ?xs) (Cons ?y ?ys)) =>
+                  (Cons (Pair xs_110 zs_210) (zip (append xs_111 ys) zs_211))
+                  ==.
+                  -- prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181):zs=(Cons zs_210 zs_211):xs_111=Nil =>
+                  (Cons (Pair xs_110 zs_210) (zip (append Nil ys) zs_211))
+                  ==.
+                  -- (append Nil ?ys) =>
+                  (Cons (Pair xs_110 zs_210) (zip ys zs_211))
+                  ==.
+                  -- <= (drop Z ?xs)
+                  (Cons (Pair xs_110 zs_210) (zip ys (drop Z zs_211)))
+                  ==.
+                  -- <= (len Nil)
+                  (Cons (Pair xs_110 zs_210) (zip ys (drop (len Nil) zs_211)))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181):zs=(Cons zs_210 zs_211):xs_111=Nil
+                  (Cons (Pair xs_110 zs_210) (zip ys (drop (len xs_111) zs_211)))
+                  ==.
+                  -- <= (drop (S ?n) (Cons ?x ?xs))
+                  (Cons (Pair xs_110 zs_210) (zip ys (drop (S (len xs_111)) (Cons zs_210 zs_211))))
+                  ==.
+                  -- <= (len (Cons ?x ?xs))
+                  (Cons (Pair xs_110 zs_210) (zip ys (drop (len (Cons xs_110 xs_111)) (Cons zs_210 zs_211))))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111)
+                  (Cons (Pair xs_110 zs_210) (zip ys (drop (len xs) (Cons zs_210 zs_211))))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181):zs=(Cons zs_210 zs_211)
+                  (Cons (Pair xs_110 zs_210) (zip ys (drop (len xs) zs)))
+                  ==.
+                  -- <= (append Nil ?ys)
+                  (Cons (Pair xs_110 zs_210) (append Nil (zip ys (drop (len xs) zs))))
+                  ==.
+                  -- <= (zip Nil ?ys)
+                  (Cons (Pair xs_110 zs_210) (append (zip Nil (take (len xs_111) zs_211)) (zip ys (drop (len xs) zs))))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181):zs=(Cons zs_210 zs_211):xs_111=Nil
+                  (Cons (Pair xs_110 zs_210) (append (zip xs_111 (take (len xs_111) zs_211)) (zip ys (drop (len xs) zs))))
+                  ==.
+                  -- <= (append (Cons ?x ?xs) ?ys)
+                  (append (Cons (Pair xs_110 zs_210) (zip xs_111 (take (len xs_111) zs_211))) (zip ys (drop (len xs) zs)))
+                  ==.
+                  -- <= (zip (Cons ?x ?xs) (Cons ?y ?ys))
+                  (append (zip (Cons xs_110 xs_111) (Cons zs_210 (take (len xs_111) zs_211))) (zip ys (drop (len xs) zs)))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111)
+                  (append (zip xs (Cons zs_210 (take (len xs_111) zs_211))) (zip ys (drop (len xs) zs)))
+                  ==.
+                  -- <= (take (S ?n) (Cons ?x ?xs))
+                  (append (zip xs (take (S (len xs_111)) (Cons zs_210 zs_211))) (zip ys (drop (len xs) zs)))
+                  ==.
+                  -- <= (len (Cons ?x ?xs))
+                  (append (zip xs (take (len (Cons xs_110 xs_111)) (Cons zs_210 zs_211))) (zip ys (drop (len xs) zs)))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111)
+                  (append (zip xs (take (len xs) (Cons zs_210 zs_211))) (zip ys (drop (len xs) zs)))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181):zs=(Cons zs_210 zs_211)
+                  (append (zip xs (take (len xs) zs)) (zip ys (drop (len xs) zs)))
+                  ***
+                  QED
+            (Nil ) ->
+              -- 
+              (zip (append xs ys) zs)
+              ==.
+              -- prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181):zs=Nil =>
+              (zip (append xs ys) Nil)
+              ==.
+              -- (zip ?xs Nil) =>
+              Nil
+              ==.
+              -- <= prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181):zs=Nil
+              zs
+              ==.
+              -- <= (append Nil ?ys)
+              (append Nil zs)
+              ==.
+              -- <= (zip ?xs Nil)
+              (append (zip xs Nil) zs)
+              ==.
+              -- <= (take (S ?n) Nil)
+              (append (zip xs (take (S (len xs_111)) Nil)) zs)
+              ==.
+              -- <= (len (Cons ?x ?xs))
+              (append (zip xs (take (len (Cons xs_110 xs_111)) Nil)) zs)
+              ==.
+              -- <= prop_83:xs=(Cons xs_110 xs_111)
+              (append (zip xs (take (len xs) Nil)) zs)
+              ==.
+              -- <= prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181):zs=Nil
+              (append (zip xs (take (len xs) zs)) zs)
+              ==.
+              -- prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181):zs=Nil =>
+              (append (zip xs (take (len xs) zs)) Nil)
+              ==.
+              -- <= (zip ?xs Nil)
+              (append (zip xs (take (len xs) zs)) (zip ys Nil))
+              ==.
+              -- <= (drop (S ?n) Nil)
+              (append (zip xs (take (len xs) zs)) (zip ys (drop (S (len xs_111)) Nil)))
+              ==.
+              -- <= (len (Cons ?x ?xs))
+              (append (zip xs (take (len xs) zs)) (zip ys (drop (len (Cons xs_110 xs_111)) Nil)))
+              ==.
+              -- <= prop_83:xs=(Cons xs_110 xs_111)
+              (append (zip xs (take (len xs) zs)) (zip ys (drop (len xs) Nil)))
+              ==.
+              -- <= prop_83:xs=(Cons xs_110 xs_111):ys=(Cons ys_180 ys_181):zs=Nil
+              (append (zip xs (take (len xs) zs)) (zip ys (drop (len xs) zs)))
+              ***
+              QED
+        (Nil ) ->
+          case zs of
+            (Cons zs_200 zs_201) ->
+              case xs_111 of
+                (Cons xs_111_330 xs_111_331) ->
+                  -- 
+                  (zip (append xs ys) zs)
+                  ==.
+                  -- prop_83:xs=(Cons xs_110 xs_111) =>
+                  (zip (append (Cons xs_110 xs_111) ys) zs)
+                  ==.
+                  -- (append (Cons ?x ?xs) ?ys) =>
+                  (zip (Cons xs_110 (append xs_111 ys)) zs)
+                  ==.
+                  -- prop_83:xs=(Cons xs_110 xs_111):ys=Nil:zs=(Cons zs_200 zs_201) =>
+                  (zip (Cons xs_110 (append xs_111 ys)) (Cons zs_200 zs_201))
+                  ==.
+                  -- (zip (Cons ?x ?xs) (Cons ?y ?ys)) =>
+                  (Cons (Pair xs_110 zs_200) (zip (append xs_111 ys) zs_201))
+                  ==.
+                  -- prop_83:xs=(Cons xs_110 xs_111):ys=Nil:zs=(Cons zs_200 zs_201):xs_111=(Cons xs_111_330 xs_111_331) =>
+                  (Cons (Pair xs_110 zs_200) (zip (append (Cons xs_111_330 xs_111_331) ys) zs_201))
+                  ==.
+                  -- prop_83:xs=(Cons xs_110 xs_111):ys=Nil =>
+                  (Cons (Pair xs_110 zs_200) (zip (append (Cons xs_111_330 xs_111_331) Nil) zs_201))
+                  ==.
+                  -- lemma-(zip (append (Cons ?xs_110 ?xs_111) Nil) ?zs)=(append (zip (Cons ?xs_110 ?xs_111) (take (len (Cons ?xs_110 ?xs_111)) ?zs)) Nil) =>
+                  (Cons (Pair xs_110 zs_200) (append (zip (Cons xs_111_330 xs_111_331) (take (len (Cons xs_111_330 xs_111_331)) zs_201)) Nil))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=Nil:zs=(Cons zs_200 zs_201):xs_111=(Cons xs_111_330 xs_111_331)
+                  (Cons (Pair xs_110 zs_200) (append (zip xs_111 (take (len (Cons xs_111_330 xs_111_331)) zs_201)) Nil))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=Nil:zs=(Cons zs_200 zs_201):xs_111=(Cons xs_111_330 xs_111_331)
+                  (Cons (Pair xs_110 zs_200) (append (zip xs_111 (take (len xs_111) zs_201)) Nil))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=Nil
+                  (Cons (Pair xs_110 zs_200) (append (zip xs_111 (take (len xs_111) zs_201)) ys))
+                  ==.
+                  -- <= (append (Cons ?x ?xs) ?ys)
+                  (append (Cons (Pair xs_110 zs_200) (zip xs_111 (take (len xs_111) zs_201))) ys)
+                  ==.
+                  -- <= (zip (Cons ?x ?xs) (Cons ?y ?ys))
+                  (append (zip (Cons xs_110 xs_111) (Cons zs_200 (take (len xs_111) zs_201))) ys)
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111)
+                  (append (zip xs (Cons zs_200 (take (len xs_111) zs_201))) ys)
+                  ==.
+                  -- <= (take (S ?n) (Cons ?x ?xs))
+                  (append (zip xs (take (S (len xs_111)) (Cons zs_200 zs_201))) ys)
+                  ==.
+                  -- <= (len (Cons ?x ?xs))
+                  (append (zip xs (take (len (Cons xs_110 xs_111)) (Cons zs_200 zs_201))) ys)
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111)
+                  (append (zip xs (take (len xs) (Cons zs_200 zs_201))) ys)
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=Nil:zs=(Cons zs_200 zs_201)
+                  (append (zip xs (take (len xs) zs)) ys)
+                  ==.
+                  -- prop_83:xs=(Cons xs_110 xs_111):ys=Nil =>
+                  (append (zip xs (take (len xs) zs)) Nil)
+                  ==.
+                  -- <= (zip Nil ?ys)
+                  (append (zip xs (take (len xs) zs)) (zip Nil (drop (len xs) zs)))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=Nil
+                  (append (zip xs (take (len xs) zs)) (zip ys (drop (len xs) zs)))
+                  ***
+                  QED
+                (Nil ) ->
+                  -- 
+                  (zip (append xs ys) zs)
+                  ==.
+                  -- prop_83:xs=(Cons xs_110 xs_111) =>
+                  (zip (append (Cons xs_110 xs_111) ys) zs)
+                  ==.
+                  -- (append (Cons ?x ?xs) ?ys) =>
+                  (zip (Cons xs_110 (append xs_111 ys)) zs)
+                  ==.
+                  -- prop_83:xs=(Cons xs_110 xs_111):ys=Nil:zs=(Cons zs_200 zs_201) =>
+                  (zip (Cons xs_110 (append xs_111 ys)) (Cons zs_200 zs_201))
+                  ==.
+                  -- (zip (Cons ?x ?xs) (Cons ?y ?ys)) =>
+                  (Cons (Pair xs_110 zs_200) (zip (append xs_111 ys) zs_201))
+                  ==.
+                  -- prop_83:xs=(Cons xs_110 xs_111):ys=Nil:zs=(Cons zs_200 zs_201):xs_111=Nil =>
+                  (Cons (Pair xs_110 zs_200) (zip (append Nil ys) zs_201))
+                  ==.
+                  -- (append Nil ?ys) =>
+                  (Cons (Pair xs_110 zs_200) (zip ys zs_201))
+                  ==.
+                  -- prop_83:xs=(Cons xs_110 xs_111):ys=Nil =>
+                  (Cons (Pair xs_110 zs_200) (zip Nil zs_201))
+                  ==.
+                  -- (zip Nil ?ys) =>
+                  (Cons (Pair xs_110 zs_200) Nil)
+                  ==.
+                  -- <= (zip Nil ?ys)
+                  (Cons (Pair xs_110 zs_200) (zip Nil (take (len xs_111) zs_201)))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=Nil:zs=(Cons zs_200 zs_201):xs_111=Nil
+                  (Cons (Pair xs_110 zs_200) (zip xs_111 (take (len xs_111) zs_201)))
+                  ==.
+                  -- prop_83:xs=(Cons xs_110 xs_111):ys=Nil:zs=(Cons zs_200 zs_201):xs_111=Nil =>
+                  (Cons (Pair xs_110 zs_200) (zip Nil (take (len xs_111) zs_201)))
+                  ==.
+                  -- (zip Nil ?ys) =>
+                  (Cons (Pair xs_110 zs_200) Nil)
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=Nil
+                  (Cons (Pair xs_110 zs_200) ys)
+                  ==.
+                  -- <= (append Nil ?ys)
+                  (Cons (Pair xs_110 zs_200) (append Nil ys))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=Nil:zs=(Cons zs_200 zs_201):xs_111=Nil
+                  (Cons (Pair xs_110 zs_200) (append xs_111 ys))
+                  ==.
+                  -- prop_83:xs=(Cons xs_110 xs_111):ys=Nil:zs=(Cons zs_200 zs_201):xs_111=Nil =>
+                  (Cons (Pair xs_110 zs_200) (append Nil ys))
+                  ==.
+                  -- <= (zip Nil ?ys)
+                  (Cons (Pair xs_110 zs_200) (append (zip Nil (take (len xs_111) zs_201)) ys))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=Nil:zs=(Cons zs_200 zs_201):xs_111=Nil
+                  (Cons (Pair xs_110 zs_200) (append (zip xs_111 (take (len xs_111) zs_201)) ys))
+                  ==.
+                  -- <= (append (Cons ?x ?xs) ?ys)
+                  (append (Cons (Pair xs_110 zs_200) (zip xs_111 (take (len xs_111) zs_201))) ys)
+                  ==.
+                  -- <= (zip (Cons ?x ?xs) (Cons ?y ?ys))
+                  (append (zip (Cons xs_110 xs_111) (Cons zs_200 (take (len xs_111) zs_201))) ys)
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111)
+                  (append (zip xs (Cons zs_200 (take (len xs_111) zs_201))) ys)
+                  ==.
+                  -- <= (take (S ?n) (Cons ?x ?xs))
+                  (append (zip xs (take (S (len xs_111)) (Cons zs_200 zs_201))) ys)
+                  ==.
+                  -- <= (len (Cons ?x ?xs))
+                  (append (zip xs (take (len (Cons xs_110 xs_111)) (Cons zs_200 zs_201))) ys)
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111)
+                  (append (zip xs (take (len xs) (Cons zs_200 zs_201))) ys)
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=Nil:zs=(Cons zs_200 zs_201)
+                  (append (zip xs (take (len xs) zs)) ys)
+                  ==.
+                  -- prop_83:xs=(Cons xs_110 xs_111):ys=Nil =>
+                  (append (zip xs (take (len xs) zs)) Nil)
+                  ==.
+                  -- <= (zip Nil ?ys)
+                  (append (zip xs (take (len xs) zs)) (zip Nil (drop (len xs) zs)))
+                  ==.
+                  -- <= prop_83:xs=(Cons xs_110 xs_111):ys=Nil
+                  (append (zip xs (take (len xs) zs)) (zip ys (drop (len xs) zs)))
+                  ***
+                  QED
+            (Nil ) ->
+              -- 
+              (zip (append xs ys) zs)
+              ==.
+              -- prop_83:xs=(Cons xs_110 xs_111):ys=Nil:zs=Nil =>
+              (zip (append xs ys) Nil)
+              ==.
+              -- (zip ?xs Nil) =>
+              Nil
+              ==.
+              -- <= prop_83:xs=(Cons xs_110 xs_111):ys=Nil
+              ys
+              ==.
+              -- <= (append Nil ?ys)
+              (append Nil ys)
+              ==.
+              -- <= (zip ?xs Nil)
+              (append (zip xs Nil) ys)
+              ==.
+              -- <= (take (S ?n) Nil)
+              (append (zip xs (take (S (len xs_111)) Nil)) ys)
+              ==.
+              -- <= (len (Cons ?x ?xs))
+              (append (zip xs (take (len (Cons xs_110 xs_111)) Nil)) ys)
+              ==.
+              -- <= prop_83:xs=(Cons xs_110 xs_111)
+              (append (zip xs (take (len xs) Nil)) ys)
+              ==.
+              -- <= prop_83:xs=(Cons xs_110 xs_111):ys=Nil:zs=Nil
+              (append (zip xs (take (len xs) zs)) ys)
+              ==.
+              -- prop_83:xs=(Cons xs_110 xs_111):ys=Nil =>
+              (append (zip xs (take (len xs) zs)) Nil)
+              ==.
+              -- <= (zip Nil ?ys)
+              (append (zip xs (take (len xs) zs)) (zip Nil (drop (len xs) zs)))
+              ==.
+              -- <= prop_83:xs=(Cons xs_110 xs_111):ys=Nil
+              (append (zip xs (take (len xs) zs)) (zip ys (drop (len xs) zs)))
+              ***
+              QED
+    (Nil ) ->
+      -- 
+      (zip (append xs ys) zs)
+      ==.
+      -- prop_83:xs=Nil =>
+      (zip (append Nil ys) zs)
+      ==.
+      -- (append Nil ?ys) =>
+      (zip ys zs)
+      ==.
+      -- <= (drop Z ?xs)
+      (zip ys (drop Z zs))
+      ==.
+      -- <= (len Nil)
+      (zip ys (drop (len Nil) zs))
+      ==.
+      -- <= prop_83:xs=Nil
+      (zip ys (drop (len xs) zs))
+      ==.
+      -- <= (append Nil ?ys)
+      (append Nil (zip ys (drop (len xs) zs)))
+      ==.
+      -- <= (zip Nil ?ys)
+      (append (zip Nil (take (len xs) zs)) (zip ys (drop (len xs) zs)))
+      ==.
+      -- <= prop_83:xs=Nil
+      (append (zip xs (take (len xs) zs)) (zip ys (drop (len xs) zs)))
+      ***
+      QED
+
+Proving begin prop_84: (zip xs (append ys zs)) = (append (zip (take (len ys) xs) ys) (zip (drop (len ys) xs) zs))
+prop_84 = VALID (0.02 sec)
+{-@prop_84::ys: (List a)->xs: (List a)->zs: (List a)->{ (zip xs (append ys zs)) = (append (zip (take (len ys) xs) ys) (zip (drop (len ys) xs) zs)) }@-}
+prop_84::(List a)->(List a)->(List a)->Proof
+prop_84 ys xs zs=
+  case xs of
+    (Cons xs_110 xs_111) ->
+      case ys of
+        (Cons ys_140 ys_141) ->
+          -- 
+          (zip xs (append ys zs))
+          ==.
+          -- prop_84:xs=(Cons xs_110 xs_111) =>
+          (zip (Cons xs_110 xs_111) (append ys zs))
+          ==.
+          -- prop_84:xs=(Cons xs_110 xs_111):ys=(Cons ys_140 ys_141) =>
+          (zip (Cons xs_110 xs_111) (append (Cons ys_140 ys_141) zs))
+          ==.
+          -- (append (Cons ?x ?xs) ?ys) =>
+          (zip (Cons xs_110 xs_111) (Cons ys_140 (append ys_141 zs)))
+          ==.
+          -- (zip (Cons ?x ?xs) (Cons ?y ?ys)) =>
+          (Cons (Pair xs_110 ys_140) (zip xs_111 (append ys_141 zs)))
+          ==.
+          -- lemma-(zip ?xs (append ?ys ?zs))=(append (zip (take (len ?ys) ?xs) ?ys) (zip (drop (len ?ys) ?xs) ?zs)) =>
+          (Cons (Pair xs_110 ys_140) (append (zip (take (len ys_141) xs_111) ys_141) (zip (drop (len ys_141) xs_111) zs)))
+          ==.
+          -- <= (drop (S ?n) (Cons ?x ?xs))
+          (Cons (Pair xs_110 ys_140) (append (zip (take (len ys_141) xs_111) ys_141) (zip (drop (S (len ys_141)) (Cons xs_110 xs_111)) zs)))
+          ==.
+          -- <= (len (Cons ?x ?xs))
+          (Cons (Pair xs_110 ys_140) (append (zip (take (len ys_141) xs_111) ys_141) (zip (drop (len (Cons ys_140 ys_141)) (Cons xs_110 xs_111)) zs)))
+          ==.
+          -- <= prop_84:xs=(Cons xs_110 xs_111):ys=(Cons ys_140 ys_141)
+          (Cons (Pair xs_110 ys_140) (append (zip (take (len ys_141) xs_111) ys_141) (zip (drop (len ys) (Cons xs_110 xs_111)) zs)))
+          ==.
+          -- <= prop_84:xs=(Cons xs_110 xs_111)
+          (Cons (Pair xs_110 ys_140) (append (zip (take (len ys_141) xs_111) ys_141) (zip (drop (len ys) xs) zs)))
+          ==.
+          -- <= (append (Cons ?x ?xs) ?ys)
+          (append (Cons (Pair xs_110 ys_140) (zip (take (len ys_141) xs_111) ys_141)) (zip (drop (len ys) xs) zs))
+          ==.
+          -- <= (zip (Cons ?x ?xs) (Cons ?y ?ys))
+          (append (zip (Cons xs_110 (take (len ys_141) xs_111)) (Cons ys_140 ys_141)) (zip (drop (len ys) xs) zs))
+          ==.
+          -- <= (take (S ?n) (Cons ?x ?xs))
+          (append (zip (take (S (len ys_141)) (Cons xs_110 xs_111)) (Cons ys_140 ys_141)) (zip (drop (len ys) xs) zs))
+          ==.
+          -- <= (len (Cons ?x ?xs))
+          (append (zip (take (len (Cons ys_140 ys_141)) (Cons xs_110 xs_111)) (Cons ys_140 ys_141)) (zip (drop (len ys) xs) zs))
+          ==.
+          -- <= prop_84:xs=(Cons xs_110 xs_111):ys=(Cons ys_140 ys_141)
+          (append (zip (take (len ys) (Cons xs_110 xs_111)) (Cons ys_140 ys_141)) (zip (drop (len ys) xs) zs))
+          ==.
+          -- <= prop_84:xs=(Cons xs_110 xs_111)
+          (append (zip (take (len ys) xs) (Cons ys_140 ys_141)) (zip (drop (len ys) xs) zs))
+          ==.
+          -- <= prop_84:xs=(Cons xs_110 xs_111):ys=(Cons ys_140 ys_141)
+          (append (zip (take (len ys) xs) ys) (zip (drop (len ys) xs) zs))
+          ***
+          QED
+        (Nil ) ->
+          -- 
+          (zip xs (append ys zs))
+          ==.
+          -- <= (drop Z ?xs)
+          (zip (drop Z xs) (append ys zs))
+          ==.
+          -- <= (len Nil)
+          (zip (drop (len Nil) xs) (append ys zs))
+          ==.
+          -- <= prop_84:xs=(Cons xs_110 xs_111):ys=Nil
+          (zip (drop (len ys) xs) (append ys zs))
+          ==.
+          -- prop_84:xs=(Cons xs_110 xs_111):ys=Nil =>
+          (zip (drop (len ys) xs) (append Nil zs))
+          ==.
+          -- (append Nil ?ys) =>
+          (zip (drop (len ys) xs) zs)
+          ==.
+          -- <= (append Nil ?ys)
+          (append Nil (zip (drop (len ys) xs) zs))
+          ==.
+          -- <= (zip ?xs Nil)
+          (append (zip (take (len ys) xs) Nil) (zip (drop (len ys) xs) zs))
+          ==.
+          -- <= prop_84:xs=(Cons xs_110 xs_111):ys=Nil
+          (append (zip (take (len ys) xs) ys) (zip (drop (len ys) xs) zs))
+          ***
+          QED
+    (Nil ) ->
+      case ys of
+        (Cons ys_120 ys_121) ->
+          -- 
+          (zip xs (append ys zs))
+          ==.
+          -- prop_84:xs=Nil =>
+          (zip Nil (append ys zs))
+          ==.
+          -- (zip Nil ?ys) =>
+          Nil
+          ==.
+          -- <= prop_84:xs=Nil
+          xs
+          ==.
+          -- <= (append Nil ?ys)
+          (append Nil xs)
+          ==.
+          -- <= (zip Nil ?ys)
+          (append (zip Nil ys) xs)
+          ==.
+          -- <= (take (S ?n) Nil)
+          (append (zip (take (S (len ys_121)) Nil) ys) xs)
+          ==.
+          -- <= (len (Cons ?x ?xs))
+          (append (zip (take (len (Cons ys_120 ys_121)) Nil) ys) xs)
+          ==.
+          -- <= prop_84:xs=Nil:ys=(Cons ys_120 ys_121)
+          (append (zip (take (len ys) Nil) ys) xs)
+          ==.
+          -- <= prop_84:xs=Nil
+          (append (zip (take (len ys) xs) ys) xs)
+          ==.
+          -- prop_84:xs=Nil =>
+          (append (zip (take (len ys) xs) ys) Nil)
+          ==.
+          -- <= (zip Nil ?ys)
+          (append (zip (take (len ys) xs) ys) (zip Nil zs))
+          ==.
+          -- <= (drop (S ?n) Nil)
+          (append (zip (take (len ys) xs) ys) (zip (drop (S (len ys_121)) Nil) zs))
+          ==.
+          -- <= (len (Cons ?x ?xs))
+          (append (zip (take (len ys) xs) ys) (zip (drop (len (Cons ys_120 ys_121)) Nil) zs))
+          ==.
+          -- <= prop_84:xs=Nil:ys=(Cons ys_120 ys_121)
+          (append (zip (take (len ys) xs) ys) (zip (drop (len ys) Nil) zs))
+          ==.
+          -- <= prop_84:xs=Nil
+          (append (zip (take (len ys) xs) ys) (zip (drop (len ys) xs) zs))
+          ***
+          QED
+        (Nil ) ->
+          -- 
+          (zip xs (append ys zs))
+          ==.
+          -- prop_84:xs=Nil =>
+          (zip Nil (append ys zs))
+          ==.
+          -- <= prop_84:xs=Nil:ys=Nil
+          (zip ys (append ys zs))
+          ==.
+          -- <= (drop Z ?xs)
+          (zip (drop Z ys) (append ys zs))
+          ==.
+          -- <= (len Nil)
+          (zip (drop (len Nil) ys) (append ys zs))
+          ==.
+          -- <= prop_84:xs=Nil:ys=Nil
+          (zip (drop (len ys) ys) (append ys zs))
+          ==.
+          -- prop_84:xs=Nil:ys=Nil =>
+          (zip (drop (len ys) Nil) (append ys zs))
+          ==.
+          -- <= prop_84:xs=Nil
+          (zip (drop (len ys) xs) (append ys zs))
+          ==.
+          -- prop_84:xs=Nil:ys=Nil =>
+          (zip (drop (len ys) xs) (append Nil zs))
+          ==.
+          -- (append Nil ?ys) =>
+          (zip (drop (len ys) xs) zs)
+          ==.
+          -- <= (append Nil ?ys)
+          (append Nil (zip (drop (len ys) xs) zs))
+          ==.
+          -- <= (zip ?xs Nil)
+          (append (zip (take (len ys) xs) Nil) (zip (drop (len ys) xs) zs))
+          ==.
+          -- <= prop_84:xs=Nil:ys=Nil
+          (append (zip (take (len ys) xs) ys) (zip (drop (len ys) xs) zs))
+          ***
+          QED
+
