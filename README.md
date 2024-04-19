@@ -1,11 +1,11 @@
 ![C.C. Lemma's logo](img/logo.svg)
 
-> [!WARNING]
-> Rewrite in progress: check back later for a new version
-
 C.C. Lemma is a tool for automating inductive equational proofs. Its main
 selling point is its ability to discover and effortlessly wield lemmas in
 service of making a proof.
+
+> [!WARNING]
+> Rewrite in progress: check back later for a new version
 
 ## The progress so far
 
