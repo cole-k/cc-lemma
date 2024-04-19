@@ -13,8 +13,6 @@ pub struct Args {
   pub single_rhs: bool,
   #[clap(short = 'i', long = "irreducible")]
   pub irreducible_only: bool,
-  #[clap(short = 'c', long = "no-cond-split")]
-  pub no_cond_split: bool,
   /// Mode
   #[clap(long = "cyclic")]
   pub cyclic: bool,
@@ -87,12 +85,6 @@ pub struct Args {
   /// Do not apply reductions destructively.
   #[clap(long = "no-destructive-rewrites")]
   pub no_destructive_rewrites: bool,
-  /// Number of times we will try to recursively prove props
-  ///
-  /// Depth 2 means that we will try to prove lemmas of lemmas, but not anything
-  /// more.
-  #[clap(long = "proof-depth", default_value = "2")]
-  pub proof_depth: usize,
   /// Does not generalize goals based on our blocking expression analysis.
   ///
   /// Note that even if this is turned off, we will still generalize lemmmas
@@ -141,7 +133,6 @@ pub struct Config {
   cyclic_mode: Mutex<bool>,
   // proof search parameters
   pub max_split_depth: usize,
-  pub split_conditionals: bool,
   pub single_rhs: bool,
   pub irreducible_only: bool,
   // timeout
@@ -166,7 +157,6 @@ pub struct Config {
   pub cvec_num_random_terms_per_type: usize,
   pub add_grounding: bool,
   pub destructive_rewrites: bool,
-  pub proof_depth: usize,
   pub generalization: bool,
   pub cc_lemmas: bool,
   pub cc_lemmas_generalization: bool,
@@ -203,7 +193,6 @@ impl Config {
       } else {
         args.max_split_depth
       },
-      split_conditionals: !args.no_cond_split,
       single_rhs: args.single_rhs,
       irreducible_only: args.irreducible_only,
       timeout: if args.timeout == 0 {
@@ -230,7 +219,6 @@ impl Config {
       cvec_num_random_terms_per_type: args.cvec_num_random_terms_per_type,
       add_grounding: !args.no_grounding,
       destructive_rewrites: !args.no_destructive_rewrites,
-      proof_depth: args.proof_depth,
       generalization: !args.no_generalization,
       cc_lemmas: !args.no_cc_lemmas,
       cc_lemmas_generalization: !args.no_cc_lemmas_generalization,
