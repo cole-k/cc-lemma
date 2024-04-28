@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use egg::{Symbol, Id};
+use egg::{Symbol, Id, Pattern, SymbolLang, Subst};
 
 use crate::{goal::Eg, analysis::cvecs_equal};
 
 type GoalName = String;
-type HoleIdx  = usize;
+type HoleIdx  = Symbol;
 
 /// A pattern that corresponds to one side of a lemma. We draw inspiration from
 /// Stitch's patterns.
@@ -36,7 +36,7 @@ enum LemmaPattern {
 
 impl LemmaPattern {
   /// Is the pattern complete (i.e. does it have no Holes)?
-  pub fn is_complete(&self) -> bool {
+  fn is_complete(&self) -> bool {
     match self {
       LemmaPattern::Hole(_) => false,
       LemmaPattern::Node(_, args) => args.iter().all(|arg| arg.is_complete()),
@@ -44,7 +44,7 @@ impl LemmaPattern {
   }
 
   /// Is it a leaf (either a Hole or a Node without arguments)?
-  pub fn is_leaf(&self) -> bool {
+  fn is_leaf(&self) -> bool {
     match self {
       LemmaPattern::Hole(_) => true,
       LemmaPattern::Node(_, args) => args.is_empty(),
@@ -52,30 +52,40 @@ impl LemmaPattern {
   }
 
   /// Mutates the pattern to fill the hole.
-  pub fn fill_hole(&mut self, hole: HoleIdx, value: &LemmaPattern) {
-    match &self {
+  fn fill_hole(&mut self, hole: HoleIdx, value: &LemmaPattern) -> bool {
+    match self {
       LemmaPattern::Hole(h) if *h == hole => {
         *self = value.clone();
+        true
       }
       LemmaPattern::Hole(_) => {
+        false
       }
       LemmaPattern::Node(_, args) => {
-        args.iter_mut().for_each(|arg| arg.fill_hole(hole, value));
+        args.iter_mut().any(|arg| arg.fill_hole(hole, value))
       }
     }
   }
 
   /// Returns a new pattern where the hole is filled.
-  pub fn subst_hole(&self, hole: HoleIdx, value: &LemmaPattern) -> LemmaPattern {
+  ///
+  /// The bool indicates whether a substitution actually happened.
+  fn subst_hole(&self, hole: HoleIdx, value: &LemmaPattern) -> (LemmaPattern, bool) {
     match &self {
       LemmaPattern::Hole(h) if *h == hole => {
-        value.clone()
+        (value.clone(), true)
       }
       LemmaPattern::Hole(_) => {
-        self.clone()
+        (self.clone(), false)
       }
       LemmaPattern::Node(op, args) => {
-        LemmaPattern::Node(*op, args.iter().map(|arg| Box::new(arg.subst_hole(hole, value))).collect())
+        let mut hole_filled = false;
+        let new_pat = LemmaPattern::Node(*op, args.iter().map(|arg| {
+          let (new_arg, arg_hole_filled) = arg.subst_hole(hole, value);
+          hole_filled |= arg_hole_filled;
+          Box::new(new_arg)
+        }).collect());
+        (new_pat, hole_filled)
       }
     }
   }
@@ -84,7 +94,7 @@ impl LemmaPattern {
   ///
   /// TODO: Could probably be made into an iterator if we make an assumption
   /// that it is a set.
-  pub fn holes(&self) -> BTreeSet<HoleIdx> {
+  fn holes(&self) -> BTreeSet<HoleIdx> {
     fn helper(pat: &LemmaPattern, holes: &mut BTreeSet<HoleIdx>) {
       match pat {
         LemmaPattern::Hole(idx) => {
@@ -98,6 +108,14 @@ impl LemmaPattern {
     let mut holes = BTreeSet::new();
     helper(self, &mut holes);
     holes
+  }
+
+  /// Converts to a Pattern in egg, where each hole becomes a pattern variable.
+  ///
+  /// TODO: If this is used often, could this be more efficient than rendering
+  /// as a String and re-parsing?
+  fn to_pattern(&self) -> Pattern<SymbolLang> {
+    self.to_string().parse().unwrap()
   }
 
 }
@@ -125,12 +143,9 @@ impl std::fmt::Display for LemmaPattern {
   }
 }
 
-/// A map from a hole to the eclasses that can go inside of it.
-type HoleMatches   = BTreeMap<HoleIdx, Vec<Id>>;
 /// A map from the eclasses a pattern matches to what eclasses go inside of its
-/// holes to create a match. We expect that often there will only be one
-/// HoleMatches per eclass.
-type EClassMatches = BTreeMap<Id, Vec<HoleMatches>>;
+/// holes to create a match.
+type EClassMatches = BTreeMap<Id, Vec<Subst>>;
 
 struct LemmaTreeNode {
   lhs: LemmaPattern,
@@ -140,7 +155,7 @@ struct LemmaTreeNode {
   /// For each goal, the eclasses that match the RHS.
   rhs_matched_eclasses: BTreeMap<GoalName, EClassMatches>,
   /// We use this to ensure that our hole indices are fresh.
-  next_hole_idx: HoleIdx,
+  next_hole_idx: usize,
   /// Is this branch active?
   status: LemmaTreeStatus,
 }
@@ -171,5 +186,9 @@ impl LemmaTreeNode {
         }
       }
     }
+  }
+
+  fn refine_hole(&self, hole: HoleIdx, value: LemmaPattern) -> LemmaTreeNode {
+    todo!()
   }
 }
