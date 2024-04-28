@@ -13,6 +13,7 @@ pub mod goal;
 pub mod parser;
 pub mod utils;
 mod goal_graph;
+mod lemma_tree;
 
 use config::{ARGS, CONFIG};
 use explain::explain_top;
