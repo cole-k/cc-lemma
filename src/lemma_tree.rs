@@ -1,8 +1,8 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use egg::{Symbol, Id, Pattern, SymbolLang, Subst, Searcher, Var};
 
-use crate::{goal::Eg, analysis::cvecs_equal};
+use crate::{goal::Eg, analysis::cvecs_equal, ast::Type};
 
 type GoalName = String;
 /// For compatibility with egg's Vars, we represent holes as ?n where n is >= 0.
@@ -14,19 +14,16 @@ type HoleIdx  = Symbol;
 /// Stitch's patterns.
 ///
 /// Examples:
-///     // A completed pattern corresponding to S (add x y)
-///     Node("S", [Node("add", [Leaf("x"), Leaf("y")])])
-///     // An incomplete pattern corresponding to S (add ?1 ?2)
+///     // A pattern corresponding to S (add Z Z). There are no holes in this pattern.
+///     Node("S", [Node("add", [Node("Z", []), Node("Z", [])])])
+///     // A pattern corresponding to S (add ?1 ?2). It has the holes ?1 and ?2.
 ///     Node("S", [Node("add", [Hole(1), Hole(2)])])
 ///
 /// TODO: The representation could probably be made more efficient by use of
 /// mutable references, etc.
 #[derive(PartialEq, Eq, Clone)]
-enum LemmaPattern {
-  /// A hole to be filled in eventually with another LemmaPattern.
-  ///
-  /// If the LemmaPattern has no Holes, then we consider it complete, otherwise
-  /// it is incomplete.
+enum PatternWithHoles {
+  /// A hole to be filled in eventually with another PatternWithHoles.
   Hole(HoleIdx),
   /// These are akin to the Nodes in SymbolLang.
   ///
@@ -34,37 +31,53 @@ enum LemmaPattern {
   /// Nil, or variables).
   ///
   /// Otherwise they are internal nodes such as (Cons _ _) or (add _ _).
-  Node(Symbol, Vec<Box<LemmaPattern>>),
+  Node(Symbol, Vec<Box<PatternWithHoles>>),
 }
 
-impl LemmaPattern {
-  /// Is the pattern complete (i.e. does it have no Holes)?
-  fn is_complete(&self) -> bool {
+/// The side of the lemma
+#[derive(Clone)]
+enum Side {
+  Left,
+  Right,
+  Both,
+}
+
+#[derive(Clone)]
+struct LemmaPattern {
+  lhs: PatternWithHoles,
+  rhs: PatternWithHoles,
+  holes: VecDeque<(HoleIdx, Side, Type)>,
+  next_hole_idx: usize,
+}
+
+impl PatternWithHoles {
+  /// Is the pattern concrete (i.e. does it have no Holes)?
+  fn is_concrete(&self) -> bool {
     match self {
-      LemmaPattern::Hole(_) => false,
-      LemmaPattern::Node(_, args) => args.iter().all(|arg| arg.is_complete()),
+      PatternWithHoles::Hole(_) => false,
+      PatternWithHoles::Node(_, args) => args.iter().all(|arg| arg.is_concrete()),
     }
   }
 
   /// Is it a leaf (either a Hole or a Node without arguments)?
   fn is_leaf(&self) -> bool {
     match self {
-      LemmaPattern::Hole(_) => true,
-      LemmaPattern::Node(_, args) => args.is_empty(),
+      PatternWithHoles::Hole(_) => true,
+      PatternWithHoles::Node(_, args) => args.is_empty(),
     }
   }
 
   /// Mutates the pattern to fill the hole.
-  fn fill_hole(&mut self, hole: HoleIdx, value: &LemmaPattern) -> bool {
+  fn fill_hole(&mut self, hole: HoleIdx, value: &PatternWithHoles) -> bool {
     match self {
-      LemmaPattern::Hole(h) if *h == hole => {
+      PatternWithHoles::Hole(h) if *h == hole => {
         *self = value.clone();
         true
       }
-      LemmaPattern::Hole(_) => {
+      PatternWithHoles::Hole(_) => {
         false
       }
-      LemmaPattern::Node(_, args) => {
+      PatternWithHoles::Node(_, args) => {
         args.iter_mut().any(|arg| arg.fill_hole(hole, value))
       }
     }
@@ -73,17 +86,17 @@ impl LemmaPattern {
   /// Returns a new pattern where the hole is filled.
   ///
   /// The bool indicates whether a substitution actually happened.
-  fn subst_hole(&self, hole: HoleIdx, value: &LemmaPattern) -> (LemmaPattern, bool) {
+  fn subst_hole(&self, hole: HoleIdx, value: &PatternWithHoles) -> (PatternWithHoles, bool) {
     match &self {
-      LemmaPattern::Hole(h) if *h == hole => {
+      PatternWithHoles::Hole(h) if *h == hole => {
         (value.clone(), true)
       }
-      LemmaPattern::Hole(_) => {
+      PatternWithHoles::Hole(_) => {
         (self.clone(), false)
       }
-      LemmaPattern::Node(op, args) => {
+      PatternWithHoles::Node(op, args) => {
         let mut hole_filled = false;
-        let new_pat = LemmaPattern::Node(*op, args.iter().map(|arg| {
+        let new_pat = PatternWithHoles::Node(*op, args.iter().map(|arg| {
           let (new_arg, arg_hole_filled) = arg.subst_hole(hole, value);
           hole_filled |= arg_hole_filled;
           Box::new(new_arg)
@@ -98,12 +111,12 @@ impl LemmaPattern {
   /// TODO: Could probably be made into an iterator if we make an assumption
   /// that it is a set.
   fn holes(&self) -> BTreeSet<HoleIdx> {
-    fn helper(pat: &LemmaPattern, holes: &mut BTreeSet<HoleIdx>) {
+    fn helper(pat: &PatternWithHoles, holes: &mut BTreeSet<HoleIdx>) {
       match pat {
-        LemmaPattern::Hole(idx) => {
+        PatternWithHoles::Hole(idx) => {
           holes.insert(*idx);
         }
-        LemmaPattern::Node(_, args) => {
+        PatternWithHoles::Node(_, args) => {
           args.iter().for_each(|arg| helper(arg, holes));
         }
       }
@@ -123,14 +136,14 @@ impl LemmaPattern {
 
 }
 
-impl std::fmt::Display for LemmaPattern {
+impl std::fmt::Display for PatternWithHoles {
   /// Formats the LemmaPattern as a sexp.
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      LemmaPattern::Hole(idx) => {
+      PatternWithHoles::Hole(idx) => {
         write!(f, "{}", idx)
       }
-      LemmaPattern::Node(op, args) => {
+      PatternWithHoles::Node(op, args) => {
         if args.is_empty() {
           write!(f, "{}", op)
         } else {
@@ -146,54 +159,131 @@ impl std::fmt::Display for LemmaPattern {
   }
 }
 
-/// A map from the eclasses a pattern matches to what eclasses go inside of its
-/// holes to create a match.
+impl std::fmt::Display for LemmaPattern {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{} = {}", self.lhs, self.rhs)
+  }
+}
+
+impl LemmaPattern {
+
+  /// The root pattern of type `ty`; its LHS and RHS are unconstrained.
+  fn empty_pattern(ty: Type) -> LemmaPattern {
+    let hole_0 = Symbol::new("?0");
+    let hole_1 = Symbol::new("?1");
+
+    LemmaPattern {
+      lhs: PatternWithHoles::Hole(hole_0),
+      rhs: PatternWithHoles::Hole(hole_1),
+      holes: VecDeque::from_iter([(hole_0, Side::Left, ty.clone()), (hole_1, Side::Right, ty.clone())].into_iter()),
+      next_hole_idx: 2,
+    }
+  }
+
+  fn next_hole(&self) -> Option<(HoleIdx, Side, Type)> {
+    self.holes.back().cloned()
+  }
+
+  /// Returns a new [`LemmaPattern`] with `hole` filled with a new [`PatternWithHoles`]
+  /// made from the constructor `node` with type `node_ty` (so unless the hole is
+  /// being filled with a leaf, `node` will be a function and will have new holes
+  /// added for it).
+  ///
+  /// `side` being passed is somewhat of an implementation detail; we use it to
+  /// avoid pointlessly substituting.
+  fn subst_hole(&self, hole: HoleIdx, node: Symbol, node_ty: Type, side: Side) -> LemmaPattern {
+    let (arg_tys, _ret_ty) = node_ty.args_ret();
+    let mut next_hole_idx = self.next_hole_idx;
+    let mut new_holes: VecDeque<(HoleIdx, Side, Type)> = arg_tys.into_iter().map(|arg_ty| {
+      let new_hole = Symbol::new(format!("?{}", self.next_hole_idx));
+      next_hole_idx += 1;
+      (new_hole, side.clone(), arg_ty)
+    }).collect();
+    let new_pattern = PatternWithHoles::Node(node, new_holes.iter().map(|(hole, _, _)| {
+      Box::new(PatternWithHoles::Hole(*hole))
+    }).collect()
+    );
+    let mut holes_without_subst_hole = self.holes.iter()
+                          .filter(|(curr_hole, _, _)| curr_hole != &hole)
+                          .cloned()
+                          .collect();
+    new_holes.append(&mut holes_without_subst_hole);
+    match &side {
+      Side::Left => {
+        LemmaPattern {
+          lhs: self.lhs.subst_hole(hole, &new_pattern).0,
+          rhs: self.rhs.clone(),
+          holes: new_holes,
+          next_hole_idx,
+        }
+      }
+      Side::Right => {
+        LemmaPattern {
+          lhs: self.lhs.clone(),
+          rhs: self.rhs.subst_hole(hole, &new_pattern).0,
+          holes: new_holes,
+          next_hole_idx,
+        }
+      }
+      Side::Both => {
+        LemmaPattern {
+          lhs: self.rhs.subst_hole(hole, &new_pattern).0,
+          rhs: self.rhs.subst_hole(hole, &new_pattern).0,
+          holes: new_holes,
+          next_hole_idx,
+        }
+      }
+    }
+  }
+
+}
+
+/// A data structure that represents a multipattern match of a [`LemmaPattern`].
 ///
-/// TODO: We should consider using our own Subst that we have control over
-/// instead of egg's. It is perhaps inefficient anyway since their Subst is just
-/// a small Vec.
-type EClassMatches = BTreeMap<Id, Vec<Subst>>;
+/// `lhs` and `rhs` match the LHS and RHS of the pattern.
+struct ClassMatch {
+  goal: GoalName,
+  lhs: Id,
+  rhs: Id,
+  /// What e-classes the holes in the pattern match to.
+  /// TODO: We should consider using our own Subst that we have control over
+  /// instead of egg's. It is perhaps inefficient anyway since their Subst is just
+  /// a small Vec.
+  subst: Subst,
+  /// Whether the `lhs` and `rhs` cvecs are equal (we compute this once so we
+  /// don't need to repeat the process).
+  cvecs_equal: bool,
+}
 
 struct LemmaTreeNode {
-  lhs: PatternAndMatches,
-  rhs: PatternAndMatches,
-  /// We use this to ensure that our hole indices are fresh.
-  max_hole_idx: usize,
-  /// The holes in the lemma
-  holes: Vec<(HoleIdx, Side)>,
-  /// Is this branch active?
-  status: LemmaTreeStatus,
+  /// The pattern which represents the current lemma.
+  pattern: LemmaPattern,
+  /// All pairs of classes this pattern matches.
+  matches: Vec<ClassMatch>,
+  /// What's the status of the lemma? (`None` if we haven't attempted this lemma).
+  lemma_status: Option<LemmaStatus>,
+  /// Do we attempt this search?
+  search_status: SearchStatus,
   /// Lemmas which are refinements of the patterns in this node.
   children: Vec<(LemmaTreeEdge, LemmaTreeNode)>,
 }
 
-struct PatternAndMatches {
-  pattern: LemmaPattern,
-  /// For each goal, the eclasses that match the given pattern and the
-  /// substitutions that give the match.
-  matched_eclasses: BTreeMap<GoalName, EClassMatches>,
+enum LemmaStatus {
+  Valid,
+  Invalid,
+  Inconclusive,
 }
 
-/// Which side of the lemma does this correspond to?
-enum Side {
-  LHS,
-  RHS,
+enum SearchStatus {
+  Active,
+  Inactive,
 }
 
 struct LemmaTreeEdge {
   /// Which hole was filled?
   hole: HoleIdx,
   /// What was it filled with?
-  pattern: LemmaPattern,
-}
-
-enum LemmaTreeStatus {
-  /// There are no pairs of distinct eclasses between the LHS and RHS that have
-  /// the same cvec.
-  Inactive,
-  /// There are pairs of distinct eclasses between the LHS and RHS that have
-  /// the same cvec.
-  Active,
+  pattern: PatternWithHoles,
 }
 
 impl PatternAndMatches {
