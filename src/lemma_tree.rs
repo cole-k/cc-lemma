@@ -263,6 +263,9 @@ impl LemmaPattern {
   }
 
   fn hole_side(&self, hole: HoleIdx) -> &Side {
+    // This lookup is in theory inefficient and we could restructure things by
+    // having the ClassMatch not only its holes but what sides the holes come
+    // from, but I expect the number of holes will be relatively small.
     self.holes.iter().find_map(|(curr_hole, curr_side)| {
       if &hole == curr_hole {
         Some(curr_side)
