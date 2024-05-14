@@ -1,6 +1,7 @@
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque, HashMap};
 
 use egg::{Symbol, Id, Pattern, SymbolLang, Subst, Searcher, Var};
+use itertools::iproduct;
 
 use crate::{goal::Eg, analysis::cvecs_equal, ast::Type};
 
@@ -42,11 +43,23 @@ enum Side {
   Both,
 }
 
+impl Side {
+  /// Combine two sides: two differing sides produce `Side::Both`, otherwise the
+  /// side is unchanged.
+  fn merge(&self, other: &Side) -> Side {
+    match (self, other) {
+      (Side::Left,  Side::Left)  => Side::Left,
+      (Side::Right, Side::Right) => Side::Right,
+      _                          => Side::Both,
+    }
+  }
+}
+
 #[derive(Clone)]
 struct LemmaPattern {
   lhs: PatternWithHoles,
   rhs: PatternWithHoles,
-  holes: VecDeque<(HoleIdx, Side, Type)>,
+  holes: Vec<(HoleIdx, Side)>,
   next_hole_idx: usize,
 }
 
@@ -168,20 +181,46 @@ impl std::fmt::Display for LemmaPattern {
 impl LemmaPattern {
 
   /// The root pattern of type `ty`; its LHS and RHS are unconstrained.
-  fn empty_pattern(ty: Type) -> LemmaPattern {
+  fn empty_pattern() -> LemmaPattern {
     let hole_0 = Symbol::new("?0");
     let hole_1 = Symbol::new("?1");
 
     LemmaPattern {
       lhs: PatternWithHoles::Hole(hole_0),
       rhs: PatternWithHoles::Hole(hole_1),
-      holes: VecDeque::from_iter([(hole_0, Side::Left, ty.clone()), (hole_1, Side::Right, ty.clone())].into_iter()),
+      holes: vec!((hole_0, Side::Left), (hole_1, Side::Right)),
       next_hole_idx: 2,
     }
   }
 
-  fn next_hole(&self) -> Option<(HoleIdx, Side, Type)> {
-    self.holes.back().cloned()
+  fn new_pattern_from_subst(&self, hole: HoleIdx, hole_pattern: &PatternWithHoles, side: &Side, new_holes: Vec<(HoleIdx, Side)>, next_hole_idx: usize) -> LemmaPattern {
+    match side {
+      Side::Left => {
+        LemmaPattern {
+          lhs: self.lhs.subst_hole(hole, &hole_pattern).0,
+          rhs: self.rhs.clone(),
+          holes: new_holes,
+          next_hole_idx,
+        }
+      }
+      Side::Right => {
+        LemmaPattern {
+          lhs: self.lhs.clone(),
+          rhs: self.rhs.subst_hole(hole, &hole_pattern).0,
+          holes: new_holes,
+          next_hole_idx,
+        }
+      }
+      Side::Both => {
+        LemmaPattern {
+          lhs: self.rhs.subst_hole(hole, &hole_pattern).0,
+          rhs: self.rhs.subst_hole(hole, &hole_pattern).0,
+          holes: new_holes,
+          next_hole_idx,
+        }
+      }
+    }
+
   }
 
   /// Returns a new [`LemmaPattern`] with `hole` filled with a new [`PatternWithHoles`]
@@ -191,49 +230,34 @@ impl LemmaPattern {
   ///
   /// `side` being passed is somewhat of an implementation detail; we use it to
   /// avoid pointlessly substituting.
-  fn subst_hole(&self, hole: HoleIdx, node: Symbol, node_ty: Type, side: Side) -> LemmaPattern {
-    let (arg_tys, _ret_ty) = node_ty.args_ret();
-    let mut next_hole_idx = self.next_hole_idx;
-    let mut new_holes: VecDeque<(HoleIdx, Side, Type)> = arg_tys.into_iter().map(|arg_ty| {
-      let new_hole = Symbol::new(format!("?{}", self.next_hole_idx));
-      next_hole_idx += 1;
-      (new_hole, side.clone(), arg_ty)
+  fn subst_hole(&self, hole: HoleIdx, node: Symbol, num_args: usize, side: &Side) -> LemmaPattern {
+    let mut new_holes: Vec<(HoleIdx, Side)> = (self.next_hole_idx..self.next_hole_idx + num_args)
+      .into_iter().map(|next_hole_idx| {
+      let new_hole = Symbol::new(format!("?{}", next_hole_idx));
+      (new_hole, side.clone())
     }).collect();
-    let new_pattern = PatternWithHoles::Node(node, new_holes.iter().map(|(hole, _, _)| {
+    let next_hole_idx = self.next_hole_idx + num_args;
+    let new_pattern = PatternWithHoles::Node(node, new_holes.iter().map(|(hole, _)| {
       Box::new(PatternWithHoles::Hole(*hole))
     }).collect()
     );
     let mut holes_without_subst_hole = self.holes.iter()
-                          .filter(|(curr_hole, _, _)| curr_hole != &hole)
+                          .filter(|(curr_hole, _)| curr_hole != &hole)
                           .cloned()
                           .collect();
     new_holes.append(&mut holes_without_subst_hole);
-    match &side {
-      Side::Left => {
-        LemmaPattern {
-          lhs: self.lhs.subst_hole(hole, &new_pattern).0,
-          rhs: self.rhs.clone(),
-          holes: new_holes,
-          next_hole_idx,
-        }
-      }
-      Side::Right => {
-        LemmaPattern {
-          lhs: self.lhs.clone(),
-          rhs: self.rhs.subst_hole(hole, &new_pattern).0,
-          holes: new_holes,
-          next_hole_idx,
-        }
-      }
-      Side::Both => {
-        LemmaPattern {
-          lhs: self.rhs.subst_hole(hole, &new_pattern).0,
-          rhs: self.rhs.subst_hole(hole, &new_pattern).0,
-          holes: new_holes,
-          next_hole_idx,
-        }
-      }
-    }
+    self.new_pattern_from_subst(hole, &new_pattern, side, new_holes, next_hole_idx)
+  }
+
+  /// Unifies `hole_1` and `hole_2` in the new pattern.
+  fn unify_holes(&self, hole_1: HoleIdx, hole_1_side: &Side, hole_2: HoleIdx, hole_2_side: &Side) -> LemmaPattern {
+    let new_side  = hole_1_side.merge(hole_2_side);
+    let new_holes = self.holes.iter().filter(|(curr_hole, _)| curr_hole != &hole_1).cloned().collect();
+    let hole_2_pattern = PatternWithHoles::Hole(hole_2);
+    // We'll substitute on this without loss of generality. I suppose we could
+    // do an analysis to identify the better side to substitute if we wanted to
+    // be efficient.
+    self.new_pattern_from_subst(hole_1, &hole_2_pattern, hole_1_side, new_holes, self.next_hole_idx)
   }
 
 }
@@ -241,31 +265,64 @@ impl LemmaPattern {
 /// A data structure that represents a multipattern match of a [`LemmaPattern`].
 ///
 /// `lhs` and `rhs` match the LHS and RHS of the pattern.
+///
+/// TODO: Should we cache a map from `Id` to `Vec<HoleIdx>`? This will allow us
+/// to more efficiently compute which holes we could possibly unify.
 struct ClassMatch {
   goal: GoalName,
   lhs: Id,
   rhs: Id,
   /// What e-classes the holes in the pattern match to.
-  /// TODO: We should consider using our own Subst that we have control over
-  /// instead of egg's. It is perhaps inefficient anyway since their Subst is just
-  /// a small Vec.
-  subst: Subst,
+  subst: BTreeMap<HoleIdx, Id>,
   /// Whether the `lhs` and `rhs` cvecs are equal (we compute this once so we
   /// don't need to repeat the process).
   cvecs_equal: bool,
 }
 
+/// These are the nodes which make up our overall lemma search tree. Each node
+/// represents a lemma over universally quantified variables created from its
+/// holes. A node's children are all lemmas that are less general than it,
+/// because children are created by filling in a hole.
+///
+/// It's a little difficult to conceptualize a node's state, so here we discuss
+/// its possiblities.
+///
+/// First, if a node's `has_matching_cvecs` is `false`, we will neither
+/// conjecture a lemma from it nor will we propagate its `current_matches` to
+/// its children. This is because we have no evidence that the lemma or its
+/// child lemmas could plausibly be true (in fact, we may have evidence that the
+/// lemma the node represents is false).
+///
+/// Otherwise, there must be some matching cvecs among the `current_matches`. If
+/// there is any [`ClassMatch`] with _mismatching_ cvecs, we can immediately set
+/// `lemma_status` to `Some(Invalid)` - this is because this match represents a
+/// counterexample to the lemma's validity.
+///
+/// If there are only matching cvecs among the `current_matches` (and there is
+/// at least one match - this should be guaranteed), we will attempt to prove
+/// the lemma represented by this node.
+///
+/// Once we have finished trying to prove the lemma (or if it was invalidated),
+/// we will check the lemma's status. If it is `Proven`, then this node is done.
+/// Otherwise, we propagate the `current_matches` downwards, creating new
+/// children.
 struct LemmaTreeNode {
   /// The pattern which represents the current lemma.
   pattern: LemmaPattern,
-  /// All pairs of classes this pattern matches.
-  matches: Vec<ClassMatch>,
-  /// What's the status of the lemma? (`None` if we haven't attempted this lemma).
+  /// These matches are transient: we will propagate them through the e-graph if
+  /// we cannot prove the lemma this node represents (or if it is an invalid
+  /// lemma).
+  current_matches: Vec<ClassMatch>,
+  /// What's the status of the lemma? (`None` if we haven't attempted this
+  /// lemma or finished attempting it).
   lemma_status: Option<LemmaStatus>,
-  /// Do we attempt this search?
-  search_status: SearchStatus,
-  /// Lemmas which are refinements of the patterns in this node.
-  children: Vec<(LemmaTreeEdge, LemmaTreeNode)>,
+  /// Did any of the [`ClassMatch`]es have matching cvecs? If none do, there is
+  /// no point in investigating the children of this node, as they cannot
+  /// possibly be valid lemmas.
+  has_matching_cvecs: bool,
+  /// Lemmas that are refinements of the `pattern` in this node. We identify
+  /// them using the hole that was filled and what it was filled with.
+  children: BTreeMap<LemmaTreeEdge, LemmaTreeNode>,
 }
 
 enum LemmaStatus {
@@ -274,108 +331,69 @@ enum LemmaStatus {
   Inconclusive,
 }
 
-enum SearchStatus {
-  Active,
-  Inactive,
-}
-
+#[derive(PartialEq, Eq, Clone)]
 struct LemmaTreeEdge {
-  /// Which hole was filled?
   hole: HoleIdx,
-  /// What was it filled with?
-  pattern: PatternWithHoles,
+  filled_with: FilledWith,
 }
 
-impl PatternAndMatches {
-  /// For a given goal egraph, refine the current matched eclasses based upon
-  /// the assumption that we file hole with pattern.
-  fn refine_matched_eclasses(&self, hole: HoleIdx, pattern: Pattern<SymbolLang>, goal_name: GoalName, goal_egraph: &Eg) -> EClassMatches {
-    let hole_var: Var = hole.as_str().parse().unwrap();
-    let hole_eclasses: BTreeSet<Id> = self
-      .matched_eclasses[&goal_name]
-      .values()
-      .flat_map(|substs| substs.iter().map(|subst| subst[hole_var])).collect();
-    // These are the substitutions for each hole eclass when we match the
-    // pattern against it.
-    //
-    // The eclasses used as keys here are _not_ the top-level eclasses that the
-    // full pattern matches! We will do further work to transform those after
-    // building this map.
-    let hole_eclass_to_substs: EClassMatches = hole_eclasses.into_iter().map(|eclass| {
-      let substs = pattern.search_eclass(goal_egraph, eclass).map_or(vec!(), |search_matches| {
-        search_matches.substs
-      });
-      (eclass, substs)
-    }).collect();
-    let orig_holes = self.pattern.holes();
-    let num_holes_in_pattern = pattern.vars().len();
-    // We build the matched eclasses by first iterating over each (eclass, subst) pair
-    self.matched_eclasses[&goal_name].iter().filter_map(|(eclass, substs)| {
-      // We construct all of the new substitutes that map to this eclass
-      let new_substs: Vec<Subst> = substs.iter().flat_map(|subst| {
-        // This subst template will have space for as many entries as the number
-        // of holes in the original pattern + the number of holes in the new
-        // pattern - 1.
-        //
-        // The - 1 accounts for the fact that we're filling one hole with the
-        // new pattern.
-        //
-        // We initialize this subst to the original subst without the hole we're
-        // filling. We'll add the holes in the new pattern after.
-        let mut subst_template = Subst::with_capacity(orig_holes.len() + num_holes_in_pattern - 1);
-        for orig_hole in &orig_holes {
-          let orig_hole_var: Var = orig_hole.as_str().parse().unwrap();
-          subst_template.insert(orig_hole_var, subst[orig_hole_var]);
-        }
-        let hole_eclass = subst[hole_var];
-        // This is where we take the substs we found for the hole eclass and expand
-        // them into a full subst for the pattern.
-        hole_eclass_to_substs[&hole_eclass].iter().map(|hole_substs| {
-          let mut new_subst = subst_template.clone();
-          for var in pattern.vars() {
-            new_subst.insert(var, hole_substs[var]);
-          }
-          new_subst
-        }).collect::<Vec<Subst>>()
-      }).collect();
-      // If we do not have any substs for this eclass, we can no longer consider
-      // it matched
-      if new_substs.is_empty() {
-        None
-      } else {
-        Some((*eclass, new_substs))
-      }
-    }).collect()
-  }
-
-  /// For a given goal egraph, find all matches for the entire pattern.
+#[derive(PartialEq, Eq, Clone)]
+/// What did we fill a hole with?
+enum FilledWith {
+  /// This represents a hole being instantiated to a function or constant in the
+  /// e-graph. The `Symbol` is the name of this function or constant.
+  ENode(Symbol),
+  /// This represents the unification of two different holes.
   ///
-  /// This differs from refine_matched_eclasses because this method creates
-  /// matches for &self whereas refine_matched_eclasses creates matches for a
-  /// child PatternAndMatches.
-  fn create_matches_from_scratch(&self, goal_egraph: &Eg) -> EClassMatches {
-    self.pattern.to_pattern().search(goal_egraph).into_iter().map(|search_matches| {
-      (search_matches.eclass, search_matches.substs)
+  /// Philosophical question: can you fill a hole with another hole?
+  AnotherHole(HoleIdx),
+}
+
+impl ClassMatch {
+  /// Which pairs of holes could we unify while still keeping this match?
+  fn unifiable_holes(&self) -> Vec<(HoleIdx, HoleIdx)> {
+    let mut class_to_holes: HashMap<Id, Vec<HoleIdx>> = HashMap::new();
+    for (hole, class) in self.subst.iter() {
+      class_to_holes.entry(*class)
+                    .and_modify(|holes| holes.push(*hole))
+                    .or_insert(vec!(*hole));
+    }
+    class_to_holes.into_iter().flat_map(|(_class, holes)| {
+      if holes.len() <= 1 {
+        vec!()
+      } else {
+        iproduct!(&holes, &holes)
+          // if hole_1 and hole_2 are distinct and map to the same e-class, we
+          // only want to return one of (hole_1, hole_2) and (hole_2, hole_1).
+          .filter(|(hole_1, hole_2)| hole_1 < hole_2)
+          .map(|(hole_1, hole_2)| (*hole_1, *hole_2))
+          .collect()
+      }
     }).collect()
   }
 }
 
 impl LemmaTreeNode {
-  /// Resets the status to inactive unless there are two distinct eclasses L in
-  /// LHS and R in RHS such that cvec(L) == cvec(R).
-  fn update_status_for_goal(&mut self, goal_name: GoalName, goal_egraph: &Eg) {
-    self.status = LemmaTreeStatus::Inactive;
-    for lhs_eclass in self.lhs.matched_eclasses.get(&goal_name).unwrap().keys() {
-      for rhs_eclass in self.rhs.matched_eclasses.get(&goal_name).unwrap().keys() {
-        if lhs_eclass == rhs_eclass {
-          continue;
-        }
-        let lhs_cvec = &goal_egraph[*lhs_eclass].data.cvec_data;
-        let rhs_cvec = &goal_egraph[*rhs_eclass].data.cvec_data;
-        if cvecs_equal(&goal_egraph.analysis.cvec_analysis, lhs_cvec, rhs_cvec).unwrap_or(false) {
-          self.status = LemmaTreeStatus::Active;
-        }
-      }
+  /// Attempts to propagate the next match, returning the number of new
+  /// [`LemmaTreeNode`]s we propagate matches to in the process.
+  fn propagate_next_match(&mut self) -> Option<usize> {
+    if self.current_matches.is_empty() {
+      return None;
     }
+    let mut new_nodes = 0;
+    let m = self.current_matches.pop().unwrap();
+    let unifiable_holes = m.unifiable_holes();
+    // First, create/lookup each new LemmaTreeNode that comes from unifying each
+    // pair of holes, adding the current match to it where we remove the hole
+    // that was substituted out from `subst`.
+    todo!();
+    // Somehow obtain the e-graph corresponding the the match's goal.
+    let goal_egraph = todo!();
+    // Then, create/lookup each new LemmaTreeNode that comes from a refinement
+    // of a hole's matched class in the e-graph. Essentially, pick a hole and
+    // look at its e-class. Then for each e-node in the e-class create or lookup
+    // a new LemmaTreeNode whose edge is the hole being filled with that
+    // e-node's symbol.
+    todo!()
   }
 }
