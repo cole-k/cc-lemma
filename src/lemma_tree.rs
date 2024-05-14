@@ -250,7 +250,9 @@ impl LemmaPattern {
   }
 
   /// Unifies `hole_1` and `hole_2` in the new pattern.
-  fn unify_holes(&self, hole_1: HoleIdx, hole_1_side: &Side, hole_2: HoleIdx, hole_2_side: &Side) -> LemmaPattern {
+  fn unify_holes(&self, hole_1: HoleIdx, hole_2: HoleIdx) -> LemmaPattern {
+    let hole_1_side = self.hole_side(hole_1);
+    let hole_2_side = self.hole_side(hole_2);
     let new_side  = hole_1_side.merge(hole_2_side);
     let new_holes = self.holes.iter().filter(|(curr_hole, _)| curr_hole != &hole_1).cloned().collect();
     let hole_2_pattern = PatternWithHoles::Hole(hole_2);
@@ -258,6 +260,16 @@ impl LemmaPattern {
     // do an analysis to identify the better side to substitute if we wanted to
     // be efficient.
     self.new_pattern_from_subst(hole_1, &hole_2_pattern, hole_1_side, new_holes, self.next_hole_idx)
+  }
+
+  fn hole_side(&self, hole: HoleIdx) -> &Side {
+    self.holes.iter().find_map(|(curr_hole, curr_side)| {
+      if &hole == curr_hole {
+        Some(curr_side)
+      } else {
+        None
+      }
+    }).unwrap()
   }
 
 }
@@ -268,6 +280,7 @@ impl LemmaPattern {
 ///
 /// TODO: Should we cache a map from `Id` to `Vec<HoleIdx>`? This will allow us
 /// to more efficiently compute which holes we could possibly unify.
+#[derive(Clone)]
 struct ClassMatch {
   goal: GoalName,
   lhs: Id,
@@ -331,13 +344,13 @@ enum LemmaStatus {
   Inconclusive,
 }
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 struct LemmaTreeEdge {
   hole: HoleIdx,
   filled_with: FilledWith,
 }
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 /// What did we fill a hole with?
 enum FilledWith {
   /// This represents a hole being instantiated to a function or constant in the
@@ -374,19 +387,48 @@ impl ClassMatch {
 }
 
 impl LemmaTreeNode {
-  /// Attempts to propagate the next match, returning the number of new
+  fn from_pattern(pattern: LemmaPattern) -> LemmaTreeNode {
+    LemmaTreeNode {
+      pattern,
+      current_matches: Vec::default(),
+      lemma_status: None,
+      has_matching_cvecs: false,
+      children: BTreeMap::default(),
+    }
+  }
+
+  /// Attempts to propagate the next match, returning the number of
   /// [`LemmaTreeNode`]s we propagate matches to in the process.
   fn propagate_next_match(&mut self) -> Option<usize> {
     if self.current_matches.is_empty() {
       return None;
     }
-    let mut new_nodes = 0;
+    let mut num_propagated_matches = 0;
     let m = self.current_matches.pop().unwrap();
-    let unifiable_holes = m.unifiable_holes();
     // First, create/lookup each new LemmaTreeNode that comes from unifying each
     // pair of holes, adding the current match to it where we remove the hole
     // that was substituted out from `subst`.
-    todo!();
+    let unifiable_holes = m.unifiable_holes();
+    for (hole, other_hole) in unifiable_holes {
+      let edge = LemmaTreeEdge {
+        hole,
+        filled_with: FilledWith::AnotherHole(other_hole),
+      };
+      self.children.entry(edge).and_modify(|child_node| {
+        let mut new_match = m.clone();
+        new_match.subst.remove(&hole);
+        child_node.add_match(new_match);
+      }).or_insert_with(|| {
+        // This `new_match` code is sadly duplicated because the borrow checker
+        // doesn't know the cases here are disjoint.
+        let mut new_match = m.clone();
+        new_match.subst.remove(&hole);
+        let mut lemma_node = LemmaTreeNode::from_pattern(self.pattern.unify_holes(hole, other_hole));
+        lemma_node.add_match(new_match);
+        lemma_node
+      });
+      num_propagated_matches += 1;
+    }
     // Somehow obtain the e-graph corresponding the the match's goal.
     let goal_egraph = todo!();
     // Then, create/lookup each new LemmaTreeNode that comes from a refinement
@@ -395,5 +437,11 @@ impl LemmaTreeNode {
     // a new LemmaTreeNode whose edge is the hole being filled with that
     // e-node's symbol.
     todo!()
+  }
+
+  fn add_match(&mut self, m: ClassMatch) {
+    // Set this field to true if `m` has matching cvecs.
+    self.has_matching_cvecs |= m.cvecs_equal;
+    self.current_matches.push(m);
   }
 }
