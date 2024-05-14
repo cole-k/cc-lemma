@@ -66,8 +66,9 @@ struct LemmaInfo {
 /// Capitalizes each part of the goal name and removes underscores.
 ///
 /// prop_50_no_cyclic -> Prop50NoCyclic
-pub fn goal_name_to_filename(goal_name: &str) -> String {
+pub fn goal_name_to_filename(goal_name: Symbol) -> String {
   goal_name
+    .as_str()
     .split('_')
     .into_iter()
     .map(|chunk| {

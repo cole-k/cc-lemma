@@ -3,7 +3,7 @@ use std::cmp::{Ordering, Reverse};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::{Rc, Weak};
 use colored::Colorize;
-use egg::{Analysis, EGraph, Id, Language, Rewrite, Runner, SymbolLang};
+use egg::{Analysis, EGraph, Id, Language, Rewrite, Runner, SymbolLang, Symbol};
 use itertools::Unique;
 use crate::ast::{Equation, Prop, sexp_size};
 use crate::config::CONFIG;
@@ -44,7 +44,7 @@ type StrongGoalRef = Rc<RefCell<GoalNode>>;
 type WeakGoalRef = Weak<RefCell<GoalNode>>;
 
 pub struct GoalNode {
-    name: String, // The same as the corresponding goal
+    name: Symbol, // The same as the corresponding goal
     lemma_id: usize,
     full_exp: Equation,
     father: Option<WeakGoalRef>,
@@ -56,7 +56,7 @@ pub struct GoalNode {
 
 #[derive(Clone, Debug)]
 pub struct GoalIndex {
-    pub name: String,
+    pub name: Symbol,
     pub lemma_id: usize,
     pub full_exp: Equation
 }
@@ -67,19 +67,19 @@ impl GoalIndex {
     }
     pub fn from_node(node: &GoalNode) -> GoalIndex {
         GoalIndex {
-            name: node.name.clone(),
+            name: node.name,
             lemma_id: node.lemma_id,
             full_exp: node.full_exp.clone()
         }
     }
     pub fn from_goal(goal: &Goal, lemma_id: usize) -> GoalIndex {
         GoalIndex {
-            name: goal.name.clone(),
+            name: goal.name,
             lemma_id, full_exp: goal.full_expr.clone()
         }
     }
 
-    pub fn from_lemma(lemma_name: String, expr: Equation, lemma_id: usize) -> GoalIndex {
+    pub fn from_lemma(lemma_name: Symbol, expr: Equation, lemma_id: usize) -> GoalIndex {
         GoalIndex {
             name: lemma_name, full_exp: expr, lemma_id
         }
@@ -89,7 +89,7 @@ impl GoalIndex {
 impl GoalNode {
     fn new(goal: &GoalIndex, father: Option<WeakGoalRef>) -> GoalNode {
         GoalNode {
-            name: goal.name.clone(), lemma_id: goal.lemma_id,
+            name: goal.name, lemma_id: goal.lemma_id,
             full_exp: goal.full_exp.clone(),
             father, status: GoalNodeStatus::Unknown,
             connect_lemmas: Vec::new(), sub_goals: Vec::new()
@@ -116,14 +116,14 @@ impl LemmaInfo {
 
 pub struct GoalGraph {
     lemma_map: HashMap<usize, LemmaInfo>,
-    goal_map: HashMap<String, StrongGoalRef>
+    goal_map: HashMap<Symbol, StrongGoalRef>
 }
 
 impl GoalGraph {
     pub fn new(root: &GoalIndex) -> GoalGraph{
         let goal = Rc::new(RefCell::new(GoalNode::new(root, None)));
         GoalGraph {
-            goal_map: HashMap::from([(root.name.clone(), Rc::clone(&goal))]),
+            goal_map: HashMap::from([(root.name, Rc::clone(&goal))]),
             lemma_map: HashMap::from([(root.lemma_id, LemmaInfo::new(goal, root.lemma_id))])
         }
     }
@@ -184,7 +184,7 @@ impl GoalGraph {
             let weak_goal: Weak<RefCell<GoalNode>> = Rc::downgrade(goal_node);
             let sub_node = Rc::new(RefCell::new(GoalNode::new(sub_goal, Some(weak_goal))));
             goal_node.borrow_mut().sub_goals.push(sub_node.clone());
-            sub_goals.push((sub_goal.name.clone(), sub_node));
+            sub_goals.push((sub_goal.name, sub_node));
         }
         self.goal_map.extend(sub_goals.into_iter());
     }
@@ -192,7 +192,7 @@ impl GoalGraph {
     pub fn record_connector_lemma(&mut self, from: &GoalIndex, root: &GoalIndex) {
         if !self.lemma_map.contains_key(&root.lemma_id) {
             let goal = Rc::new(RefCell::new(GoalNode::new(root, None)));
-            self.goal_map.insert(root.name.clone(), Rc::clone(&goal));
+            self.goal_map.insert(root.name, Rc::clone(&goal));
             self.lemma_map.insert(root.lemma_id, LemmaInfo::new(goal, root.lemma_id));
         }
 

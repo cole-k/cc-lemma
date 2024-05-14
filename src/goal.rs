@@ -546,7 +546,7 @@ fn get_output_type_name(expr: &Type) -> Symbol {
 #[derive(Clone)]
 pub struct Goal<'a> {
   /// Goal name
-  pub name: String,
+  pub name: Symbol,
   /// Equivalences we already proved
   pub egraph: Eg,
   /// Rewrites are split into reductions (invertible rules) and lemmas (non-invertible rules)
@@ -584,7 +584,7 @@ pub struct Goal<'a> {
 impl<'a> Goal<'a> {
   /// Create top-level goal
   pub fn top(
-    name: &str,
+    name: Symbol,
     prop: &Prop,
     premise: &Option<Equation>,
     global_search_state: GlobalSearchState<'a>,
@@ -598,7 +598,7 @@ impl<'a> Goal<'a> {
     let var_classes = lookup_vars(&egraph, prop.params.iter().map(|(x, _)| x));
 
     let mut res = Self {
-      name: name.to_string(),
+      name,
       // The only instantiation we have so far is where the parameters map to themselves
       var_classes: var_classes.clone(),
       grounding_instantiations: vec![var_classes.clone()],
@@ -1303,9 +1303,9 @@ impl<'a> Goal<'a> {
       );
       let con_app: Expr = con_app_string.parse().unwrap();
 
-      new_goal.name = format!("{}_{}={}", new_goal.name, scrutinee.name, con_app);
+      new_goal.name = Symbol::new(format!("{}_{}={}", new_goal.name, scrutinee.name, con_app));
       // This is tracked for proof emission.
-      instantiated_cons_and_goals.push((con_app_string, new_goal.name.clone()));
+      instantiated_cons_and_goals.push((con_app_string, new_goal.name.to_string()));
 
       // Add con_app to the new goal's egraph and union it with var
       new_goal.egraph.add_expr(&con_app);
@@ -1898,7 +1898,7 @@ impl<'a> Goal<'a> {
     }
 
     let prop = Prop::new(eq.clone(), params.clone());
-    let mut new_goal = Goal::top(&format!("{}_gen", self.name),
+    let mut new_goal = Goal::top(Symbol::new(format!("{}_gen", self.name)),
                                  &prop,
                                  &None,
                                  self.global_search_state,
@@ -2180,14 +2180,14 @@ pub struct LemmaProofState<'a> {
   pub priority: usize,
 }
 
-fn get_lemma_name(lemma_id: usize) -> String{
-  format!("lemma_{}", lemma_id)
+fn get_lemma_name(lemma_id: usize) -> Symbol {
+  Symbol::new(format!("lemma_{}", lemma_id))
 }
 
 impl<'a> LemmaProofState<'a> {
   pub fn new(lemma_number: usize, prop: Prop, premise: &Option<Equation>, global_search_state: GlobalSearchState<'a>, proof_depth: usize) -> Self {
     let lemma_name = get_lemma_name(lemma_number);
-    let mut goal = Goal::top(&lemma_name, &prop, premise, global_search_state);
+    let mut goal = Goal::top(lemma_name, &prop, premise, global_search_state);
     let lemma_rw_opt = goal.make_lemma_rewrite_type_only(&goal.eq.lhs.expr, &goal.eq.rhs.expr, lemma_number, false);
     let lemma_rw_opt_no_analysis = goal.make_lemma_rewrite_unchecked(&goal.eq.lhs.expr, &goal.eq.rhs.expr, lemma_number, false);
     let mut outcome = goal.cvecs_valid().and_then(|is_valid| {
@@ -2246,9 +2246,9 @@ impl<'a> LemmaProofState<'a> {
     }));
   }
 
-  fn get_goal_by_name(&self, goal_name: &String) -> &Goal {
+  fn get_goal_by_name(&self, goal_name: Symbol) -> &Goal {
     for goal in self.goals.iter() {
-      if goal.name.eq(goal_name) {
+      if goal.name == goal_name {
         return goal;
       }
     }
@@ -2262,7 +2262,7 @@ impl<'a> LemmaProofState<'a> {
   pub fn try_goal(&mut self, goal_index: &GoalIndex, timer: &Timer, lemmas_state: &mut LemmasState)
     -> Option<(Vec<(usize, Prop)>, Vec<GoalIndex>)> {
     let goal = self.goals.iter_mut().find(
-      |goal| {goal.name.eq(&goal_index.name)}
+      |goal| {goal.name == goal_index.name}
     ).unwrap();
     goal.saturate(&lemmas_state.lemma_rewrites);
 
@@ -2275,7 +2275,7 @@ impl<'a> LemmaProofState<'a> {
           }
         },
         _ => {
-          self.process_goal_explanation(proof_leaf, &goal_index.name);
+          self.process_goal_explanation(proof_leaf, goal_index.name);
           return None;
         }
       }
@@ -2329,10 +2329,9 @@ impl<'a> LemmaProofState<'a> {
           scrutinee.name.to_string().purple()
         );
       }
-      let goal_name = goal.name.clone();
       let (proof_term, goals) = goal.clone().case_split(scrutinee, &timer, lemmas_state, self.ih_lemma_number);
       // This goal is now an internal node in the proof tree.
-      self.lemma_proof.proof.insert(goal_name, proof_term);
+      self.lemma_proof.proof.insert(goal.name.to_string(), proof_term);
       // Add the new goals to the back of the VecDeque.
 
       let pre_size = self.goals.len();
@@ -2355,14 +2354,14 @@ impl<'a> LemmaProofState<'a> {
     }
   }
 
-  pub fn try_finish(&mut self, goal_name: &String, lemmas_state: &mut LemmasState) -> bool{
+  pub fn try_finish(&mut self, goal_name: Symbol, lemmas_state: &mut LemmasState) -> bool{
     let goal = self.goals.iter_mut().find(
-      |goal| {goal.name.eq(goal_name)}
+      |goal| {goal.name == goal_name}
     ).unwrap();
     goal.saturate(&lemmas_state.lemma_rewrites);
     if let Some(leaf) = goal.find_proof() {
-      let name = goal.name.clone();
-      self.process_goal_explanation(leaf, &name);
+      let name = goal.name;
+      self.process_goal_explanation(leaf, name);
       true
     } else {false}
   }
@@ -2373,7 +2372,7 @@ impl<'a> LemmaProofState<'a> {
     lemmas_state.add_lemmas(possible_lemmas, self.proof_depth + 1)
   }
 
-  fn process_goal_explanation(&mut self, proof_leaf: ProofLeaf, goal_name: &str) {
+  fn process_goal_explanation(&mut self, proof_leaf: ProofLeaf, goal_name: Symbol) {
     // This goal has been discharged, proceed to the next goal
     /*if CONFIG.verbose {
       println!("{} {} by {}", "Proved case".bright_blue(), goal_name, proof_leaf.name());
@@ -2888,7 +2887,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
       let proved_goals: Vec<_> = self.goal_graph.get_waiting_goals(Some(&new_lemma)).into_iter().filter(
         |info| {
           let state = proof_state.lemma_proofs.get_mut(&info.lemma_id).unwrap();
-          state.try_finish(&info.name, &mut proof_state.lemmas_state)
+          state.try_finish(info.name, &mut proof_state.lemmas_state)
         }
       ).collect();
 
@@ -2922,7 +2921,7 @@ pub fn pretty_state(state: &LemmaProofState) -> String {
     state
         .goals
         .iter()
-        .map(|g| g.name.clone())
+        .map(|g| g.name.to_string())
         .collect::<Vec<String>>()
         .join(", ")
   )

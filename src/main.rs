@@ -1,5 +1,6 @@
 use ast::{Equation, Prop};
 use colored::Colorize;
+use egg::Symbol;
 use std::fs::*;
 use std::io::{Result, Write};
 use std::time::{Duration, Instant};
@@ -50,7 +51,7 @@ fn main() -> Result<()> {
     let global_search_state = GlobalSearchState::new(&parser_state.env, &parser_state.context, &reductions, &parser_state.cvec_rules, &defns, &raw_goal.local_searchers);
 
     let mut goal = Goal::top(
-      &raw_goal.name,
+      Symbol::new(&raw_goal.name),
       &raw_goal.prop,
       &raw_goal.premise,
       global_search_state,
@@ -69,7 +70,7 @@ fn main() -> Result<()> {
       (Outcome::Unknown, Duration::from_secs(0), 0, 0, 0)
     };
     let (result_cyclic, duration_cyclic, num_lemmas_cyclic, num_attempted_lemmas_cyclic, num_proven_lemmas_cyclic) = if ARGS.do_cyclic() {
-      goal.name = format!("{}_cyclic", goal.name);
+      goal.name = Symbol::new(format!("{}_cyclic", goal.name));
       prove_goal(goal.clone(), raw_goal.prop.clone(), raw_goal.premise.clone(), global_search_state, true)?
     } else {
       (Outcome::Unknown, Duration::from_secs(0), 0, 0, 0)
@@ -188,10 +189,10 @@ fn prove_goal<'a>(goal: Goal<'a>, goal_prop: Prop, goal_premise: Option<Equation
   let duration = start_time.elapsed();
   if CONFIG.emit_proofs {
     if let Outcome::Valid = result {
-      let filename = goal_name_to_filename(&goal.name);
+      let filename = goal_name_to_filename(goal.name);
       let explanation = explain_top(
         &filename,
-        &goal.name,
+        goal.name.as_str(),
         &mut proof_state,
         // FIXME: remove magic number
         // (the first lemma - i.e. the main theorem - should be lemma 0)
