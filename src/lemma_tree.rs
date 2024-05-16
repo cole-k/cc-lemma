@@ -3,7 +3,7 @@ use std::{collections::{BTreeMap, BTreeSet, VecDeque, HashMap}, borrow::Borrow, 
 use egg::{Symbol, Id, Pattern, SymbolLang, Subst, Searcher, Var};
 use itertools::iproduct;
 
-use crate::{goal::{Eg, LemmaProofState}, analysis::cvecs_equal, ast::{Type, Equation, Prop}, goal_graph::GoalGraph};
+use crate::{goal::{Eg, LemmaProofState, Outcome}, analysis::cvecs_equal, ast::{Type, Equation, Prop}, goal_graph::GoalGraph};
 
 type GoalName = Symbol;
 /// For compatibility with egg's Vars, we represent holes as ?n where n is >= 0.
@@ -335,6 +335,11 @@ struct ClassMatch {
 /// we will check the lemma's status. If it is `Proven`, then this node is done.
 /// Otherwise, we propagate the `current_matches` downwards, creating new
 /// children.
+///
+/// TODO: since [`ClassMatch`]es contain information about which goal (and
+/// subsequently, lemma), they come from, can we use this information to
+/// discover which goals a lemma might be useful in. We might be able to do this
+/// instead of tracking this information in the goal graph.
 struct LemmaTreeNode {
   /// The pattern which represents the current lemma.
   pattern: LemmaPattern,
@@ -402,6 +407,17 @@ impl ClassMatch {
   }
 }
 
+enum PropagateMatchResult {
+  /// There weren't any matches to propagate.
+  NoMatches,
+  /// We didn't propagate the match because its parent lemma has been
+  /// (dis)proven.
+  MatchLemmaFinished,
+  /// We propagated the match. The first value is the number of children it
+  /// propagated to, the second value is the number of new children it created.
+  MatchPropagated(usize, usize),
+}
+
 impl LemmaTreeNode {
   fn from_pattern(pattern: LemmaPattern) -> LemmaTreeNode {
     LemmaTreeNode {
@@ -415,14 +431,33 @@ impl LemmaTreeNode {
 
   /// Attempts to propagate the next match, returning the number of new
   /// [`LemmaTreeNode`]s we create in the process (`None` if there are no
-  /// matches to propagate).
-  fn propagate_next_match<'a>(&mut self, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> Option<usize> {
+  /// matches to propagate - this could either be because the matches ).
+  fn propagate_next_match<'a>(&mut self, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
     if self.current_matches.is_empty() {
-      return None;
+      return PropagateMatchResult::NoMatches;
     }
-    let mut num_new_children = 0;
     let m = self.current_matches.pop().unwrap();
-    // First, create/lookup each new LemmaTreeNode that comes from unifying each
+    let mut num_propagated_matches = 0;
+    let mut num_new_children = 0;
+    // First, obtain the goal that this match comes from.
+    //
+    // TODO: refactor the goal graph to couple it better with the lemma tree.
+    // This is incredibly gross.
+    let goal_node = goal_graph.goal_map[&m.goal].as_ref().borrow();
+    let parent_lemma_state = &lemma_proofs[&goal_node.lemma_id];
+    // If this goal's lemma has been proven or invalidated, then we won't
+    // propagate it.
+    if parent_lemma_state.outcome == Some(Outcome::Valid) || parent_lemma_state.outcome == Some(Outcome::Invalid) {
+      return PropagateMatchResult::MatchLemmaFinished;
+    }
+    let goal = parent_lemma_state.goals.iter().find_map(|g| {
+      if g.name == m.goal {
+        Some(g)
+      } else {
+        None
+      }
+    }).unwrap();
+    // Next, create/lookup each new LemmaTreeNode that comes from unifying each
     // pair of holes, adding the current match to it where we remove the hole
     // that was substituted out from `subst`.
     let unifiable_holes = m.unifiable_holes();
@@ -441,20 +476,8 @@ impl LemmaTreeNode {
         self.children.insert(edge, lemma_node);
         num_new_children += 1;
       }
+      num_propagated_matches += 1;
     }
-    // Obtain the e-graph corresponding the the match's goal.
-    //
-    // TODO: refactor the goal graph to couple it better with the lemma tree.
-    // This is incredibly gross.
-    let goal_node = goal_graph.goal_map[&m.goal].as_ref().borrow();
-    let parent_lemma_state = &lemma_proofs[&goal_node.lemma_id];
-    let goal = parent_lemma_state.goals.iter().find_map(|g| {
-      if g.name == m.goal {
-        Some(g)
-      } else {
-        None
-      }
-    }).unwrap();
     // Then, create/lookup each new LemmaTreeNode that comes from a refinement
     // of a hole's matched class in the e-graph. Essentially, pick a hole and
     // look at its e-class. Then for each e-node in the e-class create or lookup
@@ -484,9 +507,10 @@ impl LemmaTreeNode {
           self.children.insert(edge, lemma_node);
           num_new_children += 1;
         }
+        num_propagated_matches += 1;
       }
     }
-    Some(num_new_children)
+    PropagateMatchResult::MatchPropagated(num_propagated_matches, num_new_children)
   }
 
   fn add_match(&mut self, m: ClassMatch) {
