@@ -490,8 +490,15 @@ impl LemmaTreeNode {
   }
 
   fn add_match(&mut self, m: ClassMatch) {
-    // Set this field to true if `m` has matching cvecs.
-    self.has_matching_cvecs |= m.cvecs_equal;
+    if m.cvecs_equal {
+      // If the match's cvecs are equal, then this overall node has a class
+      // match with matching cvecs (the one we are adding).
+      self.has_matching_cvecs = true;
+    } else {
+      // Otherwise, the match serves as a counterexample to the lemma's
+      // validity.
+      self.lemma_status = Some(LemmaStatus::Invalid);
+    }
     self.current_matches.push(m);
   }
 }
