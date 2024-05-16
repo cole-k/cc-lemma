@@ -327,9 +327,9 @@ struct ClassMatch {
 /// `lemma_status` to `Some(Invalid)` - this is because this match represents a
 /// counterexample to the lemma's validity.
 ///
-/// If there are only matching cvecs among the `current_matches` (and there is
-/// at least one match - this should be guaranteed), we will attempt to prove
-/// the lemma represented by this node.
+/// If there are only equal cvecs among the `current_matches` (and there is at
+/// least one match - this should be guaranteed), we will attempt to prove the
+/// lemma represented by this node.
 ///
 /// Once we have finished trying to prove the lemma (or if it was invalidated),
 /// we will check the lemma's status. If it is `Proven`, then this node is done.
@@ -345,10 +345,10 @@ struct LemmaTreeNode {
   /// What's the status of the lemma? (`None` if we haven't attempted this
   /// lemma or finished attempting it).
   lemma_status: Option<LemmaStatus>,
-  /// Did any of the [`ClassMatch`]es have matching cvecs? If none do, there is
+  /// Did any of the [`ClassMatch`]es have equal cvecs? If none do, there is
   /// no point in investigating the children of this node, as they cannot
   /// possibly be valid lemmas.
-  has_matching_cvecs: bool,
+  has_equal_cvecs: bool,
   /// Lemmas that are refinements of the `pattern` in this node. We identify
   /// them using the hole that was filled and what it was filled with.
   children: BTreeMap<LemmaTreeEdge, LemmaTreeNode>,
@@ -408,7 +408,7 @@ impl LemmaTreeNode {
       pattern,
       current_matches: Vec::default(),
       lemma_status: None,
-      has_matching_cvecs: false,
+      has_equal_cvecs: false,
       children: BTreeMap::default(),
     }
   }
@@ -492,8 +492,8 @@ impl LemmaTreeNode {
   fn add_match(&mut self, m: ClassMatch) {
     if m.cvecs_equal {
       // If the match's cvecs are equal, then this overall node has a class
-      // match with matching cvecs (the one we are adding).
-      self.has_matching_cvecs = true;
+      // match with equal cvecs (the one we are adding).
+      self.has_equal_cvecs = true;
     } else {
       // Otherwise, the match serves as a counterexample to the lemma's
       // validity.
