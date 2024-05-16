@@ -1,11 +1,11 @@
-use std::collections::{BTreeMap, BTreeSet, VecDeque, HashMap};
+use std::{collections::{BTreeMap, BTreeSet, VecDeque, HashMap}, borrow::Borrow, str::FromStr};
 
 use egg::{Symbol, Id, Pattern, SymbolLang, Subst, Searcher, Var};
 use itertools::iproduct;
 
-use crate::{goal::Eg, analysis::cvecs_equal, ast::Type};
+use crate::{goal::{Eg, LemmaProofState}, analysis::cvecs_equal, ast::{Type, Equation, Prop}, goal_graph::GoalGraph};
 
-type GoalName = String;
+type GoalName = Symbol;
 /// For compatibility with egg's Vars, we represent holes as ?n where n is >= 0.
 ///
 /// For example, (add ?0 ?1) has holes ?0 and ?1.
@@ -59,6 +59,10 @@ impl Side {
 struct LemmaPattern {
   lhs: PatternWithHoles,
   rhs: PatternWithHoles,
+  // FIXME: The use of Side here is probably a premature optimization. Right now
+  // the code does not even have the side threaded through everywhere so we have
+  // to do lookups _anyway_ to figure out the side which might be more
+  // inefficient that just trying to subst on both sides.
   holes: Vec<(HoleIdx, Side)>,
   next_hole_idx: usize,
 }
@@ -227,10 +231,8 @@ impl LemmaPattern {
   /// made from the constructor `node` with type `node_ty` (so unless the hole is
   /// being filled with a leaf, `node` will be a function and will have new holes
   /// added for it).
-  ///
-  /// `side` being passed is somewhat of an implementation detail; we use it to
-  /// avoid pointlessly substituting.
-  fn subst_hole(&self, hole: HoleIdx, node: Symbol, num_args: usize, side: &Side) -> LemmaPattern {
+  fn subst_hole(&self, hole: HoleIdx, node: Symbol, num_args: usize) -> LemmaPattern {
+    let side = self.hole_side(hole);
     let mut new_holes: Vec<(HoleIdx, Side)> = (self.next_hole_idx..self.next_hole_idx + num_args)
       .into_iter().map(|next_hole_idx| {
       let new_hole = Symbol::new(format!("?{}", next_hole_idx));
@@ -246,7 +248,7 @@ impl LemmaPattern {
                           .cloned()
                           .collect();
     new_holes.append(&mut holes_without_subst_hole);
-    self.new_pattern_from_subst(hole, &new_pattern, side, new_holes, next_hole_idx)
+    self.new_pattern_from_subst(hole, &new_pattern, &side, new_holes, next_hole_idx)
   }
 
   /// Unifies `hole_1` and `hole_2` in the new pattern.
@@ -273,6 +275,17 @@ impl LemmaPattern {
         None
       }
     }).unwrap()
+  }
+
+  fn to_lemma(&self) -> Prop {
+    // This will require two refactors:
+    //
+    // 1. Add type information to the holes.
+    // 2. Separate e-classes by their type.
+    //
+    // The former should be easy. The latter I think is best done by adding an
+    // analysis for type information.
+    todo!()
   }
 
 }
@@ -400,13 +413,14 @@ impl LemmaTreeNode {
     }
   }
 
-  /// Attempts to propagate the next match, returning the number of
-  /// [`LemmaTreeNode`]s we propagate matches to in the process.
-  fn propagate_next_match(&mut self) -> Option<usize> {
+  /// Attempts to propagate the next match, returning the number of new
+  /// [`LemmaTreeNode`]s we create in the process (`None` if there are no
+  /// matches to propagate).
+  fn propagate_next_match<'a>(&mut self, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> Option<usize> {
     if self.current_matches.is_empty() {
       return None;
     }
-    let mut num_propagated_matches = 0;
+    let mut num_new_children = 0;
     let m = self.current_matches.pop().unwrap();
     // First, create/lookup each new LemmaTreeNode that comes from unifying each
     // pair of holes, adding the current match to it where we remove the hole
@@ -417,29 +431,62 @@ impl LemmaTreeNode {
         hole,
         filled_with: FilledWith::AnotherHole(other_hole),
       };
-      self.children.entry(edge).and_modify(|child_node| {
-        let mut new_match = m.clone();
-        new_match.subst.remove(&hole);
+      let mut new_match = m.clone();
+      new_match.subst.remove(&hole);
+      if let Some(child_node) = self.children.get_mut(&edge) {
         child_node.add_match(new_match);
-      }).or_insert_with(|| {
-        // This `new_match` code is sadly duplicated because the borrow checker
-        // doesn't know the cases here are disjoint.
-        let mut new_match = m.clone();
-        new_match.subst.remove(&hole);
+      } else {
         let mut lemma_node = LemmaTreeNode::from_pattern(self.pattern.unify_holes(hole, other_hole));
         lemma_node.add_match(new_match);
-        lemma_node
-      });
-      num_propagated_matches += 1;
+        self.children.insert(edge, lemma_node);
+        num_new_children += 1;
+      }
     }
-    // Somehow obtain the e-graph corresponding the the match's goal.
-    let goal_egraph = todo!();
+    // Obtain the e-graph corresponding the the match's goal.
+    //
+    // TODO: refactor the goal graph to couple it better with the lemma tree.
+    // This is incredibly gross.
+    let goal_node = goal_graph.goal_map[&m.goal].as_ref().borrow();
+    let parent_lemma_state = &lemma_proofs[&goal_node.lemma_id];
+    let goal = parent_lemma_state.goals.iter().find_map(|g| {
+      if g.name == m.goal {
+        Some(g)
+      } else {
+        None
+      }
+    }).unwrap();
     // Then, create/lookup each new LemmaTreeNode that comes from a refinement
     // of a hole's matched class in the e-graph. Essentially, pick a hole and
     // look at its e-class. Then for each e-node in the e-class create or lookup
     // a new LemmaTreeNode whose edge is the hole being filled with that
     // e-node's symbol.
-    todo!()
+    for (hole, class) in &m.subst {
+      for node in &goal.egraph[*class].nodes {
+        let edge = LemmaTreeEdge {
+          hole: *hole,
+          filled_with: FilledWith::ENode(node.op),
+        };
+        let mut new_match = m.clone();
+        new_match.subst.remove(hole);
+        node.children.iter().enumerate().for_each(|(child_idx, child_eclass)| {
+          // The nexts holes that get created are determinisitc, so as long as
+          // we create and assign them in the same order we will construct the
+          // new match correctly.
+          let hole_idx = self.pattern.next_hole_idx + child_idx;
+          let new_hole = Symbol::new(&format!("?{}", hole_idx));
+          new_match.subst.insert(new_hole, *child_eclass);
+        });
+        if let Some(child_node) = self.children.get_mut(&edge) {
+          child_node.add_match(new_match);
+        } else {
+          let mut lemma_node = LemmaTreeNode::from_pattern(self.pattern.subst_hole(*hole, node.op, node.children.len()));
+          lemma_node.add_match(new_match);
+          self.children.insert(edge, lemma_node);
+          num_new_children += 1;
+        }
+      }
+    }
+    Some(num_new_children)
   }
 
   fn add_match(&mut self, m: ClassMatch) {

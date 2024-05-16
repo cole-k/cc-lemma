@@ -45,7 +45,7 @@ type WeakGoalRef = Weak<RefCell<GoalNode>>;
 
 pub struct GoalNode {
     name: Symbol, // The same as the corresponding goal
-    lemma_id: usize,
+    pub lemma_id: usize,
     full_exp: Equation,
     father: Option<WeakGoalRef>,
     status: GoalNodeStatus,
@@ -116,7 +116,7 @@ impl LemmaInfo {
 
 pub struct GoalGraph {
     lemma_map: HashMap<usize, LemmaInfo>,
-    goal_map: HashMap<Symbol, StrongGoalRef>
+    pub goal_map: HashMap<Symbol, StrongGoalRef>
 }
 
 impl GoalGraph {
