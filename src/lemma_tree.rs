@@ -305,9 +305,18 @@ struct ClassMatch {
   subst: BTreeMap<HoleIdx, Id>,
   /// Whether the `lhs` and `rhs` cvecs are equal (we compute this once so we
   /// don't need to repeat the process).
+  ///
+  /// TODO: It seems rather unnecessary to consider pairs with unequal cvecs. We
+  /// would expect that most are going to be unequal (even among pairs of the
+  /// same type). We should see to what extent these types of matches are useful
+  /// (I expect that they are mostly useful for filtering out way-too-general
+  /// lemmas). However, the argument in favor of them is that because we
+  /// enumerate them anyway, their propagation probably doesn't take too long
+  /// and they are useful to clear out trivially invalid lemmas.
   cvecs_equal: bool,
 }
 
+/// FIXME: This information is out of date
 /// These are the nodes which make up our overall lemma search tree. Each node
 /// represents a lemma over universally quantified variables created from its
 /// holes. A node's children are all lemmas that are less general than it,
@@ -346,19 +355,18 @@ struct LemmaTreeNode {
   /// These matches are transient: we will propagate them through the e-graph if
   /// we cannot prove the lemma this node represents (or if it is an invalid
   /// lemma).
-  current_matches: Vec<ClassMatch>,
+  ///
+  /// When we create a `LemmaTreeNode`, it needs to have at least one match.
+  current_matches: VecDeque<ClassMatch>,
   /// What's the status of the lemma? (`None` if we haven't attempted this
-  /// lemma or finished attempting it).
+  /// lemma).
   lemma_status: Option<LemmaStatus>,
-  /// Did any of the [`ClassMatch`]es have equal cvecs? If none do, there is
-  /// no point in investigating the children of this node, as they cannot
-  /// possibly be valid lemmas.
-  has_equal_cvecs: bool,
   /// Lemmas that are refinements of the `pattern` in this node. We identify
   /// them using the hole that was filled and what it was filled with.
   children: BTreeMap<LemmaTreeEdge, LemmaTreeNode>,
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 enum LemmaStatus {
   Valid,
   Invalid,
@@ -407,6 +415,7 @@ impl ClassMatch {
   }
 }
 
+// TODO: make this into a struct and make it addable
 enum PropagateMatchResult {
   /// There weren't any matches to propagate.
   NoMatches,
@@ -422,21 +431,16 @@ impl LemmaTreeNode {
   fn from_pattern(pattern: LemmaPattern) -> LemmaTreeNode {
     LemmaTreeNode {
       pattern,
-      current_matches: Vec::default(),
+      current_matches: VecDeque::default(),
       lemma_status: None,
-      has_equal_cvecs: false,
       children: BTreeMap::default(),
     }
   }
 
-  /// Attempts to propagate the next match, returning the number of new
+  /// Attempts to propagate the match, returning the number of new
   /// [`LemmaTreeNode`]s we create in the process (`None` if there are no
   /// matches to propagate - this could either be because the matches ).
-  fn propagate_next_match<'a>(&mut self, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
-    if self.current_matches.is_empty() {
-      return PropagateMatchResult::NoMatches;
-    }
-    let m = self.current_matches.pop().unwrap();
+  fn propagate_match<'a>(&mut self, m: ClassMatch, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
     let mut num_propagated_matches = 0;
     let mut num_new_children = 0;
     // First, obtain the goal that this match comes from.
@@ -470,13 +474,25 @@ impl LemmaTreeNode {
       new_match.subst.remove(&hole);
       if let Some(child_node) = self.children.get_mut(&edge) {
         child_node.add_match(new_match);
-      } else {
+        num_propagated_matches += 1;
+      // We only will create new nodes if there is a match.
+      //
+      // TODO: This means that matches with unequal cvecs have less power to
+      // invalidate lemmas because there's an ordering issue. If we propagate a
+      // match with unequal cvecs and discard a specialization of the match
+      // because the child node doesn't yet exist, then if we add that node
+      // later we might not discover it's invalid. However, this shouldn't be a
+      // huge concern because 1) we should expect that most matches with equal
+      // cvecs correspond to legitimate lemmas and 2) the cvec analysis for the
+      // lemma will hopefully invalidate it, although generating the e-graph for
+      // this lemma will probably take time.
+      } else if m.cvecs_equal {
         let mut lemma_node = LemmaTreeNode::from_pattern(self.pattern.unify_holes(hole, other_hole));
         lemma_node.add_match(new_match);
         self.children.insert(edge, lemma_node);
         num_new_children += 1;
+        num_propagated_matches += 1;
       }
-      num_propagated_matches += 1;
     }
     // Then, create/lookup each new LemmaTreeNode that comes from a refinement
     // of a hole's matched class in the e-graph. Essentially, pick a hole and
@@ -501,28 +517,71 @@ impl LemmaTreeNode {
         });
         if let Some(child_node) = self.children.get_mut(&edge) {
           child_node.add_match(new_match);
-        } else {
+          num_propagated_matches += 1;
+        } else if m.cvecs_equal {
           let mut lemma_node = LemmaTreeNode::from_pattern(self.pattern.subst_hole(*hole, node.op, node.children.len()));
           lemma_node.add_match(new_match);
           self.children.insert(edge, lemma_node);
           num_new_children += 1;
+          num_propagated_matches += 1;
         }
-        num_propagated_matches += 1;
       }
     }
     PropagateMatchResult::MatchPropagated(num_propagated_matches, num_new_children)
   }
 
+  /// Attempts to propagate the next match, returning the number of new
+  /// [`LemmaTreeNode`]s we create in the process (`None` if there are no
+  /// matches to propagate - this could either be because the matches ).
+  fn propagate_next_match<'a>(&mut self, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
+    match self.current_matches.pop_back() {
+      Some(m) => {
+        self.propagate_match(m, goal_graph, lemma_proofs)
+      }
+      None => PropagateMatchResult::NoMatches
+    }
+  }
+
+  fn propagate_all_matches<'a>(&mut self, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
+    self.current_matches.into_iter().map(|m| {
+      self.propagate_match(m, goal_graph, lemma_proofs);
+      todo!()
+    }).sum();
+    todo!()
+  }
+
+  /// Adds the match to the current node:
+  ///
+  /// If the node has been attempted already (indicated by `lemma_status` being
+  /// `Some(_)`), then we send the match along to the node's children.
+  ///
+  /// If the node has not been attempted already, we add it to its matches.
+  ///
+  /// TODO: implement + track how many propagations come from adding this
   fn add_match(&mut self, m: ClassMatch) {
-    if m.cvecs_equal {
-      // If the match's cvecs are equal, then this overall node has a class
-      // match with equal cvecs (the one we are adding).
-      self.has_equal_cvecs = true;
-    } else {
-      // Otherwise, the match serves as a counterexample to the lemma's
+    if !m.cvecs_equal {
+      // We shouldn't have proven the lemma valid.
+      assert!(self.lemma_status != Some(LemmaStatus::Valid));
+      // The match serves as a counterexample to the lemma's
       // validity.
       self.lemma_status = Some(LemmaStatus::Invalid);
     }
-    self.current_matches.push(m);
+    match self.lemma_status {
+      Some(LemmaStatus::Valid) => {
+        // Nothing to do here: the node is valid so we don't need any more
+        // matches.
+      }
+      Some(_) => {
+        // Recursively propagate this match downwards
+        self.propagate_match(m, todo!(), todo!());
+        // In case we just invalidated this node, we also need to flush its
+        // other matches; otherwise, they'll be stuck forever. In most cases
+        // this list should be empty so this will be a no-op.
+        self.propagate_all_matches(todo!(), todo!());
+      }
+      None => {
+        self.current_matches.push_front(m);
+      }
+    }
   }
 }
