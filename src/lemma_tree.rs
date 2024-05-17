@@ -278,7 +278,16 @@ impl LemmaPattern {
     let hole_1_side = self.hole_side(hole_1);
     let hole_2_side = self.hole_side(hole_2);
     let new_side  = hole_1_side.merge(hole_2_side);
-    let new_holes = self.holes.iter().filter(|(curr_hole, _, _)| curr_hole != &hole_1).cloned().collect();
+    let new_holes = self.holes.iter().filter_map(|(curr_hole, ty, side)| {
+      // Remove hole_1, we're substituting it
+      if curr_hole == &hole_1 {
+        None
+      } else if curr_hole == &hole_2 {
+        Some((curr_hole.clone(), ty.clone(), new_side.clone()))
+      } else {
+        Some((curr_hole.clone(), ty.clone(), side.clone()))
+      }
+    }).collect();
     let hole_2_pattern = PatternWithHoles::Hole(hole_2);
     // We'll substitute on this without loss of generality. I suppose we could
     // do an analysis to identify the better side to substitute if we wanted to
@@ -414,6 +423,8 @@ pub struct LemmaTreeNode {
   /// In another branch, we could instead unify ?0 and ?1, yielding ?0 = ?0.
   /// If we allow propagation in this branch, then we could set ?0 = S ?2, yielding
   /// (S ?2) = (S ?2).
+  ///
+  /// FIXME: we need to allow for multiple unions; this doesn't allow for that.
   propagation_allowed: bool,
   /// Lemmas that are refinements of the `pattern` in this node. We identify
   /// them using the hole that was filled and what it was filled with.
