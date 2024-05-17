@@ -1755,6 +1755,9 @@ impl<'a> Goal<'a> {
                       let m = ClassMatch::top_match(origin.clone(), class_1.id, class_2.id, cvecs_equal);
                       let mut propagate_result = lemma_tree.add_match(m, goal_graph, lemma_proofs);
                       lemmas.append(&mut propagate_result.existing_lemmas);
+                      for (_, new_lemma) in &propagate_result.new_lemmas {
+                        println!("new lemma {}", new_lemma);
+                      }
                       lemmas.append(&mut propagate_result.new_lemmas);
                     })
                     .or_insert_with(|| {
@@ -1762,6 +1765,9 @@ impl<'a> Goal<'a> {
                       let mut root = LemmaTreeNode::from_pattern(LemmaPattern::empty_pattern(class_2_type));
                       let mut propagate_result = root.add_match(m, goal_graph, lemma_proofs);
                       lemmas.append(&mut propagate_result.existing_lemmas);
+                      for (_, new_lemma) in &propagate_result.new_lemmas {
+                        println!("new lemma {}", new_lemma);
+                      }
                       lemmas.append(&mut propagate_result.new_lemmas);
                       root
                     });
@@ -1779,7 +1785,9 @@ impl<'a> Goal<'a> {
         .context
         .get(&representatitve_op)
         .or_else(|| self.local_context.get(&representatitve_op))
-        .cloned()
+        // In case the representative is a function, we will take its return
+        // type since we assume that all functions are fully applied.
+        .map(|ty| ty.args_ret().1)
         .unwrap_or_else(|| {
           panic!("class {}'s representative {} is not in any context", class, representatitve_op)
         })
