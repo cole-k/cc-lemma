@@ -1746,7 +1746,6 @@ impl<'a> Goal<'a> {
           continue;
         }
 
-        println!("Trying to propagate class {} and class {}", class_1.id, class_2.id);
         // FIXME: what do we do if we can't make cvecs for this node? Probably
         // just let it through and conjecture lemmas from it, but now it can't
         // be counterexample. Or maybe we should just ignore it like we do now.

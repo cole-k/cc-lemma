@@ -76,7 +76,7 @@ impl Type {
 
 impl PartialEq for Type {
   fn eq(&self, other: &Self) -> bool {
-      self == other
+      self.cmp(other).is_eq()
   }
 }
 
