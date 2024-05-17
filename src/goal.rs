@@ -1755,6 +1755,12 @@ impl<'a> Goal<'a> {
                       let m = ClassMatch::top_match(origin.clone(), class_1.id, class_2.id, cvecs_equal);
                       let mut propagate_result = lemma_tree.add_match(m, goal_graph, lemma_proofs);
                       lemmas.append(&mut propagate_result.existing_lemmas);
+
+                      todo!("Right now, propagation eagerly returns a new
+                      candidate lemma the moment its lemma node gets created by
+                      a match. We need to add _all matches_ first before we
+                      evaluate whether to try and prove a lemma.");
+
                       for (_, new_lemma) in &propagate_result.new_lemmas {
                         println!("new lemma {}", new_lemma);
                       }
