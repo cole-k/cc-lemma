@@ -4,7 +4,7 @@ use egg::{Symbol, Id, Pattern, SymbolLang, Subst, Searcher, Var};
 use itertools::iproduct;
 use symbolic_expressions::Sexp;
 
-use crate::{goal::{Eg, LemmaProofState, Outcome}, analysis::cvecs_equal, ast::{Type, Equation, Prop}, goal_graph::GoalGraph};
+use crate::{goal::{Eg, LemmaProofState, Outcome}, analysis::cvecs_equal, ast::{Type, Equation, Prop}, goal_graph::{GoalGraph, GoalIndex}};
 
 const HOLE_VAR_PREFIX: &str = "var_";
 const HOLE_PATTERN_PREFIX: &str = "?";
@@ -319,7 +319,8 @@ impl LemmaPattern {
 /// to more efficiently compute which holes we could possibly unify.
 #[derive(Clone)]
 struct ClassMatch {
-  goal: GoalName,
+  /// Which goal does this match come from?
+  origin: GoalIndex,
   lhs: Id,
   rhs: Id,
   /// What e-classes the holes in the pattern match to.
@@ -453,7 +454,7 @@ impl ClassMatch {
 
 #[derive(Default, Clone)]
 struct PropagateMatchResult {
-  new_lemmas: Vec<Prop>,
+  new_lemmas: Vec<(GoalIndex, Prop)>,
   num_propagated_matches: usize,
 }
 
@@ -483,7 +484,7 @@ impl LemmaTreeNode {
     //
     // TODO: refactor the goal graph to couple it better with the lemma tree.
     // This is incredibly gross.
-    let goal_node = goal_graph.goal_map[&m.goal].as_ref().borrow();
+    let goal_node = goal_graph.goal_map[&m.origin.name].as_ref().borrow();
     let parent_lemma_state = &lemma_proofs[&goal_node.lemma_id];
     // If this goal's lemma has been proven or invalidated, then we won't
     // propagate it.
@@ -491,7 +492,7 @@ impl LemmaTreeNode {
       return PropagateMatchResult::default();
     }
     let goal = parent_lemma_state.goals.iter().find_map(|g| {
-      if g.name == m.goal {
+      if g.name == m.origin.name {
         Some(g)
       } else {
         None
@@ -510,7 +511,7 @@ impl LemmaTreeNode {
       let mut new_match = m.clone();
       new_match.subst.remove(&hole);
       if let Some(child_node) = self.children.get_mut(&edge) {
-        child_node.add_match(new_match);
+        child_node.add_match(new_match, goal_graph, lemma_proofs);
         propagate_result.num_propagated_matches += 1;
       // We only will create new nodes if there is a match.
       //
@@ -528,8 +529,8 @@ impl LemmaTreeNode {
         // We force nodes created from unifying holes to be a leaf because otherwise we will have
         // many duplicates.
         lemma_node.propagation_allowed = false;
-        propagate_result.merge(lemma_node.add_match(new_match));
-        propagate_result.new_lemmas.push(lemma_node.pattern.to_lemma());
+        propagate_result.merge(lemma_node.add_match(new_match, goal_graph, lemma_proofs));
+        propagate_result.new_lemmas.push((m.origin.clone(), lemma_node.pattern.to_lemma()));
         self.children.insert(edge, lemma_node);
       }
     }
@@ -554,7 +555,7 @@ impl LemmaTreeNode {
           new_match.subst.insert(new_hole, *child_eclass);
         });
         if let Some(child_node) = self.children.get_mut(&edge) {
-          propagate_result.merge(child_node.add_match(new_match));
+          propagate_result.merge(child_node.add_match(new_match, goal_graph, lemma_proofs));
         } else if m.cvecs_equal {
           // We only will follow this branch if it leads to something in the global vocabulary.
           //
@@ -564,8 +565,8 @@ impl LemmaTreeNode {
           // TODO: Does this handle partial application ($)?
           if let Some(ty) = goal.global_search_state.context.get(&node.op) {
             let mut lemma_node = LemmaTreeNode::from_pattern(self.pattern.subst_hole(*hole, node.op, ty));
-            propagate_result.merge(lemma_node.add_match(new_match));
-            propagate_result.new_lemmas.push(lemma_node.pattern.to_lemma());
+            propagate_result.merge(lemma_node.add_match(new_match, goal_graph, lemma_proofs));
+            propagate_result.new_lemmas.push((m.origin.clone(), lemma_node.pattern.to_lemma()));
             self.children.insert(edge, lemma_node);
           }
         }
@@ -600,7 +601,7 @@ impl LemmaTreeNode {
   /// `Some(_)`), then we send the match along to the node's children.
   ///
   /// If the node has not been attempted already, we add it to its matches.
-  fn add_match(&mut self, m: ClassMatch) -> PropagateMatchResult {
+  fn add_match<'a>(&mut self, m: ClassMatch, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
     let mut propagate_result = PropagateMatchResult::default();
     if !m.cvecs_equal {
       // We shouldn't have proven the lemma valid.
@@ -624,11 +625,11 @@ impl LemmaTreeNode {
       }
       Some(_) => {
         // Recursively propagate this match downwards
-        propagate_result.merge(self.propagate_match(m, todo!(), todo!()));
+        propagate_result.merge(self.propagate_match(m, goal_graph, lemma_proofs));
         // In case we just invalidated this node, we also need to flush its
         // other matches; otherwise, they'll be stuck forever. In most cases
         // this list should be empty so this will be a no-op.
-        self.propagate_all_matches(todo!(), todo!());
+        self.propagate_all_matches(goal_graph, lemma_proofs);
       }
       None => {
         self.current_matches.push_front(m);
