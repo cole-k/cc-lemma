@@ -1,4 +1,5 @@
 use crate::goal_graph::{GoalGraph, GoalIndex, GoalNode, GoalNodeStatus};
+use crate::lemma_tree::{LemmaTreeNode, ClassMatch, LemmaPattern};
 use colored::Colorize;
 use egg::*;
 use itertools::Itertools;
@@ -1722,6 +1723,68 @@ impl<'a> Goal<'a> {
     }
     lemmas
   }
+  /// Search for cc lemmas using the lemma tree instead of extraction.
+  ///
+  /// The cvec analysis needs to be saturated before this can be run.
+  fn search_for_cc_lemmas_using_lemma_tree(&self, timer: &Timer, origin: &GoalIndex, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>, lemma_trees: &mut BTreeMap<Type, LemmaTreeNode>, goal_graph: &GoalGraph) -> Vec<(GoalIndex, Prop)> {
+    let mut lemmas = vec!();
+    // self.egraph.analysis.cvec_analysis.saturate();
+    for class_1 in self.egraph.classes() {
+      for class_2 in self.egraph.classes() {
+        if class_1.id >= class_2.id {
+          continue;
+        }
+        if timer.timeout() {
+          return lemmas;
+        }
+        let class_1_type = self.type_of_class(class_1.id);
+        let class_2_type = self.type_of_class(class_2.id);
+
+        // FIXME: types should be interned, like strings. This comparison
+        // probably happens a lot.
+        if class_1_type != class_2_type {
+          continue;
+        }
+
+        println!("Trying to propagate class {} and class {}", class_1.id, class_2.id);
+        // FIXME: what do we do if we can't make cvecs for this node? Probably
+        // just let it through and conjecture lemmas from it, but now it can't
+        // be counterexample. Or maybe we should just ignore it like we do now.
+        if let Some(cvecs_equal) = cvecs_equal(&self.egraph.analysis.cvec_analysis, &self.egraph[class_1.id].data.cvec_data, &self.egraph[class_2.id].data.cvec_data) {
+          lemma_trees.entry(class_1_type)
+                    .and_modify(|lemma_tree| {
+                      let m = ClassMatch::top_match(origin.clone(), class_1.id, class_2.id, cvecs_equal);
+                      let mut propagate_result = lemma_tree.add_match(m, goal_graph, lemma_proofs);
+                      lemmas.append(&mut propagate_result.existing_lemmas);
+                      lemmas.append(&mut propagate_result.new_lemmas);
+                    })
+                    .or_insert_with(|| {
+                      let m = ClassMatch::top_match(origin.clone(), class_1.id, class_2.id, cvecs_equal);
+                      let mut root = LemmaTreeNode::from_pattern(LemmaPattern::empty_pattern(class_2_type));
+                      let mut propagate_result = root.add_match(m, goal_graph, lemma_proofs);
+                      lemmas.append(&mut propagate_result.existing_lemmas);
+                      lemmas.append(&mut propagate_result.new_lemmas);
+                      root
+                    });
+        }
+
+      }
+    }
+    lemmas
+  }
+
+  /// HACK: This should really be done as an analysis or baked into the language.
+  fn type_of_class(&self, class: Id) -> Type {
+    let representatitve_op = self.egraph[class].data.canonical_form_data.get_enode().op;
+    self.global_search_state
+        .context
+        .get(&representatitve_op)
+        .or_else(|| self.local_context.get(&representatitve_op))
+        .cloned()
+        .unwrap_or_else(|| {
+          panic!("class {}'s representative {} is not in any context", class, representatitve_op)
+        })
+  }
 
   /// Used for debugging.
   fn _print_lhs_rhs(&self) {
@@ -2260,7 +2323,7 @@ impl<'a> LemmaProofState<'a> {
   // 2. the indices of all related lemmas
   // 3. the info of all related goals
   pub fn try_goal(&mut self, goal_index: &GoalIndex, timer: &Timer, lemmas_state: &mut LemmasState)
-    -> Option<(Vec<(usize, Prop)>, Vec<GoalIndex>)> {
+    -> Option<Vec<GoalIndex>> {
     let goal = self.goals.iter_mut().find(
       |goal| {goal.name == goal_index.name}
     ).unwrap();
@@ -2303,21 +2366,26 @@ impl<'a> LemmaProofState<'a> {
         };
 
     // println!("searching for generalized lemmas");
-    let mut related_lemmas = Vec::new();
-    if CONFIG.generalization {
-      let lemma_indices = lemmas_state.add_lemmas(goal.find_generalized_goals(&blocking_exprs), self.proof_depth + 1);
-      related_lemmas.extend(lemma_indices);
-    }
-    // println!("searching for cc lemmas");
-    if CONFIG.cc_lemmas {
-      let possible_lemmas = goal.search_for_cc_lemmas(&timer, lemmas_state);
-      let lemma_indices = lemmas_state.add_lemmas(possible_lemmas, self.proof_depth + 1);
-      related_lemmas.extend(lemma_indices);
-    }
+    // let mut related_lemmas = Vec::new();
+    // if CONFIG.generalization {
+    //   let lemma_indices = lemmas_state.add_lemmas(goal.find_generalized_goals(&blocking_exprs), self.proof_depth + 1);
+    //   related_lemmas.extend(lemma_indices);
+    // }
+    // // println!("searching for cc lemmas");
+    // if CONFIG.cc_lemmas {
+    //   let possible_lemmas = goal.search_for_cc_lemmas(&timer, lemmas_state);
+    //   let lemma_indices = lemmas_state.add_lemmas(possible_lemmas, self.proof_depth + 1);
+    //   related_lemmas.extend(lemma_indices);
+    // }
     // println!("done searching for cc lemmas");
+
     // This ends up being really slow so we'll just take the lemma duplication for now
     // It's unclear that it lets us prove that much more anyway.
     // state.add_cyclic_lemmas(&goal);
+
+    // HACK: we saturate the cvec analysis here so we can later immutably use
+    // the goal.
+    goal.egraph.analysis.cvec_analysis.saturate();
 
     goal.debug_search_for_patterns_in_egraph();
 
@@ -2340,7 +2408,7 @@ impl<'a> LemmaProofState<'a> {
 
         |index| {GoalIndex::from_goal(&self.goals[index], goal_index.lemma_id)}
       ).collect_vec();
-      Some((related_lemmas, sub_goals))
+      Some(sub_goals)
     } else {
       if CONFIG.verbose {
         println!("{}", "Cannot case split: no blocking variables found".red());
@@ -2366,10 +2434,22 @@ impl<'a> LemmaProofState<'a> {
     } else {false}
   }
 
-  pub fn extract_lemmas(&mut self, goal: &mut Goal, timer: &Timer, lemmas_state: &mut LemmasState) -> Vec<(usize, Prop)> {
+  pub fn extract_lemmas(&self, goal_index: &GoalIndex, timer: &Timer, lemmas_state: &mut LemmasState, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>, lemma_trees: &mut BTreeMap<Type, LemmaTreeNode>,
+    goal_graph: &GoalGraph) -> Vec<(GoalIndex, usize, Prop)> {
     if !CONFIG.cc_lemmas {return vec![];}
-    let possible_lemmas = goal.search_for_cc_lemmas(&timer, lemmas_state);
-    lemmas_state.add_lemmas(possible_lemmas, self.proof_depth + 1)
+    let goal = self.goals.iter().find(
+      |goal| {goal.name == goal_index.name}
+    ).unwrap();
+    let possible_lemmas = goal.search_for_cc_lemmas_using_lemma_tree(timer, goal_index, lemma_proofs, lemma_trees, goal_graph);
+    let related_lemmas = possible_lemmas.into_iter().filter_map(|(goal_index, lemma)| {
+      if lemmas_state.is_valid_new_prop(&lemma) {
+        let lemma_index = lemmas_state.find_or_make_fresh_lemma(lemma.clone(), 0);
+        Some((goal_index, lemma_index, lemma))
+      } else {
+        None
+      }
+    }).collect();
+    related_lemmas
   }
 
   fn process_goal_explanation(&mut self, proof_leaf: ProofLeaf, goal_name: Symbol) {
@@ -2756,20 +2836,22 @@ struct GoalLevelPriorityQueue {
   goal_graph: GoalGraph,
   next_goal: Option<GoalIndex>,
   prop_map: HashMap<usize, Prop>,
-  is_found_new_lemma: bool
+  is_found_new_lemma: bool,
+  lemma_trees: BTreeMap<Type, LemmaTreeNode>,
 }
 
 impl GoalLevelPriorityQueue {
   fn new(root: &GoalIndex) -> GoalLevelPriorityQueue {
     GoalLevelPriorityQueue {
       goal_graph: GoalGraph::new(root), next_goal: None,
-      prop_map: HashMap::new(), is_found_new_lemma: false
+      prop_map: HashMap::new(), is_found_new_lemma: false,
+      lemma_trees: BTreeMap::default(),
     }
   }
-  fn add_lemmas_for<'a>(&mut self, index: &GoalIndex, lemmas: Vec<(usize, Prop)>, proof_state: &mut ProofState<'a>) {
+  fn add_lemmas<'a>(&mut self, lemmas: Vec<(GoalIndex, usize, Prop)>, proof_state: &mut ProofState<'a>) {
     if lemmas.is_empty() {return;}
     //println!("found lemmas for {}", info.full_exp);
-    for (lemma_id, prop) in lemmas {
+    for (origin_index, lemma_id, prop) in lemmas {
       //println!("  {}", prop);
       if proof_state.timer.timeout() {return;}
 
@@ -2777,13 +2859,13 @@ impl GoalLevelPriorityQueue {
       let start_info = GoalIndex::from_lemma(
         get_lemma_name(lemma_id), prop.eq.clone(), lemma_id
       );
-      self.goal_graph.record_connector_lemma(index, &start_info);
+      self.goal_graph.record_connector_lemma(&origin_index, &start_info);
     }
   }
 
-  fn insert_waiting<'a>(&mut self, index: &GoalIndex, related_lemmas: Vec<(usize, Prop)>,
+  fn insert_waiting<'a>(&mut self, index: &GoalIndex, related_lemmas: Vec<(GoalIndex, usize, Prop)>,
                         related_goals: Vec<GoalIndex>, proof_state: &mut ProofState<'a>) {
-    self.add_lemmas_for(index, related_lemmas, proof_state);
+    self.add_lemmas(related_lemmas, proof_state);
     self.goal_graph.record_case_split(index, &related_goals);
   }
 }
@@ -2840,20 +2922,25 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
       return;
     }
 
-    let lemma_proof_state = proof_state.lemma_proofs.get_mut(&lemma_index).unwrap();
     // println!("\ntry goal {} from {} {}", info.full_exp, self.prop_map[&info.lemma_id], lemma_proof_state.case_split_depth);
 
-    let step_res = lemma_proof_state.try_goal(&info, &proof_state.timer, &mut proof_state.lemmas_state);
+    // HACK: we do two lookups, the first to briefly use the proof state as
+    // mutable to try the goal, the second to obtain the goal immutably so we
+    // can extract lemmas using the full proof state.
+    let step_res = proof_state.lemma_proofs.get_mut(&lemma_index).unwrap()
+      .try_goal(&info, &proof_state.timer, &mut proof_state.lemmas_state);
 
-    if let Some((raw_related_lemmas, related_goals)) = step_res {
-      let mut related_lemmas = raw_related_lemmas;
+    let lemma_proof_state = proof_state.lemma_proofs.get(&lemma_index).unwrap();
+
+    if let Some(related_goals) = step_res {
+      let related_lemmas =  lemma_proof_state.extract_lemmas(&info, &proof_state.timer, &mut proof_state.lemmas_state, &proof_state.lemma_proofs, &mut self.lemma_trees, &self.goal_graph);
 
       if CONFIG.verbose {
         println!("\nFrom {}", info.full_exp);
         println!("(Lemma) {}", self.prop_map[&info.lemma_id]);
         println!("  lemmas: {}, goals: {}", related_lemmas.len(), related_goals.len());
         for lemma in related_lemmas.iter() {
-          println!("  ({}) {}", sexp_size(&lemma.1.eq.lhs) + sexp_size(&lemma.1.eq.rhs), lemma.1);
+          println!("  ({}) {}", sexp_size(&lemma.2.eq.lhs) + sexp_size(&lemma.2.eq.rhs), lemma.1);
         }
       }
       self.insert_waiting(&info, related_lemmas, related_goals, proof_state);

@@ -11,7 +11,7 @@ pub type SSubst = BTreeMap<String, Sexp>;
 // This is almost like egg's Subst but iterable
 pub type IdSubst = IndexMap<Symbol, Id>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Type {
   pub repr: Sexp,
 }
@@ -72,6 +72,28 @@ impl Type {
     }
   }
 
+}
+
+impl PartialEq for Type {
+  fn eq(&self, other: &Self) -> bool {
+      self == other
+  }
+}
+
+impl Eq for Type {
+
+}
+
+impl PartialOrd for Type {
+  fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    Some(self.cmp(&other))
+  }
+}
+
+impl Ord for Type {
+  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    cmp_sexp_lexicographic(&self.repr, &other.repr, |_| false)
+  }
 }
 
 impl FromStr for Type {

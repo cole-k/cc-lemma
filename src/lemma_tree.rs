@@ -64,7 +64,7 @@ impl Side {
 }
 
 #[derive(Clone)]
-struct LemmaPattern {
+pub struct LemmaPattern {
   lhs: PatternWithHoles,
   rhs: PatternWithHoles,
   // FIXME: The use of Side here is probably a premature optimization. Right now
@@ -203,7 +203,7 @@ impl std::fmt::Display for LemmaPattern {
 impl LemmaPattern {
 
   /// The root pattern of type `ty`; its LHS and RHS are unconstrained.
-  fn empty_pattern(ty: Type) -> LemmaPattern {
+  pub fn empty_pattern(ty: Type) -> LemmaPattern {
     let hole_0 = 0;
     let hole_1 = 1;
 
@@ -299,7 +299,7 @@ impl LemmaPattern {
     }).unwrap()
   }
 
-  fn to_lemma(&self) -> Prop {
+  pub fn to_lemma(&self) -> Prop {
     let params = self.holes.iter().map(|(hole, hole_ty, _side)| {
       (Symbol::new(format!("{}{}", HOLE_VAR_PREFIX, hole)), hole_ty.clone())
     }).collect();
@@ -318,7 +318,7 @@ impl LemmaPattern {
 /// TODO: Should we cache a map from `Id` to `Vec<HoleIdx>`? This will allow us
 /// to more efficiently compute which holes we could possibly unify.
 #[derive(Clone)]
-struct ClassMatch {
+pub struct ClassMatch {
   /// Which goal does this match come from?
   origin: GoalIndex,
   lhs: Id,
@@ -336,6 +336,23 @@ struct ClassMatch {
   /// enumerate them anyway, their propagation probably doesn't take too long
   /// and they are useful to clear out trivially invalid lemmas.
   cvecs_equal: bool,
+}
+
+impl ClassMatch {
+  /// Constructs a top-level match (i.e. one for the top-level pattern, where
+  /// lhs is the pattern ?0 and rhs is the pattern ?1).
+  pub fn top_match(origin: GoalIndex, lhs: Id, rhs: Id, cvecs_equal: bool) -> Self {
+    let mut subst = BTreeMap::default();
+    subst.insert(0, lhs);
+    subst.insert(1, rhs);
+    Self {
+      origin,
+      lhs,
+      rhs,
+      subst,
+      cvecs_equal
+    }
+  }
 }
 
 /// FIXME: This information is out of date
@@ -371,7 +388,7 @@ struct ClassMatch {
 /// subsequently, lemma), they come from, can we use this information to
 /// discover which goals a lemma might be useful in. We might be able to do this
 /// instead of tracking this information in the goal graph.
-struct LemmaTreeNode {
+pub struct LemmaTreeNode {
   /// The pattern which represents the current lemma.
   pattern: LemmaPattern,
   /// These matches are transient: we will propagate them through the e-graph if
@@ -453,20 +470,34 @@ impl ClassMatch {
 }
 
 #[derive(Default, Clone)]
-struct PropagateMatchResult {
-  new_lemmas: Vec<(GoalIndex, Prop)>,
-  num_propagated_matches: usize,
+pub struct PropagateMatchResult {
+  pub new_lemmas: Vec<(GoalIndex, Prop)>,
+  /// In theory we should only ever need the new lemmas, but these are used to
+  /// track dependencies in the goal graph.
+  ///
+  /// TODO: do a restructuring that obviates the need for this field - probably
+  /// we will want to thread the global lemma state through the lemma tree when
+  /// we propagate matches in order to annotate lemma tree nodes with their
+  /// lemma number as well as the parent relation that is tracked in the goal
+  /// graph.
+  ///
+  /// This also will probably mean putting all of the LemmaTreeNodes into a map
+  /// the same way we have all lemmas in a map somewhere so that we can jump
+  /// between them easily.
+  pub existing_lemmas: Vec<(GoalIndex, Prop)>,
+  pub num_propagated_matches: usize,
 }
 
 impl PropagateMatchResult {
   fn merge(&mut self, mut rhs: Self) {
     self.new_lemmas.append(&mut rhs.new_lemmas);
+    self.existing_lemmas.append(&mut rhs.existing_lemmas);
     self.num_propagated_matches += rhs.num_propagated_matches;
   }
 }
 
 impl LemmaTreeNode {
-  fn from_pattern(pattern: LemmaPattern) -> LemmaTreeNode {
+  pub fn from_pattern(pattern: LemmaPattern) -> LemmaTreeNode {
     LemmaTreeNode {
       pattern,
       current_matches: VecDeque::default(),
@@ -512,6 +543,7 @@ impl LemmaTreeNode {
       new_match.subst.remove(&hole);
       if let Some(child_node) = self.children.get_mut(&edge) {
         child_node.add_match(new_match, goal_graph, lemma_proofs);
+        propagate_result.existing_lemmas.push((m.origin.clone(), child_node.pattern.to_lemma()));
         propagate_result.num_propagated_matches += 1;
       // We only will create new nodes if there is a match.
       //
@@ -556,6 +588,7 @@ impl LemmaTreeNode {
         });
         if let Some(child_node) = self.children.get_mut(&edge) {
           propagate_result.merge(child_node.add_match(new_match, goal_graph, lemma_proofs));
+          propagate_result.existing_lemmas.push((m.origin.clone(), child_node.pattern.to_lemma()));
         } else if m.cvecs_equal {
           // We only will follow this branch if it leads to something in the global vocabulary.
           //
@@ -601,7 +634,7 @@ impl LemmaTreeNode {
   /// `Some(_)`), then we send the match along to the node's children.
   ///
   /// If the node has not been attempted already, we add it to its matches.
-  fn add_match<'a>(&mut self, m: ClassMatch, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
+  pub fn add_match<'a>(&mut self, m: ClassMatch, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
     let mut propagate_result = PropagateMatchResult::default();
     if !m.cvecs_equal {
       // We shouldn't have proven the lemma valid.
