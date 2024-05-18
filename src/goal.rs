@@ -1,5 +1,5 @@
 use crate::goal_graph::{GoalGraph, GoalIndex, GoalNode, GoalNodeStatus};
-use crate::lemma_tree::{LemmaTreeNode, ClassMatch, LemmaPattern};
+use crate::lemma_tree::{LemmaTreeNode, ClassMatch, LemmaPattern, LemmaStatus};
 use colored::Colorize;
 use egg::*;
 use itertools::Itertools;
@@ -1726,8 +1726,7 @@ impl<'a> Goal<'a> {
   /// Search for cc lemmas using the lemma tree instead of extraction.
   ///
   /// The cvec analysis needs to be saturated before this can be run.
-  fn search_for_cc_lemmas_using_lemma_tree(&self, timer: &Timer, origin: &GoalIndex, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>, lemma_trees: &mut BTreeMap<Type, LemmaTreeNode>, goal_graph: &GoalGraph) -> Vec<(GoalIndex, Prop)> {
-    let mut lemmas = vec!();
+  fn search_for_cc_lemmas_using_lemma_tree(&self, timer: &Timer, origin: &GoalIndex, lemmas_state: &mut LemmasState, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>, lemma_trees: &mut BTreeMap<Type, LemmaTreeNode>, goal_graph: &GoalGraph) -> Vec<(GoalIndex, usize, Prop)> {
     // self.egraph.analysis.cvec_analysis.saturate();
     for class_1 in self.egraph.classes() {
       for class_2 in self.egraph.classes() {
@@ -1735,7 +1734,7 @@ impl<'a> Goal<'a> {
           continue;
         }
         if timer.timeout() {
-          return lemmas;
+          return vec!();
         }
         let class_1_type = self.type_of_class(class_1.id);
         let class_2_type = self.type_of_class(class_2.id);
@@ -1753,35 +1752,27 @@ impl<'a> Goal<'a> {
           lemma_trees.entry(class_1_type)
                     .and_modify(|lemma_tree| {
                       let m = ClassMatch::top_match(origin.clone(), class_1.id, class_2.id, cvecs_equal);
-                      let mut propagate_result = lemma_tree.add_match(m, goal_graph, lemma_proofs);
-                      lemmas.append(&mut propagate_result.existing_lemmas);
-
-                      todo!("Right now, propagation eagerly returns a new
-                      candidate lemma the moment its lemma node gets created by
-                      a match. We need to add _all matches_ first before we
-                      evaluate whether to try and prove a lemma.");
-
-                      for (_, new_lemma) in &propagate_result.new_lemmas {
-                        println!("new lemma {}", new_lemma);
-                      }
-                      lemmas.append(&mut propagate_result.new_lemmas);
+                      let _ = lemma_tree.add_match(m, lemmas_state, goal_graph, lemma_proofs);
                     })
                     .or_insert_with(|| {
                       let m = ClassMatch::top_match(origin.clone(), class_1.id, class_2.id, cvecs_equal);
-                      let mut root = LemmaTreeNode::from_pattern(LemmaPattern::empty_pattern(class_2_type));
-                      let mut propagate_result = root.add_match(m, goal_graph, lemma_proofs);
-                      lemmas.append(&mut propagate_result.existing_lemmas);
-                      for (_, new_lemma) in &propagate_result.new_lemmas {
-                        println!("new lemma {}", new_lemma);
-                      }
-                      lemmas.append(&mut propagate_result.new_lemmas);
+                      let pattern = LemmaPattern::empty_pattern(class_2_type);
+                      // NOTE: We use this function to guarantee we add a lemma
+                      // because even though we expect the root lemma to be
+                      // invalid, we want to add its children.
+                      //
+                      // We should probably make a function for making a new
+                      // lemma tree from the lemmas state.
+                      let lemma_idx = lemmas_state.find_or_make_fresh_lemma(pattern.to_lemma(), 0);
+                      let mut root = LemmaTreeNode::from_pattern(pattern, lemma_idx);
+                      let _ = root.add_match(m, lemmas_state, goal_graph, lemma_proofs);
                       root
                     });
         }
 
       }
     }
-    lemmas
+    lemma_trees.values_mut().flat_map(|lemma_tree| lemma_tree.find_all_new_lemmas()).collect()
   }
 
   /// HACK: This should really be done as an analysis or baked into the language.
@@ -2195,14 +2186,17 @@ impl LemmasState {
   }
 
   pub fn add_lemmas<I: IntoIterator<Item = Prop>>(&mut self, iter: I, proof_depth: usize) -> Vec<(usize, Prop)>{
-    let mut new_lemmas = Vec::new();
-    for lemma in iter.into_iter() {
-      if self.is_valid_new_prop(&lemma) {
-        let backup = lemma.clone();
-        new_lemmas.push((self.find_or_make_fresh_lemma(lemma, proof_depth), backup));
-      }
+    iter.into_iter().flat_map(|lemma| {
+      self.add_lemma(lemma.clone(), proof_depth).map(|lemma_idx| (lemma_idx, lemma))
+    }).collect()
+  }
+
+  pub fn add_lemma(&mut self, lemma: Prop, proof_depth: usize) -> Option<usize> {
+    if self.is_valid_new_prop(&lemma) {
+      Some(self.find_or_make_fresh_lemma(lemma, proof_depth))
+    } else {
+      None
     }
-    new_lemmas
   }
 
 }
@@ -2453,16 +2447,7 @@ impl<'a> LemmaProofState<'a> {
     let goal = self.goals.iter().find(
       |goal| {goal.name == goal_index.name}
     ).unwrap();
-    let possible_lemmas = goal.search_for_cc_lemmas_using_lemma_tree(timer, goal_index, lemma_proofs, lemma_trees, goal_graph);
-    let related_lemmas = possible_lemmas.into_iter().filter_map(|(goal_index, lemma)| {
-      if lemmas_state.is_valid_new_prop(&lemma) {
-        let lemma_index = lemmas_state.find_or_make_fresh_lemma(lemma.clone(), 0);
-        Some((goal_index, lemma_index, lemma))
-      } else {
-        None
-      }
-    }).collect();
-    related_lemmas
+    goal.search_for_cc_lemmas_using_lemma_tree(timer, goal_index, lemmas_state, lemma_proofs, lemma_trees, goal_graph)
   }
 
   fn process_goal_explanation(&mut self, proof_leaf: ProofLeaf, goal_name: Symbol) {
@@ -2944,6 +2929,19 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
       .try_goal(&info, &proof_state.timer, &mut proof_state.lemmas_state);
 
     let lemma_proof_state = proof_state.lemma_proofs.get(&lemma_index).unwrap();
+
+    if let Some(outcome) = &lemma_proof_state.outcome {
+      let lemma_status = match outcome {
+        Outcome::Invalid => LemmaStatus::Invalid,
+        Outcome::Valid   => LemmaStatus::Valid,
+        Outcome::Unknown | Outcome::Timeout => LemmaStatus::Inconclusive,
+      };
+      // FIXME: this is a hack to record the outcome to the lemma trees.
+      // We really should probably fold the trees into the lemma state.
+      self.lemma_trees.values_mut().for_each(|lemma_tree| {
+        lemma_tree.record_lemma_result(lemma_index, lemma_status);
+      })
+    }
 
     if let Some(related_goals) = step_res {
       let related_lemmas =  lemma_proof_state.extract_lemmas(&info, &proof_state.timer, &mut proof_state.lemmas_state, &proof_state.lemma_proofs, &mut self.lemma_trees, &self.goal_graph);
