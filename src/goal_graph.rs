@@ -49,39 +49,52 @@ pub struct GoalNode {
     full_exp: Equation,
     father: Option<WeakGoalRef>,
     status: GoalNodeStatus,
-
     connect_lemmas: Vec<usize>,
-    sub_goals: Vec<StrongGoalRef>
+    sub_goals: Vec<StrongGoalRef>,
+    lemma_depth: usize,
 }
 
 #[derive(Clone, Debug)]
 pub struct GoalIndex {
     pub name: Symbol,
     pub lemma_id: usize,
-    pub full_exp: Equation
+    pub full_exp: Equation,
+    /// A proxy for the size of the lemma: how many times have we substituted a
+    /// hole in the lemma?
+    ///
+    /// This is _not_ equal to the maximum AST depth of the lemma, but instead
+    /// tracks how many non-hole nodes there are in the lemma.
+    ///
+    /// FIXME: This should eventually be used in lieu of the lemma AST size we use
+    /// in our goal priority queue. Or we should switch to using something like
+    /// https://github.com/mlb2251/lambdas.
+    pub lemma_depth: usize,
 }
 
 impl GoalIndex {
     pub fn get_cost(&self) -> usize {
-        sexp_size(&self.full_exp.lhs) + sexp_size(&self.full_exp.rhs)
+        // sexp_size(&self.full_exp.lhs) + sexp_size(&self.full_exp.rhs)
+        self.lemma_depth
     }
     pub fn from_node(node: &GoalNode) -> GoalIndex {
         GoalIndex {
             name: node.name,
             lemma_id: node.lemma_id,
-            full_exp: node.full_exp.clone()
+            full_exp: node.full_exp.clone(),
+            lemma_depth: node.lemma_depth,
         }
     }
-    pub fn from_goal(goal: &Goal, lemma_id: usize) -> GoalIndex {
+    pub fn from_goal(goal: &Goal, lemma_id: usize, lemma_depth: usize) -> GoalIndex {
         GoalIndex {
             name: goal.name,
-            lemma_id, full_exp: goal.full_expr.clone()
+            lemma_id, full_exp: goal.full_expr.clone(),
+            lemma_depth,
         }
     }
 
-    pub fn from_lemma(lemma_name: Symbol, expr: Equation, lemma_id: usize) -> GoalIndex {
+    pub fn from_lemma(lemma_name: Symbol, expr: Equation, lemma_id: usize, lemma_depth: usize) -> GoalIndex {
         GoalIndex {
-            name: lemma_name, full_exp: expr, lemma_id
+            name: lemma_name, full_exp: expr, lemma_id, lemma_depth
         }
     }
 }
@@ -92,7 +105,8 @@ impl GoalNode {
             name: goal.name, lemma_id: goal.lemma_id,
             full_exp: goal.full_exp.clone(),
             father, status: GoalNodeStatus::Unknown,
-            connect_lemmas: Vec::new(), sub_goals: Vec::new()
+            connect_lemmas: Vec::new(), sub_goals: Vec::new(),
+            lemma_depth: goal.lemma_depth,
         }
     }
 }

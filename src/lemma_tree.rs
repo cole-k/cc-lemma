@@ -416,16 +416,8 @@ pub struct LemmaTreeNode {
   pattern: LemmaPattern,
   /// The index of the lemma corresponding to this node in the LemmaTree
   lemma_idx: usize,
-  /// A proxy for the size of the lemma: how many times have we substituted a
-  /// hole in the lemma?
-  ///
-  /// This is _not_ equal to the maximum AST depth of the lemma, but instead
-  /// tracks how many non-hole nodes there are in the lemma.
-  ///
-  /// FIXME: This should eventually be used in lieu of the lemma AST size we use
-  /// in our goal priority queue. Or we should switch to using something like
-  /// https://github.com/mlb2251/lambdas.
-  lemma_depth: usize,
+  /// The GoalIndex that is associated with this lemma in the GoalGraph.
+  goal_index: GoalIndex,
   /// These matches are transient: we will propagate them through the e-graph if
   /// we cannot prove the lemma this node represents (or if it is an invalid
   /// lemma).
@@ -538,10 +530,11 @@ impl PropagateMatchResult {
 
 impl LemmaTreeNode {
   pub fn from_pattern(pattern: LemmaPattern, lemma_idx: usize, lemma_depth: usize) -> LemmaTreeNode {
+    let goal_index = GoalIndex::from_lemma(Symbol::new(format!("lemma_{}", lemma_idx)), pattern.to_lemma().eq, lemma_idx, lemma_depth);
     LemmaTreeNode {
       pattern,
       lemma_idx,
-      lemma_depth,
+      goal_index,
       current_matches: VecDeque::default(),
       lemma_status: None,
       match_enode_propagation_allowed: true,
@@ -617,7 +610,7 @@ impl LemmaTreeNode {
           // TODO: look up the lemma's result if it has one.
           let lemma_idx = lemmas_state.find_or_make_fresh_lemma(pattern.to_lemma(), 0);
           // The lemma depth does not increase because we're just unifying holes.
-          let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.lemma_depth);
+          let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_depth);
           // We force nodes created from unifying holes to be a leaf because otherwise we will have
           // many duplicates.
           lemma_node.match_enode_propagation_allowed = false;
@@ -659,12 +652,6 @@ impl LemmaTreeNode {
       // so far.
       return propagate_result;
     }
-    if self.lemma_depth > lemmas_state.max_lemma_depth {
-      // We use lemma depth as a way to avoid proposing needlessly large lemmas.
-      // This is a bit of a hack; we should probably instead restructure the
-      // search.
-      return propagate_result;
-    }
     // Then, create/lookup each new LemmaTreeNode that comes from a refinement
     // of the current hole's matched class in the e-graph. For each e-node in
     // the e-class create or lookup a new LemmaTreeNode whose edge is the hole
@@ -698,7 +685,7 @@ impl LemmaTreeNode {
           let pattern = self.pattern.subst_hole(*current_hole, node.op, ty);
           let lemma_idx = lemmas_state.find_or_make_fresh_lemma(pattern.to_lemma(), 0);
           // The lemma depth increases because we do a subst.
-          let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.lemma_depth + 1);
+          let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_depth + 1);
           propagate_result.merge(lemma_node.add_match(new_match, lemmas_state, goal_graph, lemma_proofs));
 
           self.children.insert(edge, lemma_node);
@@ -743,6 +730,13 @@ impl LemmaTreeNode {
       // validity.
       self.lemma_status = Some(LemmaStatus::Invalid);
     }
+    // Defer doing anything more with the match if this node is outside the
+    // depth we are willing to consider. We will revisit it later.
+    if self.goal_index.lemma_depth > lemmas_state.max_lemma_depth {
+      propagate_result.num_propagated_matches += 1;
+      self.current_matches.push_front(m);
+      return propagate_result;
+    }
     match self.lemma_status {
       Some(LemmaStatus::Valid) => {
         // Nothing to do here: the node is valid so we don't need any more
@@ -765,8 +759,8 @@ impl LemmaTreeNode {
   }
 
   /// FIXME: this is needlessly inefficient
-  pub fn find_all_new_lemmas(&mut self, max_depth: usize) -> Vec<(GoalIndex, usize, Prop)> {
-    if self.lemma_depth > max_depth {
+  pub fn find_all_new_lemmas(&mut self, max_depth: usize) -> Vec<(GoalIndex, usize, Prop, usize)> {
+    if self.goal_index.lemma_depth > max_depth {
       return vec!()
     }
     match self.lemma_status {
@@ -777,7 +771,7 @@ impl LemmaTreeNode {
         self.current_matches.iter().for_each(|m| {
           goal_idxs.entry(m.origin.name).or_insert_with(|| m.origin.clone());
         });
-        goal_idxs.into_values().map(|goal_idx| (goal_idx, self.lemma_idx, self.pattern.to_lemma())).collect()
+        goal_idxs.into_values().map(|goal_idx| (goal_idx, self.lemma_idx, self.pattern.to_lemma(), self.goal_index.lemma_depth)).collect()
       }
       // It's been proven, no need to try it.
       //
@@ -798,6 +792,9 @@ impl LemmaTreeNode {
     // Base case: set the status
     if self.lemma_idx == lemma_idx {
       self.lemma_status = Some(result);
+      if result == LemmaStatus::Valid {
+        self.mark_branch_valid();
+      }
       return;
     }
 
@@ -812,5 +809,15 @@ impl LemmaTreeNode {
 
     // Look for the result in the children.
     self.children.values_mut().for_each(|child| child.record_lemma_result(lemma_idx, result));
+  }
+
+  fn mark_branch_valid(&mut self) {
+    // This branch is valid (and therefore so are its children), so we can clear
+    // any work we've done.
+    self.lemma_status = Some(LemmaStatus::Valid);
+    // Remove the current matches.
+    self.current_matches.clear();
+    // Do the same for all children.
+    self.children.values_mut().for_each(|child| child.mark_branch_valid());
   }
 }

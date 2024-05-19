@@ -1726,7 +1726,7 @@ impl<'a> Goal<'a> {
   /// Search for cc lemmas using the lemma tree instead of extraction.
   ///
   /// The cvec analysis needs to be saturated before this can be run.
-  fn search_for_cc_lemmas_using_lemma_tree(&self, timer: &Timer, origin: &GoalIndex, lemmas_state: &mut LemmasState, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>, lemma_trees: &mut BTreeMap<Type, LemmaTreeNode>, goal_graph: &GoalGraph) -> Vec<(GoalIndex, usize, Prop)> {
+  fn search_for_cc_lemmas_using_lemma_tree(&self, timer: &Timer, origin: &GoalIndex, lemmas_state: &mut LemmasState, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>, lemma_trees: &mut BTreeMap<Type, LemmaTreeNode>, goal_graph: &GoalGraph) -> Vec<(GoalIndex, usize, Prop, usize)> {
     // self.egraph.analysis.cvec_analysis.saturate();
     // println!("adding matches to lemma tree");
     for class_1 in self.egraph.classes() {
@@ -2421,7 +2421,7 @@ impl<'a> LemmaProofState<'a> {
       self.goals.extend(goals);
       let sub_goals = (pre_size..self.goals.len()).map(
 
-        |index| {GoalIndex::from_goal(&self.goals[index], goal_index.lemma_id)}
+        |index| {GoalIndex::from_goal(&self.goals[index], goal_index.lemma_id, goal_index.lemma_depth + 1)}
       ).collect_vec();
       Some(sub_goals)
     } else {
@@ -2450,7 +2450,7 @@ impl<'a> LemmaProofState<'a> {
   }
 
   pub fn extract_lemmas(&self, goal_index: &GoalIndex, timer: &Timer, lemmas_state: &mut LemmasState, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>, lemma_trees: &mut BTreeMap<Type, LemmaTreeNode>,
-    goal_graph: &GoalGraph) -> Vec<(GoalIndex, usize, Prop)> {
+    goal_graph: &GoalGraph) -> Vec<(GoalIndex, usize, Prop, usize)> {
     if !CONFIG.cc_lemmas {return vec![];}
     let goal = self.goals.iter().find(
       |goal| {goal.name == goal_index.name}
@@ -2854,22 +2854,22 @@ impl GoalLevelPriorityQueue {
       lemma_trees: BTreeMap::default(),
     }
   }
-  fn add_lemmas<'a>(&mut self, lemmas: Vec<(GoalIndex, usize, Prop)>, proof_state: &mut ProofState<'a>) {
+  fn add_lemmas<'a>(&mut self, lemmas: Vec<(GoalIndex, usize, Prop, usize)>, proof_state: &mut ProofState<'a>) {
     if lemmas.is_empty() {return;}
     //println!("found lemmas for {}", info.full_exp);
-    for (origin_index, lemma_id, prop) in lemmas {
+    for (origin_index, lemma_id, prop, lemma_depth) in lemmas {
       //println!("  {}", prop);
       if proof_state.timer.timeout() {return;}
 
       self.prop_map.entry(lemma_id).or_insert(prop.clone());
       let start_info = GoalIndex::from_lemma(
-        get_lemma_name(lemma_id), prop.eq.clone(), lemma_id
+        get_lemma_name(lemma_id), prop.eq.clone(), lemma_id, lemma_depth
       );
       self.goal_graph.record_connector_lemma(&origin_index, &start_info);
     }
   }
 
-  fn insert_waiting<'a>(&mut self, index: &GoalIndex, related_lemmas: Vec<(GoalIndex, usize, Prop)>,
+  fn insert_waiting<'a>(&mut self, index: &GoalIndex, related_lemmas: Vec<(GoalIndex, usize, Prop, usize)>,
                         related_goals: Vec<GoalIndex>, proof_state: &mut ProofState<'a>) {
     self.add_lemmas(related_lemmas, proof_state);
     self.goal_graph.record_case_split(index, &related_goals);
@@ -2890,10 +2890,9 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
     }*/
 
     if let Some(optimal) = frontier.into_iter().min_by_key(|index| {
-      let cost = index.get_cost();
-      let estimated_max_depth = cost / 2;
-      proof_state.lemmas_state.max_lemma_depth = std::cmp::max(proof_state.lemmas_state.max_lemma_depth, estimated_max_depth);
+      index.lemma_depth
     }) {
+      proof_state.lemmas_state.max_lemma_depth = std::cmp::max(proof_state.lemmas_state.max_lemma_depth, optimal.lemma_depth);
       self.next_goal = Some(optimal.clone());
       Ok(vec!(optimal.lemma_id))
     } else {
@@ -2918,6 +2917,10 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
         lemma_index, LemmaProofState::new(lemma_index, prop, &None, proof_state.global_search_state, 0)
       );
     }
+
+    // println!("trying goal {}", info.full_exp);
+    // let mut input = String::new();
+    // std::io::stdin().read_line(&mut input).expect("Failed to read line");
 
     if CONFIG.verbose {
       println!("\ntry goal {} from {}", info.full_exp, self.prop_map[&info.lemma_id]);
@@ -3139,10 +3142,16 @@ pub fn prove_top<'a>(goal_prop: Prop, goal_premise: Option<Equation>, global_sea
     global_search_state,
   };
 
+  // HACK: the depth of the original lemma is estimated as its AST size divided
+  // by 2. This might be too high or low, which can cause us to incorrectly
+  // prioritize its goal nodes.
+  let estimated_depth = goal_prop.size() / 2;
+
   let top_goal_lemma_number = proof_state.lemmas_state.find_or_make_fresh_lemma(goal_prop.clone(), 0);
   let top_goal_lemma_proof = LemmaProofState::new(top_goal_lemma_number, goal_prop, &goal_premise, global_search_state, 0);
 
-  let start_info = GoalIndex::from_goal(&top_goal_lemma_proof.goals[0], top_goal_lemma_number);
+  let start_info = GoalIndex::from_goal(&top_goal_lemma_proof.goals[0], top_goal_lemma_number, estimated_depth);
+  proof_state.lemmas_state.max_lemma_depth = estimated_depth;
   let mut scheduler = GoalLevelPriorityQueue::new(&start_info);
   scheduler.prop_map.insert(top_goal_lemma_number, top_goal_lemma_proof.prop.clone());
 
