@@ -50,7 +50,7 @@ impl Type {
           ARROW => {
             let args = xs[1]
               .list()
-              .unwrap()
+              .unwrap_or_else(|_| panic!("{} doesnt have a list argument", self))
               .iter()
               .map(|x| Type::new(x.clone()))
               .collect();

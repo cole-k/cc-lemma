@@ -1728,6 +1728,7 @@ impl<'a> Goal<'a> {
   /// The cvec analysis needs to be saturated before this can be run.
   fn search_for_cc_lemmas_using_lemma_tree(&self, timer: &Timer, origin: &GoalIndex, lemmas_state: &mut LemmasState, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>, lemma_trees: &mut BTreeMap<Type, LemmaTreeNode>, goal_graph: &GoalGraph) -> Vec<(GoalIndex, usize, Prop)> {
     // self.egraph.analysis.cvec_analysis.saturate();
+    // println!("adding matches to lemma tree");
     for class_1 in self.egraph.classes() {
       for class_2 in self.egraph.classes() {
         if class_1.id >= class_2.id {
@@ -1738,6 +1739,11 @@ impl<'a> Goal<'a> {
         }
         let class_1_type = self.type_of_class(class_1.id);
         let class_2_type = self.type_of_class(class_2.id);
+        if class_1_type.is_none() || class_2_type.is_none() {
+          continue;
+        }
+        let class_1_type = class_1_type.unwrap();
+        let class_2_type = class_2_type.unwrap();
 
         // FIXME: types should be interned, like strings. This comparison
         // probably happens a lot.
@@ -1764,7 +1770,7 @@ impl<'a> Goal<'a> {
                       // We should probably make a function for making a new
                       // lemma tree from the lemmas state.
                       let lemma_idx = lemmas_state.find_or_make_fresh_lemma(pattern.to_lemma(), 0);
-                      let mut root = LemmaTreeNode::from_pattern(pattern, lemma_idx);
+                      let mut root = LemmaTreeNode::from_pattern(pattern, lemma_idx, 0);
                       let _ = root.add_match(m, lemmas_state, goal_graph, lemma_proofs);
                       root
                     });
@@ -1772,11 +1778,12 @@ impl<'a> Goal<'a> {
 
       }
     }
-    lemma_trees.values_mut().flat_map(|lemma_tree| lemma_tree.find_all_new_lemmas()).collect()
+    // println!("extracting lemmas from tree");
+    lemma_trees.values_mut().flat_map(|lemma_tree| lemma_tree.find_all_new_lemmas(lemmas_state.max_lemma_depth)).collect()
   }
 
   /// HACK: This should really be done as an analysis or baked into the language.
-  fn type_of_class(&self, class: Id) -> Type {
+  fn type_of_class(&self, class: Id) -> Option<Type> {
     let representatitve_op = self.egraph[class].data.canonical_form_data.get_enode().op;
     self.global_search_state
         .context
@@ -1785,9 +1792,9 @@ impl<'a> Goal<'a> {
         // In case the representative is a function, we will take its return
         // type since we assume that all functions are fully applied.
         .map(|ty| ty.args_ret().1)
-        .unwrap_or_else(|| {
-          panic!("class {}'s representative {} is not in any context", class, representatitve_op)
-        })
+        // .unwrap_or_else(|| {
+        //   panic!("class {}'s representative {} is not in any context", class, representatitve_op)
+        // })
   }
 
   /// Used for debugging.
@@ -2157,6 +2164,7 @@ pub struct LemmasState {
   pub lemma_number: usize,
   /// (lemma number, proof depth)
   pub all_lemmas: HashMap<Prop, (usize, usize)>,
+  pub max_lemma_depth: usize,
 }
 
 impl LemmasState {
@@ -2882,7 +2890,9 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
     }*/
 
     if let Some(optimal) = frontier.into_iter().min_by_key(|index| {
-      index.get_cost()
+      let cost = index.get_cost();
+      let estimated_max_depth = cost / 2;
+      proof_state.lemmas_state.max_lemma_depth = std::cmp::max(proof_state.lemmas_state.max_lemma_depth, estimated_max_depth);
     }) {
       self.next_goal = Some(optimal.clone());
       Ok(vec!(optimal.lemma_id))

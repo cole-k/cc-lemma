@@ -29,7 +29,7 @@
 (:: id (-> (a) a))
 (let id (?x) ?x)
 
-(:: comp (-> ((-> b c) (-> a b) (a)) c))
+(:: comp (-> ((-> b c) (-> (a) b) (a)) c))
 (let comp (?f ?g ?x) ($ ?f ($ ?g ?x)))
 
 (:: const (-> (a b) a))
@@ -193,10 +193,10 @@
 (let mirror (Leaf           ) Leaf                             )
 (let mirror ((Node ?l ?x ?r)) (Node (mirror ?r) ?x (mirror ?l)))
 
-(:: mapE (-> ((-> a b) (Expr a)) (Expr b)))
+(:: mapE (-> ((-> (a) b) (Expr a)) (Expr b)))
 (let mapE (?f (MkExpr ?t ?n)) (MkExpr (mapT ?f ?t) ?n))
 
-(:: mapT (-> ((-> a b) (Tm a)) (Tm b)))
+(:: mapT (-> ((-> (a) b) (Tm a)) (Tm b)))
 (let mapT (?f (Var ?x)     ) (Var ($ ?f ?x))                  )
 (let mapT (?f (Cst ?n)     ) (Cst ?n)                         )
 (let mapT (?f (App ?e1 ?e2)) (App (mapE ?f ?e1) (mapE ?f ?e2)))
@@ -272,7 +272,7 @@
   xs
 )
 
-(=== goal_12 (n f xs) (Nat (-> a b) (List a))
+(=== goal_12 (n f xs) (Nat (-> (a) b) (List a))
   (drop n (map f xs))
   (map f (drop n xs))
 )
@@ -282,7 +282,7 @@
   (drop n xs)
 )
 
-(=== goal_14 (p xs ys) ((-> a Bool) (List a) (List a))
+(=== goal_14 (p xs ys) ((-> (a) Bool) (List a) (List a))
   (filter p (append xs ys))
   (append (filter p xs) (filter p ys))
 )
@@ -423,7 +423,7 @@
   Nil
 )
 
-(=== goal_41 (n f xs) (Nat (-> a b) (List a))
+(=== goal_41 (n f xs) (Nat (-> (a) b) (List a))
   (take n (map f xs))
   (map f (take n xs))
 )
@@ -433,7 +433,7 @@
   (Cons x (take n xs))
 )
 
-(=== goal_43 (p xs) ((-> a Bool) (List a))
+(=== goal_43 (p xs) ((-> (a) Bool) (List a))
   (append (takeWhile p xs) (dropWhile p xs))
   xs
 )
@@ -565,7 +565,7 @@
   True
 )
 
-(=== goal_67 (p xs) ((-> a Bool) (List a))
+(=== goal_67 (p xs) ((-> (a) Bool) (List a))
   (leq (len (filter p xs)) (len xs))
   True
 )
@@ -611,7 +611,7 @@
   (take (sub (len xs) i) (rev xs))
 )
 
-(=== goal_75 (p xs) ((-> a Bool) (List a))
+(=== goal_75 (p xs) ((-> (a) Bool) (List a))
   (rev (filter p xs))
   (filter p (rev xs))
 )

@@ -237,7 +237,7 @@
 (let qreva (Nil ?acc) ?acc)
 (let qreva ((Cons ?x ?xs) ?acc) (qreva ?xs (Cons ?x ?acc)))
 
-(:: revflat (-> (Tree a) (List a)))
+(:: revflat (-> ((Tree a)) (List a)))
 (let revflat (Leaf) Nil)
 (let revflat ((Node ?l ?x ?r)) (append (revflat ?l) (Cons ?x (revflat ?r))))
 
