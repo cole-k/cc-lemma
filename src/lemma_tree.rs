@@ -351,6 +351,14 @@ impl LemmaPattern {
     Prop::new(Equation::new(lhs, rhs), params)
   }
 
+  fn is_consistent(&self) -> bool {
+    let pattern_holes: BTreeSet<usize> = self.lhs.holes().union(&self.rhs.holes()).cloned().collect();
+    let all_holes: BTreeSet<usize> = self.holes.iter().chain(self.locked_holes.iter()).map(|(hole, _, _)| {
+      *hole
+    }).collect();
+    pattern_holes.is_subset(&all_holes) && all_holes.is_subset(&pattern_holes)
+  }
+
 }
 
 /// A data structure that represents a multipattern match of a [`LemmaPattern`].
@@ -493,7 +501,7 @@ struct LemmaTreeEdge {
   filled_with: FilledWith,
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
 /// What did we fill a hole with?
 enum FilledWith {
   /// This represents a hole being instantiated to a function or constant in the
@@ -606,6 +614,9 @@ impl LemmaTreeNode {
     } else {
       None
     };
+    // if !pattern.is_consistent() {
+    //   panic!("Pattern {} is inconsistent! holes: {:?}, locked holes: {:?}", pattern, pattern.holes, pattern.locked_holes);
+    // }
     LemmaTreeNode {
       pattern,
       lemma_idx,
@@ -624,10 +635,74 @@ impl LemmaTreeNode {
   /// FIXME: refactor this into separate parts for unifying holes using a match,
   /// "locking in" a hole, and propagating a match via its enodes.
   fn propagate_match<'a>(&mut self, m: ClassMatch, lemmas_state: &mut LemmasState, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
-    if self.pattern.holes.is_empty() {
+    if self.pattern.holes.is_empty() && self.pattern.locked_holes.is_empty() {
       return PropagateMatchResult::default();
     }
-    let (current_hole, _, _) = self.pattern.holes.back().unwrap();
+    let mut propagate_result = PropagateMatchResult::default();
+    // We will prefer taking unfilled holes, but if there are only locked holes
+    // remaining, then we will try unifying them.
+    if self.pattern.holes.is_empty() {
+      // Create/lookup each new LemmaTreeNode that comes from unifying each
+      // pair of holes, adding the current match to it where we remove the hole
+      // that was substituted out from `subst`.
+      //
+      // FIXME: this inefficiently considers all possible holes instead of only
+      // locked ones. Also we should probably assign an order to considering
+      // these unions to avoid duplicates.
+      let unifiable_holes = m.unifiable_holes();
+      for (hole, other_hole) in unifiable_holes {
+        // Both holes should be unifyiable.
+        if self.pattern.locked_holes.iter().find(|(h, _, _)| *h == hole).is_none()
+          || self.pattern.locked_holes.iter().find(|(h, _, _)| *h == other_hole).is_none() {
+          continue;
+        }
+        let edge = LemmaTreeEdge {
+          hole,
+          filled_with: FilledWith::AnotherHole(other_hole),
+        };
+        let mut new_match = m.clone();
+        let class = new_match.subst.remove(&hole).unwrap();
+        new_match.subst.remove(&other_hole);
+        // HACK: we know what the index of the fresh hole that will unify the two
+        // is going to be, so we just insert the class at that hole here.
+        new_match.subst.insert(self.pattern.next_hole_idx, class);
+        if let Some(child_node) = self.children.get_mut(&edge) {
+          propagate_result.merge(child_node.add_match(new_match, lemmas_state, goal_graph, lemma_proofs));
+          propagate_result.existing_lemmas.push((m.origin.clone(), child_node.pattern.to_lemma()));
+          propagate_result.num_propagated_matches += 1;
+        // We only will create new nodes if there is a match.
+        //
+        // TODO: This means that matches with unequal cvecs have less power to
+        // invalidate lemmas because there's an ordering issue. If we propagate a
+        // match with unequal cvecs and discard a specialization of the match
+        // because the child node doesn't yet exist, then if we add that node
+        // later we might not discover it's invalid. However, this shouldn't be a
+        // huge concern because 1) we should expect that most matches with equal
+        // cvecs correspond to legitimate lemmas and 2) the cvec analysis for the
+        // lemma will hopefully invalidate it, although generating the e-graph for
+        // this lemma will probably take time.
+        } else if m.cvecs_equal {
+          let pattern = self.pattern.unify_holes(hole, other_hole);
+          // We always will make a lemma, even though we might suspect it is
+          // invalid.
+          //
+          // TODO: look up the lemma's result if it has one.
+          let lemma_idx = lemmas_state.find_or_make_fresh_lemma(pattern.to_lemma(), 0);
+          // The lemma depth does not increase because we're just unifying holes.
+          let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_depth);
+          // We force nodes created from unifying holes to be a leaf because otherwise we will have
+          // many duplicates.
+          lemma_node.match_enode_propagation_allowed = false;
+          propagate_result.merge(lemma_node.add_match(new_match, lemmas_state, goal_graph, lemma_proofs));
+          propagate_result.new_lemmas.push((m.origin.clone(), lemma_node.pattern.to_lemma()));
+          // println!("current node pattern {}\n holes {:?}, locked holes {:?}", self.pattern, self.pattern.holes, self.pattern.locked_holes);
+          // println!("new node pattern {}\n holes {:?}, locked holes {:?}", lemma_node.pattern, lemma_node.pattern.holes, lemma_node.pattern.locked_holes);
+          self.children.insert(edge, lemma_node);
+        }
+      }
+      return propagate_result;
+    }
+    let (current_hole, _, _) = *self.pattern.holes.back().unwrap();
     // First, obtain the goal that this match comes from.
     //
     // TODO: refactor the goal graph to couple it better with the lemma tree.
@@ -646,62 +721,11 @@ impl LemmaTreeNode {
         None
       }
     }).unwrap();
-    let mut propagate_result = PropagateMatchResult::default();
 
-    // Next, create/lookup each new LemmaTreeNode that comes from unifying each
-    // pair of holes, adding the current match to it where we remove the hole
-    // that was substituted out from `subst`.
-    let unifiable_holes = m.unifiable_holes();
-    for (hole, other_hole) in unifiable_holes {
-      if hole != *current_hole {
-        continue;
-      }
-      let edge = LemmaTreeEdge {
-        hole: *current_hole,
-        filled_with: FilledWith::AnotherHole(other_hole),
-      };
-      let mut new_match = m.clone();
-      let class = new_match.subst.remove(&hole).unwrap();
-      new_match.subst.remove(&other_hole);
-      // HACK: we know what the index of the fresh hole that will unify the two
-      // is going to be, so we just insert the class at that hole here.
-      new_match.subst.insert(self.pattern.next_hole_idx, class);
-      if let Some(child_node) = self.children.get_mut(&edge) {
-        propagate_result.merge(child_node.add_match(new_match, lemmas_state, goal_graph, lemma_proofs));
-        propagate_result.existing_lemmas.push((m.origin.clone(), child_node.pattern.to_lemma()));
-        propagate_result.num_propagated_matches += 1;
-      // We only will create new nodes if there is a match.
-      //
-      // TODO: This means that matches with unequal cvecs have less power to
-      // invalidate lemmas because there's an ordering issue. If we propagate a
-      // match with unequal cvecs and discard a specialization of the match
-      // because the child node doesn't yet exist, then if we add that node
-      // later we might not discover it's invalid. However, this shouldn't be a
-      // huge concern because 1) we should expect that most matches with equal
-      // cvecs correspond to legitimate lemmas and 2) the cvec analysis for the
-      // lemma will hopefully invalidate it, although generating the e-graph for
-      // this lemma will probably take time.
-      } else if m.cvecs_equal {
-        let pattern = self.pattern.unify_holes(hole, other_hole);
-        // We always will make a lemma, even though we might suspect it is
-        // invalid.
-        //
-        // TODO: look up the lemma's result if it has one.
-        let lemma_idx = lemmas_state.find_or_make_fresh_lemma(pattern.to_lemma(), 0);
-        // The lemma depth does not increase because we're just unifying holes.
-        let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_depth);
-        // We force nodes created from unifying holes to be a leaf because otherwise we will have
-        // many duplicates.
-        lemma_node.match_enode_propagation_allowed = false;
-        propagate_result.merge(lemma_node.add_match(new_match, lemmas_state, goal_graph, lemma_proofs));
-        propagate_result.new_lemmas.push((m.origin.clone(), lemma_node.pattern.to_lemma()));
-        self.children.insert(edge, lemma_node);
-      }
-    }
     // Next, we will create an edge corresponding to "locking" or preventing the
     // current hole from being filled.
     let lock_edge = LemmaTreeEdge {
-      hole: *current_hole,
+      hole: current_hole,
       filled_with: FilledWith::Lock,
     };
     if let Some(child_node) = self.children.get_mut(&lock_edge) {
@@ -710,19 +734,29 @@ impl LemmaTreeNode {
       propagate_result.num_propagated_matches += 1;
     } else {
       // Create a new node where we move the current hole to the locked holes.
-      let mut new_node = self.clone();
-      let (hole_loc, _) = new_node.pattern.holes.iter().find_position(|(hole, _, _)| hole == current_hole).unwrap();
+      //
+      // We zero out the current matches and children but keep everything else
+      // the same since the node is not fundamentally changed.
+      let mut new_node = LemmaTreeNode {
+        pattern: self.pattern.clone(),
+        lemma_idx: self.lemma_idx,
+        goal_index: self.goal_index.clone(),
+        current_matches: VecDeque::default(),
+        lemma_status: self.lemma_status.clone(),
+        match_enode_propagation_allowed: self.match_enode_propagation_allowed,
+        children: BTreeMap::default(),
+      };
+      let (hole_loc, _) = new_node.pattern.holes.iter().find_position(|(hole, _, _)| *hole == current_hole).unwrap();
       let hole_info = new_node.pattern.holes.remove(hole_loc).unwrap();
       new_node.pattern.locked_holes.push(hole_info);
-      // Everything else about this new node will be the same except we will
-      // zero out its matches (they will presumably get propagated).
-      //
-      // TODO: do a shallow clone that doesn't copy the current matches since we
-      // don't use them.
-      new_node.current_matches = VecDeque::default();
       // Now propagate the match.
       propagate_result.merge(new_node.add_match(m.clone(), lemmas_state, goal_graph, lemma_proofs));
       propagate_result.num_propagated_matches += 1;
+      // println!("current node pattern {}\n holes {:?}, locked holes {:?}", self.pattern, self.pattern.holes, self.pattern.locked_holes);
+      // println!("new node pattern {}\n holes {:?}, locked holes {:?}", new_node.pattern, new_node.pattern.holes, new_node.pattern.locked_holes);
+      // if !new_node.pattern.is_consistent() {
+      //   panic!("inconsistent pattern")
+      // }
       self.children.insert(lock_edge, new_node);
     }
     if !self.match_enode_propagation_allowed {
@@ -734,14 +768,14 @@ impl LemmaTreeNode {
     // of the current hole's matched class in the e-graph. For each e-node in
     // the e-class create or lookup a new LemmaTreeNode whose edge is the hole
     // being filled with that e-node's symbol.
-    let class = m.subst[current_hole];
+    let class = m.subst[&current_hole];
     for node in &goal.egraph[class].nodes {
       let edge = LemmaTreeEdge {
-        hole: *current_hole,
+        hole: current_hole,
         filled_with: FilledWith::ENode(node.op),
       };
       let mut new_match = m.clone();
-      new_match.subst.remove(current_hole);
+      new_match.subst.remove(&current_hole);
       node.children.iter().enumerate().for_each(|(child_idx, child_eclass)| {
         // The nexts holes that get created are determinisitc, so as long as
         // we create and assign them in the same order we will construct the
@@ -760,7 +794,8 @@ impl LemmaTreeNode {
         //
         // TODO: Does this handle partial application ($)?
         if let Some(ty) = goal.global_search_state.context.get(&node.op) {
-          let pattern = self.pattern.subst_hole(*current_hole, node.op, ty);
+          // println!("holes: {:?}, locked holes: {:?}", self.pattern.holes, self.pattern.locked_holes);
+          let pattern = self.pattern.subst_hole(current_hole, node.op, ty);
           let lemma_idx = lemmas_state.find_or_make_fresh_lemma(pattern.to_lemma(), 0);
           // The lemma depth increases because we do a subst.
           let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_depth + 1);
@@ -770,6 +805,13 @@ impl LemmaTreeNode {
         }
       }
     }
+    // if self.children.keys().any(|key| key.hole != current_hole) {
+    //   println!("current pattern: {}, current holes: {:?}, current locked holes: {:?}", self.pattern, self.pattern.holes, self.pattern.locked_holes);
+    //   self.children.keys().for_each(|key| {
+    //     println!("child edge fills hole {} with {:?}", key.hole, key.filled_with);
+    //   });
+    //   panic!("somehow there's a key that isn't equal to the current hole!");
+    // }
     propagate_result
   }
 

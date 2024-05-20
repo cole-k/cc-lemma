@@ -1755,6 +1755,9 @@ impl<'a> Goal<'a> {
         // just let it through and conjecture lemmas from it, but now it can't
         // be counterexample. Or maybe we should just ignore it like we do now.
         if let Some(cvecs_equal) = cvecs_equal(&self.egraph.analysis.cvec_analysis, &self.egraph[class_1.id].data.cvec_data, &self.egraph[class_2.id].data.cvec_data) {
+          if !cvecs_equal {
+            continue;
+          }
           lemma_trees.entry(class_1_type)
                     .and_modify(|lemma_tree| {
                       let m = ClassMatch::top_match(origin.clone(), class_1.id, class_2.id, cvecs_equal);
