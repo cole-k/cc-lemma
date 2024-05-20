@@ -5,7 +5,7 @@ use egg::{Symbol, Id, Pattern, SymbolLang, Subst, Searcher, Var};
 use itertools::{iproduct, Itertools};
 use symbolic_expressions::Sexp;
 
-use crate::{goal::{Eg, LemmaProofState, Outcome, LemmasState}, analysis::cvecs_equal, ast::{Type, Equation, Prop}, goal_graph::{GoalGraph, GoalIndex}};
+use crate::{goal::{Eg, LemmaProofState, Outcome, LemmasState}, analysis::cvecs_equal, ast::{Type, Equation, Prop}, goal_graph::{GoalGraph, GoalIndex}, config::CONFIG};
 
 const HOLE_VAR_PREFIX: &str = "var_";
 const HOLE_PATTERN_PREFIX: &str = "?";
@@ -582,16 +582,26 @@ impl LemmaTreeNode {
   pub fn from_pattern(pattern: LemmaPattern, lemma_idx: usize, lemma_depth: usize) -> LemmaTreeNode {
     let goal_index = GoalIndex::from_lemma(Symbol::new(format!("lemma_{}", lemma_idx)), pattern.to_lemma().eq, lemma_idx, lemma_depth);
     // (sort of)
-    // HACK: if any hole does not appear on both sides, we won't theorize this as a lemma.
+    // HACK: if any hole does not appear on both sides, we consider it a free variable.
+    // If there are more free variables than allowed (by default we only allow 1), we
+    // will declare the lemma invalid immediately.
+    //
     // While there are certainly some lemmas for which this might be relevant, such as
     //
     // mul x Z = Z
     //
-    // The vast majority should not have free variables.
+    // The vast majority should not have free variables (or at most 1, like in
+    // this example).
     //
     // FIXME: Figure out a better heuristic for invalidating intermediate lemmas
     // that are too general.
-    let lemma_status = if pattern.holes.iter().chain(pattern.locked_holes.iter()).any(|(_hole, _ty, side)| side != &Side::Both) {
+    let mut num_free_vars = 0;
+    pattern.holes.iter().chain(pattern.locked_holes.iter()).for_each(|(_hole, _ty, side)| {
+      if side != &Side::Both {
+        num_free_vars += 1;
+      }
+    });
+    let lemma_status = if num_free_vars > CONFIG.num_free_vars_allowed {
       Some(LemmaStatus::Invalid)
     } else {
       None

@@ -118,6 +118,9 @@ pub struct Args {
 
   #[clap(long = "output-lemma-tree")]
   pub output_lemma_tree: bool,
+
+  #[clap(long = "num-free-vars-allowed", default_value = "1")]
+  pub num_free_vars_allowed: usize,
 }
 
 impl Args {
@@ -175,6 +178,7 @@ pub struct Config {
   pub saturate_only_parent: bool,
   pub reduce_proven_lemma: bool,
   pub output_lemma_tree: bool,
+  pub num_free_vars_allowed: usize,
 }
 
 impl Config {
@@ -238,6 +242,7 @@ impl Config {
       saturate_only_parent: args.saturate_only_parent,
       reduce_proven_lemma: args.reduce_proven_lemmas,
       output_lemma_tree: args.output_lemma_tree,
+      num_free_vars_allowed: args.num_free_vars_allowed,
     }
   }
 
