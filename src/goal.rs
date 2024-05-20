@@ -2838,12 +2838,12 @@ trait BreadthFirstScheduler {
 
 }
 
-struct GoalLevelPriorityQueue {
+pub struct GoalLevelPriorityQueue {
   goal_graph: GoalGraph,
   next_goal: Option<GoalIndex>,
   prop_map: HashMap<usize, Prop>,
   is_found_new_lemma: bool,
-  lemma_trees: BTreeMap<Type, LemmaTreeNode>,
+  pub lemma_trees: BTreeMap<Type, LemmaTreeNode>,
 }
 
 impl GoalLevelPriorityQueue {
@@ -3134,7 +3134,7 @@ fn find_proof(eq: &ETermEquation, egraph: &mut Eg) -> Option<ProofLeaf> {
   }
 }
 
-pub fn prove_top<'a>(goal_prop: Prop, goal_premise: Option<Equation>, global_search_state: GlobalSearchState<'a>) -> (Outcome, ProofState) {
+pub fn prove_top<'a>(goal_prop: Prop, goal_premise: Option<Equation>, global_search_state: GlobalSearchState<'a>) -> (Outcome, ProofState, GoalLevelPriorityQueue) {
   let mut proof_state = ProofState {
     timer: Timer::new(Instant::now()),
     lemmas_state: LemmasState::default(),
@@ -3161,6 +3161,6 @@ pub fn prove_top<'a>(goal_prop: Prop, goal_premise: Option<Equation>, global_sea
   //let outcome = proof_state.prove_breadth_first(top_goal_lemma_number, &mut LemmaSizePriorityQueue::default());
   let outcome = proof_state.prove_breadth_first(top_goal_lemma_number, &mut scheduler);
 
-  (outcome, proof_state)
+  (outcome, proof_state, scheduler)
 
 }

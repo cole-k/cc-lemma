@@ -170,7 +170,7 @@ fn prove_goal<'a>(goal: Goal<'a>, goal_prop: Prop, goal_premise: Option<Equation
       println!("  {:?}", rule);
     }
   }
-  let (result, mut proof_state) = goal::prove_top(goal_prop, goal_premise, global_search_state);
+  let (result, mut proof_state, scheduler) = goal::prove_top(goal_prop, goal_premise, global_search_state);
   let mut num_lemmas = 0;
   let mut num_proven_lemmas = 0;
   let mut num_lemmas_not_attempted = 0;
@@ -205,6 +205,12 @@ fn prove_goal<'a>(goal: Goal<'a>, goal_prop: Prop, goal_premise: Option<Equation
       let mut file = File::create(CONFIG.proofs_directory.join(format!("{}.hs", filename)))?;
       file.write_all(explanation.as_bytes())?;
     }
+  }
+  if CONFIG.output_lemma_tree {
+    let filename = goal_name_to_filename(goal.name);
+    let serialized = serde_json::to_string(&scheduler.lemma_trees).unwrap();
+    let mut file = File::create(CONFIG.output_directory.join(format!("{}-lemma-tree.json", filename)))?;
+    file.write_all(serialized.as_bytes())?;
   }
   // if result == Outcome::Timeout || result == Outcome::Unknown {
   //   for (i, chain) in proof_state.lemmas_state.possible_lemmas.chains.iter().enumerate() {

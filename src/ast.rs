@@ -2,6 +2,7 @@ use egg::*;
 use lazy_static::lazy_static;
 
 use indexmap::IndexMap;
+use serde::Serialize;
 use std::{collections::{BTreeMap, BTreeSet}, fmt::Display, str::FromStr, hash::Hash};
 use symbolic_expressions::{Sexp, SexpError};
 
@@ -109,6 +110,15 @@ impl Display for Type {
     write!(f, "{}", self.repr)
   }
 }
+
+impl Serialize for Type {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer {
+    serializer.serialize_str(&format!("{}", self))
+  }
+}
+
 
 // Expressions
 pub type Expr = RecExpr<SymbolLang>;

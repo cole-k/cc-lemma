@@ -1,3 +1,4 @@
+use serde::{Serialize, Serializer, ser::{SerializeStruct, SerializeSeq}};
 use std::{collections::{BTreeMap, BTreeSet, VecDeque, HashMap, HashSet}, borrow::Borrow, str::FromStr};
 
 use egg::{Symbol, Id, Pattern, SymbolLang, Subst, Searcher, Var};
@@ -89,6 +90,14 @@ pub struct LemmaPattern {
   /// These are holes which we will not allow to be filled.
   locked_holes: Vec<(HoleIdx, Type, Side)>,
   next_hole_idx: usize,
+}
+
+impl Serialize for LemmaPattern {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: Serializer {
+    serializer.serialize_str(&format!("{} = {}", self.lhs, self.rhs))
+  }
 }
 
 impl PatternWithHoles {
@@ -249,6 +258,7 @@ impl LemmaPattern {
     let num_args = arg_tys.len();
     let mut new_holes: VecDeque<(HoleIdx, Type, Side)> = arg_tys
       .into_iter()
+      .rev()
       .enumerate()
       .map(|(arg_idx, arg_ty)| {
         let new_hole = self.next_hole_idx + arg_idx;
@@ -421,7 +431,7 @@ impl ClassMatch {
 /// subsequently, lemma), they come from, can we use this information to
 /// discover which goals a lemma might be useful in. We might be able to do this
 /// instead of tracking this information in the goal graph.
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct LemmaTreeNode {
   /// The pattern which represents the current lemma.
   pattern: LemmaPattern,
@@ -434,6 +444,7 @@ pub struct LemmaTreeNode {
   /// lemma).
   ///
   /// When we create a `LemmaTreeNode`, it needs to have at least one match.
+  #[serde(skip_serializing)]
   current_matches: VecDeque<ClassMatch>,
   /// What's the status of the lemma? (`None` if we haven't attempted this
   /// lemma).
@@ -456,10 +467,20 @@ pub struct LemmaTreeNode {
   match_enode_propagation_allowed: bool,
   /// Lemmas that are refinements of the `pattern` in this node. We identify
   /// them using the hole that was filled and what it was filled with.
+  #[serde(serialize_with = "serialize_children_map")]
   children: BTreeMap<LemmaTreeEdge, LemmaTreeNode>,
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+fn serialize_children_map<S>(children: &BTreeMap<LemmaTreeEdge, LemmaTreeNode>, serializer: S) -> Result<S::Ok, S::Error>
+where S: Serializer {
+  let mut s = serializer.serialize_seq(Some(children.len()))?;
+  children.iter().try_for_each(|(edge, node)| {
+    s.serialize_element(&(edge, node))
+  })?;
+  s.end()
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize)]
 pub enum LemmaStatus {
   Valid,
   Invalid,
@@ -467,7 +488,7 @@ pub enum LemmaStatus {
   InQueue,
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Serialize)]
 struct LemmaTreeEdge {
   hole: HoleIdx,
   filled_with: FilledWith,
@@ -486,6 +507,25 @@ enum FilledWith {
   /// Not exactly something that the hole is "filled with," this represents the
   /// hole never being allowed to be filled.
   Lock,
+}
+
+impl Serialize for FilledWith {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: Serializer {
+    let s = match self {
+      Self::ENode(symb) => {
+        format!("ENode({})", symb)
+      }
+      Self::AnotherHole(hole_idx) => {
+        format!("{}", hole_idx)
+      }
+      Self::Lock => {
+        format!("Lock")
+      }
+    };
+    serializer.serialize_str(&s)
+  }
 }
 
 impl ClassMatch {

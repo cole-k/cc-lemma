@@ -5,6 +5,7 @@ use std::rc::{Rc, Weak};
 use colored::Colorize;
 use egg::{Analysis, EGraph, Id, Language, Rewrite, Runner, SymbolLang, Symbol};
 use itertools::Unique;
+use serde::Serialize;
 use crate::ast::{Equation, Prop, sexp_size};
 use crate::config::CONFIG;
 use crate::goal::Goal;
@@ -54,10 +55,12 @@ pub struct GoalNode {
     lemma_depth: usize,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct GoalIndex {
+    #[serde(serialize_with = "crate::utils::serialize_symbol")]
     pub name: Symbol,
     pub lemma_id: usize,
+    #[serde(skip_serializing)]
     pub full_exp: Equation,
     /// A proxy for the size of the lemma: how many times have we substituted a
     /// hole in the lemma?

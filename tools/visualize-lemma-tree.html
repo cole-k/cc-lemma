@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tree Visualization</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+  }
+  .node {
+    border: 2px solid #000;
+    padding: 10px;
+    text-align: center;
+    margin: 10px;
+  }
+  .node-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .children-container {
+    display: flex;
+    justify-content: center;
+  }
+  .abbreviated-node {
+    cursor: pointer;
+    color: blue;
+    text-decoration: underline;
+  }
+  .Valid {
+    background-color: green;
+    color: white;
+  }
+  .Invalid {
+    background-color: red;
+    color: white;
+  }
+  .Inconclusive {
+    background-color: yellow;
+    color: black;
+  }
+  .null, .InQueue {
+    background-color: transparent;
+    color: black;
+  }
+  #file-input {
+    position: absolute;
+    top: 20px;
+  }
+</style>
+</head>
+<body>
+<input type="file" id="file-input" accept=".json">
+<div id="tree-visualization"></div>
+<script>
+document.getElementById('file-input').addEventListener('change', function(event) {
+  const file = event.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const treeData = JSON.parse(e.target.result);
+      annotateTreeData(treeData);
+      const treeSelector = renderTreeSelection(treeData);
+      const container = document.getElementById('tree-visualization');
+      container.innerHTML = '';
+      container.appendChild(treeSelector);
+    };
+    reader.readAsText(file);
+  }
+});
+
+function createNodeElement(node, abbr = null) {
+  const div = document.createElement('div');
+  div.className = 'node';
+  if (node.lemma_status) {
+    div.classList.add(node.lemma_status);
+  } else {
+    div.classList.add('null');
+  }
+  if (abbr) {
+    div.className += ' abbreviated-node';
+    div.innerHTML = `<span>${abbr.hole} ↦ ${abbr.filled_with}</span><br>
+                     <span>${node.numNodes} children<span>
+                     ${node.hasValid ? '<br><span>Has valid children</span>' : ''}`;
+  } else {
+    div.innerHTML = `<strong>Pattern:</strong> ${node.pattern}<br>
+                     <strong>Lemma Index:</strong> ${node.lemma_idx}<br>
+                     <strong>Lemma Status:</strong> ${node.lemma_status}<br>
+                     <strong>Num nodes:</strong> ${node.numNodes}<br>
+                     <strong>Any child valid?:</strong> ${node.hasValid}</strong>`;
+  }
+  return div;
+}
+
+  function renderTree(currentNode, parentNode = null) {
+  const container = document.getElementById('tree-visualization');
+  container.innerHTML = '';
+
+  const nodeContainer = document.createElement('div');
+  nodeContainer.className = 'node-container';
+
+  if (parentNode) {
+    if (parentNode.treeData) {
+      const parentDiv = renderTreeSelection(parentNode.treeData);
+      nodeContainer.appendChild(parentDiv);
+    } else {
+      const parentDiv = createNodeElement(parentNode, parentNode.edge);
+      parentDiv.onclick = () => renderTree(parentNode, parentNode.parent);
+      nodeContainer.appendChild(parentDiv);
+    }
+  }
+
+  const currentDiv = createNodeElement(currentNode);
+  nodeContainer.appendChild(currentDiv);
+
+  const childrenContainer = document.createElement('div');
+  childrenContainer.className = 'children-container';
+  currentNode.children.forEach(([abbreviated, child]) => {
+    if (child) {
+      const childDiv = createNodeElement(child, abbreviated);
+        childDiv.onclick = () => renderTree(child, {...currentNode, edge: abbreviated, parent: parentNode});
+      childrenContainer.appendChild(childDiv);
+    }
+  });
+  nodeContainer.appendChild(childrenContainer);
+  container.appendChild(nodeContainer);
+}
+
+function renderTreeSelection(treeData) {
+  const childrenContainer = document.createElement('div');
+  childrenContainer.className = 'children-container abbreviated-node';
+  Object.keys(treeData).forEach(treeName => {
+    const treeButton = document.createElement('div');
+    treeButton.className = 'node';
+    treeButton.innerText = treeName;
+    treeButton.addEventListener('click', () => {
+      renderTree(treeData[treeName], {treeData});
+    });
+    childrenContainer.appendChild(treeButton);
+  });
+  return childrenContainer;
+}
+
+function annotateTreeData(treeData) {
+    Object.keys(treeData).forEach(treeName => {
+        const tree = treeData[treeName];
+        annotateTreeNode(tree);
+    })
+}
+
+function annotateTreeNode(treeNode) {
+    treeNode.numNodes = 1;
+    treeNode.hasValid = treeNode.lemma_status == 'Valid';
+    if (treeNode.children) {
+        treeNode.children.forEach(([abbr, child]) => {
+            annotateTreeNode(child);
+            treeNode.numNodes += child.numNodes;
+            treeNode.hasValid = treeNode.hasValid || child.hasValid;
+        });
+    }
+}
+
+</script>
+</body>
+</html>

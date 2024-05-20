@@ -4,6 +4,7 @@ use colored::Colorize;
 use egg::*;
 use itertools::Itertools;
 use log::warn;
+use serde::Serializer;
 use crate::analysis::{CvecAnalysis, CycleggAnalysis, print_cvec};
 
 fn cartesian_product_helper<T: Clone>(
@@ -408,4 +409,10 @@ where T: PartialOrd + PartialEq {
     &self.chain.front().unwrap()
   }
 
+}
+
+
+pub fn serialize_symbol<S>(symb: &Symbol, serializer: S) -> Result<S::Ok, S::Error>
+where S: Serializer {
+  serializer.serialize_str(symb.as_str())
 }
