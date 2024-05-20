@@ -2167,7 +2167,7 @@ pub struct LemmasState {
   pub lemma_number: usize,
   /// (lemma number, proof depth)
   pub all_lemmas: HashMap<Prop, (usize, usize)>,
-  pub max_lemma_depth: usize,
+  pub max_lemma_size: usize,
 }
 
 impl LemmasState {
@@ -2893,9 +2893,9 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
     }*/
 
     if let Some(optimal) = frontier.into_iter().min_by_key(|index| {
-      index.lemma_depth
+      index.get_cost()
     }) {
-      proof_state.lemmas_state.max_lemma_depth = std::cmp::max(proof_state.lemmas_state.max_lemma_depth, optimal.lemma_depth);
+      proof_state.lemmas_state.max_lemma_size = std::cmp::max(proof_state.lemmas_state.max_lemma_size, optimal.get_cost());
       self.next_goal = Some(optimal.clone());
       Ok(vec!(optimal.lemma_id))
     } else {
@@ -2933,6 +2933,11 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
       // println!("{} {:?}", "already result".green(), lemma_state.outcome);
       assert_eq!(lemma_state.outcome, Some(Outcome::Invalid));
       self.goal_graph.record_lemma_result(info.lemma_id, GoalNodeStatus::Invalid);
+      // FIXME: this is a hack to record the outcome to the lemma trees.
+      // We really should probably fold the trees into the lemma state.
+      self.lemma_trees.values_mut().for_each(|lemma_tree| {
+        lemma_tree.record_lemma_result(lemma_index, LemmaStatus::Invalid);
+      });
       return;
     }
 
@@ -3142,15 +3147,13 @@ pub fn prove_top<'a>(goal_prop: Prop, goal_premise: Option<Equation>, global_sea
     global_search_state,
   };
 
-  // HACK: the depth of the original lemma is artifically set to 0. This might
-  // be too low, which can cause us to incorrectly prioritize its goal nodes.
-  let estimated_depth = 0;
+  let top_level_lemma_size = goal_prop.size();
 
   let top_goal_lemma_number = proof_state.lemmas_state.find_or_make_fresh_lemma(goal_prop.clone(), 0);
   let top_goal_lemma_proof = LemmaProofState::new(top_goal_lemma_number, goal_prop, &goal_premise, global_search_state, 0);
 
-  let start_info = GoalIndex::from_goal(&top_goal_lemma_proof.goals[0], top_goal_lemma_number, estimated_depth);
-  proof_state.lemmas_state.max_lemma_depth = estimated_depth;
+  let start_info = GoalIndex::from_goal(&top_goal_lemma_proof.goals[0], top_goal_lemma_number, 0);
+  proof_state.lemmas_state.max_lemma_size = top_level_lemma_size;
   let mut scheduler = GoalLevelPriorityQueue::new(&start_info);
   scheduler.prop_map.insert(top_goal_lemma_number, top_goal_lemma_proof.prop.clone());
 

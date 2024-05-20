@@ -419,7 +419,12 @@ pub fn parse_file(filename: &str) -> Result<ParserState, SexpError> {
         let raw_goal = RawGoal {
           name,
           premise,
-          prop: Prop::new(equation, params),
+          // NOTE: Needs to be trusted; otherwise conditional props fail
+          // immediately.
+          //
+          // However, this means the IH can get duplicated. We should just also
+          // alpha rename the conditions.
+          prop: Prop::new_trusted(equation, params),
           local_rules,
           local_searchers,
         };

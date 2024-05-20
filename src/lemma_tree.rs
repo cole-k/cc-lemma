@@ -90,6 +90,7 @@ pub struct LemmaPattern {
   /// These are holes which we will not allow to be filled.
   locked_holes: Vec<(HoleIdx, Type, Side)>,
   next_hole_idx: usize,
+  // FIXME: track size
 }
 
 impl Serialize for LemmaPattern {
@@ -286,6 +287,9 @@ impl LemmaPattern {
   /// Unifies `hole_1` and `hole_2` in the new pattern.
   ///
   /// If either hole is locked, does nothing.
+  ///
+  /// FIXME: hole_1 must be an open hole and hole_2 must be a locked hole (or
+  /// fresh). Restrict unifable_holes to be to only locked holes.
   fn unify_holes(&self, hole_1: HoleIdx, hole_2: HoleIdx) -> LemmaPattern {
     // println!("unifying {} and {} in {}", hole_1, hole_2, self);
     // FIXME: there are a lot of hacks to deal with locked holes.
@@ -593,6 +597,7 @@ impl PropagateMatchResult {
 }
 
 impl LemmaTreeNode {
+  // FIXME: lemma_depth is unused and should be replaced by a size.
   pub fn from_pattern(pattern: LemmaPattern, lemma_idx: usize, lemma_depth: usize) -> LemmaTreeNode {
     let goal_index = GoalIndex::from_lemma(Symbol::new(format!("lemma_{}", lemma_idx)), pattern.to_lemma().eq, lemma_idx, lemma_depth);
     // (sort of)
@@ -860,8 +865,8 @@ impl LemmaTreeNode {
       self.lemma_status = Some(LemmaStatus::Invalid);
     }
     // Defer doing anything more with the match if this node is outside the
-    // depth we are willing to consider. We will revisit it later.
-    if self.goal_index.lemma_depth > lemmas_state.max_lemma_depth {
+    // size we are willing to consider. We will revisit it later.
+    if self.goal_index.get_cost() > lemmas_state.max_lemma_size {
       propagate_result.num_propagated_matches += 1;
       self.current_matches.push_front(m);
       return propagate_result;
@@ -889,7 +894,7 @@ impl LemmaTreeNode {
 
   /// FIXME: this is needlessly inefficient
   pub fn find_all_new_lemmas<'a>(&mut self, timer: &Timer, lemmas_state: &mut LemmasState, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> Vec<(GoalIndex, usize, Prop, usize)> {
-    if self.goal_index.lemma_depth > lemmas_state.max_lemma_depth {
+    if self.goal_index.get_cost() > lemmas_state.max_lemma_size {
       return vec!()
     }
     if timer.timeout() {
