@@ -89,7 +89,9 @@ function createNodeElement(node, abbr = null) {
                      <span>${node.numNodes} children<span>
                      ${node.hasValid ? '<br><span>Has valid children</span>' : ''}`;
   } else {
-    div.innerHTML = `<strong>Pattern:</strong> ${node.pattern}<br>
+    div.innerHTML = `<strong>Pattern:</strong> ${node.pattern.pattern}<br>
+                     <strong>Holes:</strong> [${node.pattern.holes}]<br>
+                     <strong>Locked Holes:</strong> [${node.pattern.locked_holes}]<br>
                      <strong>Lemma Index:</strong> ${node.lemma_idx}<br>
                      <strong>Lemma Status:</strong> ${node.lemma_status}<br>
                      <strong>Num nodes:</strong> ${node.numNodes}<br>

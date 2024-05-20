@@ -1761,7 +1761,7 @@ impl<'a> Goal<'a> {
           lemma_trees.entry(class_1_type)
                     .and_modify(|lemma_tree| {
                       let m = ClassMatch::top_match(origin.clone(), class_1.id, class_2.id, cvecs_equal);
-                      let _ = lemma_tree.add_match(m, lemmas_state, goal_graph, lemma_proofs);
+                      let _ = lemma_tree.add_match(timer, m, lemmas_state, goal_graph, lemma_proofs);
                     })
                     .or_insert_with(|| {
                       let m = ClassMatch::top_match(origin.clone(), class_1.id, class_2.id, cvecs_equal);
@@ -1774,7 +1774,7 @@ impl<'a> Goal<'a> {
                       // lemma tree from the lemmas state.
                       let lemma_idx = lemmas_state.find_or_make_fresh_lemma(pattern.to_lemma(), 0);
                       let mut root = LemmaTreeNode::from_pattern(pattern, lemma_idx, 0);
-                      let _ = root.add_match(m, lemmas_state, goal_graph, lemma_proofs);
+                      let _ = root.add_match(timer, m, lemmas_state, goal_graph, lemma_proofs);
                       root
                     });
         }
@@ -1782,7 +1782,7 @@ impl<'a> Goal<'a> {
       }
     }
     // println!("extracting lemmas from tree");
-    lemma_trees.values_mut().flat_map(|lemma_tree| lemma_tree.find_all_new_lemmas(lemmas_state.max_lemma_depth)).collect()
+    lemma_trees.values_mut().flat_map(|lemma_tree| lemma_tree.find_all_new_lemmas(timer, lemmas_state, goal_graph, lemma_proofs)).collect()
   }
 
   /// HACK: This should really be done as an analysis or baked into the language.
@@ -2921,7 +2921,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
       );
     }
 
-    // println!("trying goal {}", info.full_exp);
+    // println!("trying goal {}\n ENTER to continue", info.full_exp);
     // let mut input = String::new();
     // std::io::stdin().read_line(&mut input).expect("Failed to read line");
 
