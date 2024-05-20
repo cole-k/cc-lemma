@@ -258,7 +258,6 @@ impl LemmaPattern {
     let num_args = arg_tys.len();
     let mut new_holes: VecDeque<(HoleIdx, Type, Side)> = arg_tys
       .into_iter()
-      .rev()
       .enumerate()
       .map(|(arg_idx, arg_ty)| {
         let new_hole = self.next_hole_idx + arg_idx;
