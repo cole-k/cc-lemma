@@ -44,7 +44,7 @@ enum PatternWithHoles {
 }
 
 /// The side of the lemma
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum Side {
   Left,
   Right,
@@ -59,6 +59,20 @@ impl Side {
       (Side::Left,  Side::Left)  => Side::Left,
       (Side::Right, Side::Right) => Side::Right,
       _                          => Side::Both,
+    }
+  }
+
+  fn subst_pattern(&self, hole: HoleIdx, hole_pattern: &PatternWithHoles, (lhs, rhs): (&PatternWithHoles, &PatternWithHoles)) -> (PatternWithHoles, PatternWithHoles) {
+    match self {
+      Self::Left => {
+        (lhs.subst_hole(hole, hole_pattern).0, rhs.clone())
+      }
+      Self::Right => {
+        (lhs.clone(), rhs.subst_hole(hole, hole_pattern).0)
+      }
+      Self::Both => {
+        (lhs.subst_hole(hole, hole_pattern).0, rhs.subst_hole(hole, hole_pattern).0)
+      }
     }
   }
 }
@@ -212,36 +226,14 @@ impl LemmaPattern {
   }
 
   fn new_pattern_from_subst(&self, hole: HoleIdx, hole_pattern: &PatternWithHoles, side: &Side, new_holes: VecDeque<(HoleIdx, Type, Side)>, next_hole_idx: usize) -> LemmaPattern {
-    match side {
-      Side::Left => {
-        LemmaPattern {
-          lhs: self.lhs.subst_hole(hole, &hole_pattern).0,
-          rhs: self.rhs.clone(),
-          holes: new_holes,
-          locked_holes: self.locked_holes.clone(),
-          next_hole_idx,
-        }
-      }
-      Side::Right => {
-        LemmaPattern {
-          lhs: self.lhs.clone(),
-          rhs: self.rhs.subst_hole(hole, &hole_pattern).0,
-          holes: new_holes,
-          locked_holes: self.locked_holes.clone(),
-          next_hole_idx,
-        }
-      }
-      Side::Both => {
-        LemmaPattern {
-          lhs: self.lhs.subst_hole(hole, &hole_pattern).0,
-          rhs: self.rhs.subst_hole(hole, &hole_pattern).0,
-          holes: new_holes,
-          locked_holes: self.locked_holes.clone(),
-          next_hole_idx,
-        }
-      }
+    let (lhs, rhs) = side.subst_pattern(hole, hole_pattern, (&self.lhs, &self.rhs));
+    LemmaPattern {
+      lhs,
+      rhs,
+      holes: new_holes,
+      locked_holes: self.locked_holes.clone(),
+      next_hole_idx,
     }
-
   }
 
   /// Returns a new [`LemmaPattern`] with `hole` filled with a new [`PatternWithHoles`]
@@ -251,7 +243,8 @@ impl LemmaPattern {
   ///
   /// Invariant: hole must not be locked.
   fn subst_hole(&self, hole: HoleIdx, node: Symbol, node_ty: &Type) -> LemmaPattern {
-    let side = self.hole_side(hole);
+    // println!("substituting {} with {} in {}", hole, node, self);
+    let (side, _) = self.hole_side_type(hole);
     let (arg_tys, _ret_ty) = node_ty.args_ret();
     let num_args = arg_tys.len();
     let mut new_holes: VecDeque<(HoleIdx, Type, Side)> = arg_tys
@@ -278,39 +271,57 @@ impl LemmaPattern {
   /// Unifies `hole_1` and `hole_2` in the new pattern.
   ///
   /// If either hole is locked, does nothing.
-  fn unify_holes(&self, hole_1: HoleIdx, hole_2: HoleIdx) -> Option<LemmaPattern> {
-    if self.locked_holes.iter().any(|(locked_hole, _, _)| hole_1 == *locked_hole || hole_2 == *locked_hole) {
-      return None;
+  fn unify_holes(&self, hole_1: HoleIdx, hole_2: HoleIdx) -> LemmaPattern {
+    // println!("unifying {} and {} in {}", hole_1, hole_2, self);
+    // FIXME: there are a lot of hacks to deal with locked holes.
+    let unified_hole_is_locked = self.locked_holes.iter().any(|(locked_hole, _, _)| {
+      *locked_hole == hole_1 || *locked_hole == hole_2
+    });
+    let (hole_1_side, hole_ty) = self.hole_side_type(hole_1);
+    // The types should be the same, so ignore the second one without loss of
+    // generality.
+    let (hole_2_side, _) = self.hole_side_type(hole_2);
+    let unified_hole_side = hole_1_side.merge(hole_2_side);
+    let fresh_hole = self.next_hole_idx;
+    // Remove hole_1 and hole_2 in all holes.
+    // Even though
+    let mut new_holes: VecDeque<_> = self.holes.iter().filter(|(curr_hole, _, _)| {
+      curr_hole != &hole_1 && curr_hole != &hole_2
+    }).cloned().collect();
+    let mut new_locked_holes: Vec<_> = self.locked_holes.iter().filter(|(curr_hole, _, _)| {
+      curr_hole != &hole_1 && curr_hole != &hole_2
+    }).cloned().collect();
+    if unified_hole_is_locked {
+      new_locked_holes.push((fresh_hole, hole_ty.clone(), unified_hole_side));
+    } else {
+      // HACK: we push the unified hole to the back because presumably one of
+      // the two holes was at the back before. There might be a better thing to do here.
+      new_holes.push_back((fresh_hole, hole_ty.clone(), unified_hole_side));
     }
-    let hole_1_side = self.hole_side(hole_1);
-    let hole_2_side = self.hole_side(hole_2);
-    let new_side  = hole_1_side.merge(hole_2_side);
-    let new_holes = self.holes.iter().filter_map(|(curr_hole, ty, side)| {
-      // Remove hole_1, we're substituting it
-      if curr_hole == &hole_1 {
-        None
-      } else if curr_hole == &hole_2 {
-        Some((curr_hole.clone(), ty.clone(), new_side.clone()))
-      } else {
-        Some((curr_hole.clone(), ty.clone(), side.clone()))
-      }
-    }).collect();
-    let hole_2_pattern = PatternWithHoles::Hole(hole_2);
-    // We'll substitute on this without loss of generality. I suppose we could
-    // do an analysis to identify the better side to substitute if we wanted to
-    // be efficient.
-    let lp = self.new_pattern_from_subst(hole_1, &hole_2_pattern, hole_1_side, new_holes, self.next_hole_idx);
+    let fresh_hole_pattern = PatternWithHoles::Hole(fresh_hole);
+    let (lhs, rhs) = hole_1_side.subst_pattern(hole_1, &fresh_hole_pattern, (&self.lhs, &self.rhs));
+    let (lhs, rhs) = hole_2_side.subst_pattern(hole_2, &fresh_hole_pattern, (&lhs, &rhs));
+    let lp = LemmaPattern {
+      lhs,
+      rhs,
+      holes: new_holes,
+      locked_holes: new_locked_holes,
+      next_hole_idx: self.next_hole_idx + 1,
+    };
     // println!("unifying {} and {} in {} produces {}", hole_1, hole_2, self, lp);
-    Some(lp)
+    lp
   }
 
-  fn hole_side(&self, hole: HoleIdx) -> &Side {
+  fn hole_side_type(&self, hole: HoleIdx) -> (&Side, &Type) {
+    // println!("looking for the {} hole on {}", hole, self);
+    // println!("holes: {:?}, locked holes: {:?}", self.holes, self.locked_holes);
+
     // This lookup is in theory inefficient and we could restructure things by
     // having the ClassMatch not only its holes but what sides the holes come
     // from, but I expect the number of holes will be relatively small.
-    self.holes.iter().find_map(|(curr_hole, _, curr_side)| {
+    self.holes.iter().chain(self.locked_holes.iter()).find_map(|(curr_hole, curr_ty, curr_side)| {
       if &hole == curr_hole {
-        Some(curr_side)
+        Some((curr_side, curr_ty))
       } else {
         None
       }
@@ -531,12 +542,27 @@ impl PropagateMatchResult {
 impl LemmaTreeNode {
   pub fn from_pattern(pattern: LemmaPattern, lemma_idx: usize, lemma_depth: usize) -> LemmaTreeNode {
     let goal_index = GoalIndex::from_lemma(Symbol::new(format!("lemma_{}", lemma_idx)), pattern.to_lemma().eq, lemma_idx, lemma_depth);
+    // (sort of)
+    // HACK: if any hole does not appear on both sides, we won't theorize this as a lemma.
+    // While there are certainly some lemmas for which this might be relevant, such as
+    //
+    // mul x Z = Z
+    //
+    // The vast majority should not have free variables.
+    //
+    // FIXME: Figure out a better heuristic for invalidating intermediate lemmas
+    // that are too general.
+    let lemma_status = if pattern.holes.iter().chain(pattern.locked_holes.iter()).any(|(_hole, _ty, side)| side != &Side::Both) {
+      Some(LemmaStatus::Invalid)
+    } else {
+      None
+    };
     LemmaTreeNode {
       pattern,
       lemma_idx,
       goal_index,
       current_matches: VecDeque::default(),
-      lemma_status: None,
+      lemma_status,
       match_enode_propagation_allowed: true,
       children: BTreeMap::default(),
     }
@@ -586,7 +612,11 @@ impl LemmaTreeNode {
         filled_with: FilledWith::AnotherHole(other_hole),
       };
       let mut new_match = m.clone();
-      new_match.subst.remove(&hole);
+      let class = new_match.subst.remove(&hole).unwrap();
+      new_match.subst.remove(&other_hole);
+      // HACK: we know what the index of the fresh hole that will unify the two
+      // is going to be, so we just insert the class at that hole here.
+      new_match.subst.insert(self.pattern.next_hole_idx, class);
       if let Some(child_node) = self.children.get_mut(&edge) {
         propagate_result.merge(child_node.add_match(new_match, lemmas_state, goal_graph, lemma_proofs));
         propagate_result.existing_lemmas.push((m.origin.clone(), child_node.pattern.to_lemma()));
@@ -603,21 +633,20 @@ impl LemmaTreeNode {
       // lemma will hopefully invalidate it, although generating the e-graph for
       // this lemma will probably take time.
       } else if m.cvecs_equal {
-        if let Some(pattern) = self.pattern.unify_holes(hole, other_hole){
-          // We always will make a lemma, even though we might suspect it is
-          // invalid.
-          //
-          // TODO: look up the lemma's result if it has one.
-          let lemma_idx = lemmas_state.find_or_make_fresh_lemma(pattern.to_lemma(), 0);
-          // The lemma depth does not increase because we're just unifying holes.
-          let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_depth);
-          // We force nodes created from unifying holes to be a leaf because otherwise we will have
-          // many duplicates.
-          lemma_node.match_enode_propagation_allowed = false;
-          propagate_result.merge(lemma_node.add_match(new_match, lemmas_state, goal_graph, lemma_proofs));
-          propagate_result.new_lemmas.push((m.origin.clone(), lemma_node.pattern.to_lemma()));
-          self.children.insert(edge, lemma_node);
-        }
+        let pattern = self.pattern.unify_holes(hole, other_hole);
+        // We always will make a lemma, even though we might suspect it is
+        // invalid.
+        //
+        // TODO: look up the lemma's result if it has one.
+        let lemma_idx = lemmas_state.find_or_make_fresh_lemma(pattern.to_lemma(), 0);
+        // The lemma depth does not increase because we're just unifying holes.
+        let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_depth);
+        // We force nodes created from unifying holes to be a leaf because otherwise we will have
+        // many duplicates.
+        lemma_node.match_enode_propagation_allowed = false;
+        propagate_result.merge(lemma_node.add_match(new_match, lemmas_state, goal_graph, lemma_proofs));
+        propagate_result.new_lemmas.push((m.origin.clone(), lemma_node.pattern.to_lemma()));
+        self.children.insert(edge, lemma_node);
       }
     }
     // Next, we will create an edge corresponding to "locking" or preventing the

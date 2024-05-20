@@ -3142,10 +3142,9 @@ pub fn prove_top<'a>(goal_prop: Prop, goal_premise: Option<Equation>, global_sea
     global_search_state,
   };
 
-  // HACK: the depth of the original lemma is estimated as its AST size divided
-  // by 2. This might be too high or low, which can cause us to incorrectly
-  // prioritize its goal nodes.
-  let estimated_depth = goal_prop.size() / 2;
+  // HACK: the depth of the original lemma is artifically set to 0. This might
+  // be too low, which can cause us to incorrectly prioritize its goal nodes.
+  let estimated_depth = 0;
 
   let top_goal_lemma_number = proof_state.lemmas_state.find_or_make_fresh_lemma(goal_prop.clone(), 0);
   let top_goal_lemma_proof = LemmaProofState::new(top_goal_lemma_number, goal_prop, &goal_premise, global_search_state, 0);
