@@ -76,8 +76,8 @@ pub struct GoalIndex {
 
 impl GoalIndex {
     pub fn get_cost(&self) -> usize {
-        // sexp_size(&self.full_exp.lhs) + sexp_size(&self.full_exp.rhs)
-        self.lemma_depth
+        sexp_size(&self.full_exp.lhs) + sexp_size(&self.full_exp.rhs)
+        // self.lemma_depth
     }
     pub fn from_node(node: &GoalNode) -> GoalIndex {
         GoalIndex {

@@ -871,6 +871,7 @@ impl LemmaTreeNode {
       self.current_matches.push_front(m);
       return propagate_result;
     }
+    // println!("{}, {}, {}", self.goal_index.get_cost(), self.pattern.to_lemma().size(), lemmas_state.max_lemma_size);
     match self.lemma_status {
       Some(LemmaStatus::Valid) => {
         // Nothing to do here: the node is valid so we don't need any more
