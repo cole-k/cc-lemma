@@ -620,6 +620,10 @@ impl LemmaTreeNode {
     });
     let lemma_status = if num_free_vars > CONFIG.num_free_vars_allowed {
       Some(LemmaStatus::Invalid)
+    // FIXME: this is a HACK. We don't want to try proving internal nodes so we
+    // set the node to inconclusive if it has holes still.
+    } else if !pattern.holes.is_empty() {
+      Some(LemmaStatus::Inconclusive)
     } else {
       None
     };
@@ -714,7 +718,10 @@ impl LemmaTreeNode {
         let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_depth);
         // We force nodes created from unifying holes to be a leaf because otherwise we will have
         // many duplicates.
-        lemma_node.match_enode_propagation_allowed = false;
+        //
+        // FIXME: this is no longer true due to a refactor, we should probably
+        // just remove the field entirely.
+        // lemma_node.match_enode_propagation_allowed = false;
         propagate_result.merge(lemma_node.add_match(timer, new_match, lemmas_state, goal_graph, lemma_proofs));
         propagate_result.new_lemmas.push((m.origin.clone(), lemma_node.pattern.to_lemma()));
         // println!("current node pattern {}\n holes {:?}, locked holes {:?}", self.pattern, self.pattern.holes, self.pattern.locked_holes);
