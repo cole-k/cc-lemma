@@ -472,6 +472,17 @@ pub struct LemmaTreeNode {
   /// them using the hole that was filled and what it was filled with.
   #[serde(serialize_with = "serialize_children_map")]
   children: BTreeMap<LemmaTreeEdge, LemmaTreeNode>,
+  /// For debugging purposes only
+  first_match: ClassMatch,
+}
+
+impl Serialize for ClassMatch {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: Serializer {
+    let s = self.subst.iter().map(|(hole, class)| format!("{}: {}", hole, class)).join(", ");
+    serializer.serialize_str(&s)
+  }
 }
 
 fn serialize_children_map<S>(children: &BTreeMap<LemmaTreeEdge, LemmaTreeNode>, serializer: S) -> Result<S::Ok, S::Error>
@@ -555,11 +566,11 @@ impl ClassMatch {
   }
 
   /// Which holes can unify with this hole (other than itself)?
-  fn holes_unifiable_with(&self, hole: HoleIdx) -> Vec<HoleIdx> {
+  fn holes_unifiable_with<I: IntoIterator<Item = HoleIdx>>(&self, hole: HoleIdx, hole_candidates: I) -> Vec<HoleIdx> {
     let hole_class = self.subst[&hole];
-    self.subst.iter().filter_map(|(other_hole, other_class)| {
-      if hole != *other_hole && hole_class == *other_class {
-        Some(*other_hole)
+    hole_candidates.into_iter().filter_map(|other_hole| {
+      if hole != other_hole && hole_class == self.subst[&other_hole]  {
+        Some(other_hole)
       } else {
         None
       }
@@ -596,7 +607,7 @@ impl PropagateMatchResult {
 
 impl LemmaTreeNode {
   // FIXME: lemma_depth is unused and should be replaced by a size.
-  pub fn from_pattern(pattern: LemmaPattern, lemma_idx: usize, lemma_depth: usize) -> LemmaTreeNode {
+  pub fn from_pattern(pattern: LemmaPattern, lemma_idx: usize, lemma_depth: usize, first_match: ClassMatch) -> LemmaTreeNode {
     let goal_index = GoalIndex::from_lemma(Symbol::new(format!("lemma_{}", lemma_idx)), pattern.to_lemma().eq, lemma_idx, lemma_depth);
     // (sort of)
     // HACK: if any hole does not appear on both sides, we consider it a free variable.
@@ -620,10 +631,11 @@ impl LemmaTreeNode {
     });
     let lemma_status = if num_free_vars > CONFIG.num_free_vars_allowed {
       Some(LemmaStatus::Invalid)
-    // FIXME: this is a HACK. We don't want to try proving internal nodes so we
-    // set the node to inconclusive if it has holes still.
-    } else if !pattern.holes.is_empty() {
-      Some(LemmaStatus::Inconclusive)
+    // doesn't seem to be necessary
+    // // FIXME: this is a HACK. We don't want to try proving internal nodes so we
+    // // set the node to inconclusive if it has holes still.
+    // } else if !pattern.holes.is_empty() {
+    //   Some(LemmaStatus::Inconclusive)
     } else {
       None
     };
@@ -638,6 +650,7 @@ impl LemmaTreeNode {
       lemma_status,
       match_enode_propagation_allowed: true,
       children: BTreeMap::default(),
+      first_match,
     }
   }
 
@@ -648,6 +661,11 @@ impl LemmaTreeNode {
   /// FIXME: refactor this into separate parts for unifying holes using a match,
   /// "locking in" a hole, and propagating a match via its enodes.
   fn propagate_match<'a>(&mut self, timer: &Timer, m: ClassMatch, lemmas_state: &mut LemmasState, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
+    // if m.lhs == Id::from(3) && m.rhs == Id::from(1)
+    //   || m.lhs == Id::from(1) && m.rhs == Id::from(3) {
+    //     println!("pattern: {}", self.pattern);
+    //     println!("match subst: {:?}", m.subst);
+    // }
     if timer.timeout() {
       return PropagateMatchResult::default();
     }
@@ -676,22 +694,15 @@ impl LemmaTreeNode {
     }).unwrap();
 
     // Next, we will try to unify this hole with any existing locked holes.
-    let unifiable_holes = m.holes_unifiable_with(current_hole);
-    for (other_hole) in unifiable_holes {
-      // The first hole must be the current hole
-      if self.pattern.locked_holes.iter().find(|(h, _, _)| *h == other_hole).is_none() {
-        continue;
-      }
+    let unifiable_holes = m.holes_unifiable_with(current_hole, self.pattern.locked_holes.iter().map(|(hole, _, _)| *hole));
+    for other_hole in unifiable_holes {
       let edge = LemmaTreeEdge {
         hole: current_hole,
         filled_with: FilledWith::AnotherHole(other_hole),
       };
       let mut new_match = m.clone();
-      let class = new_match.subst.remove(&current_hole).unwrap();
-      new_match.subst.remove(&other_hole);
-      // HACK: we know what the index of the fresh hole that will unify the two
-      // is going to be, so we just insert the class at that hole here.
-      new_match.subst.insert(self.pattern.next_hole_idx, class);
+      // Remove current_hole: we're replacing it with other_hole.
+      new_match.subst.remove(&current_hole).unwrap();
       if let Some(child_node) = self.children.get_mut(&edge) {
         propagate_result.merge(child_node.add_match(timer, new_match, lemmas_state, goal_graph, lemma_proofs));
         propagate_result.existing_lemmas.push((m.origin.clone(), child_node.pattern.to_lemma()));
@@ -715,7 +726,7 @@ impl LemmaTreeNode {
         // TODO: look up the lemma's result if it has one.
         let lemma_idx = lemmas_state.find_or_make_fresh_lemma(pattern.to_lemma(), 0);
         // The lemma depth does not increase because we're just unifying holes.
-        let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_depth);
+        let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_depth, new_match.clone());
         // We force nodes created from unifying holes to be a leaf because otherwise we will have
         // many duplicates.
         //
@@ -753,6 +764,7 @@ impl LemmaTreeNode {
         lemma_status: self.lemma_status.clone(),
         match_enode_propagation_allowed: self.match_enode_propagation_allowed,
         children: BTreeMap::default(),
+        first_match: self.first_match.clone(),
       };
       let (hole_loc, _) = new_node.pattern.holes.iter().find_position(|(hole, _, _)| *hole == current_hole).unwrap();
       let hole_info = new_node.pattern.holes.remove(hole_loc).unwrap();
@@ -806,7 +818,7 @@ impl LemmaTreeNode {
           let pattern = self.pattern.subst_hole(current_hole, node.op, ty);
           let lemma_idx = lemmas_state.find_or_make_fresh_lemma(pattern.to_lemma(), 0);
           // The lemma depth increases because we do a subst.
-          let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_depth + 1);
+          let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_depth + 1, new_match.clone());
           propagate_result.merge(lemma_node.add_match(timer, new_match, lemmas_state, goal_graph, lemma_proofs));
 
           self.children.insert(edge, lemma_node);

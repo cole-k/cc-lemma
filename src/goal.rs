@@ -1773,7 +1773,7 @@ impl<'a> Goal<'a> {
                       // We should probably make a function for making a new
                       // lemma tree from the lemmas state.
                       let lemma_idx = lemmas_state.find_or_make_fresh_lemma(pattern.to_lemma(), 0);
-                      let mut root = LemmaTreeNode::from_pattern(pattern, lemma_idx, 0);
+                      let mut root = LemmaTreeNode::from_pattern(pattern, lemma_idx, 0, m.clone());
                       let _ = root.add_match(timer, m, lemmas_state, goal_graph, lemma_proofs);
                       root
                     });
@@ -2157,6 +2157,7 @@ impl std::fmt::Display for ProofLeaf {
 
 #[derive(Default)]
 pub struct LemmasState {
+  // FIXME: These are probably useless now
   pub proven_lemmas: MinElements<Prop>,
   pub invalid_lemmas: MaxElements<Prop>,
   pub lemma_rewrites: BTreeMap<String, Rw>,
@@ -2172,11 +2173,12 @@ pub struct LemmasState {
 
 impl LemmasState {
   pub fn is_valid_new_prop(&self, prop: &Prop) -> bool {
-    let is_proven = self.proven_lemmas.contains_leq(&prop);
-    let is_invalid = self.invalid_lemmas.contains_geq(&prop);
-    let is_too_big = CONFIG.max_lemma_size > 0
-        && sexp_size(&prop.eq.lhs) + sexp_size(&prop.eq.rhs) > CONFIG.max_lemma_size;
-    !is_proven && !is_invalid && !is_too_big
+    // let is_proven = self.proven_lemmas.contains_leq(&prop);
+    // let is_invalid = self.invalid_lemmas.contains_geq(&prop);
+    // let is_too_big = CONFIG.max_lemma_size > 0
+    //    && sexp_size(&prop.eq.lhs) + sexp_size(&prop.eq.rhs) > CONFIG.max_lemma_size;
+    // !is_proven && !is_invalid && !is_too_big
+    true
   }
 
   pub fn find_or_make_fresh_lemma(&mut self, prop: Prop, proof_depth: usize) -> usize {
@@ -2481,12 +2483,12 @@ impl<'a> ProofState<'a> {
     //println!("  {:?}", lemmas_state.lemma_rewrites_no_analysis);
     if lemma_proof_state.outcome == Some(Outcome::Valid) {
       //println!("new lemma: {}", lemma_proof_state.prop);
-      lemmas_state.proven_lemmas.insert(lemma_proof_state.prop.clone());
+      // lemmas_state.proven_lemmas.insert(lemma_proof_state.prop.clone());
       lemma_proof_state.rw.as_ref().map(|rw| rw.add_to_rewrites(&mut lemmas_state.lemma_rewrites));
       lemma_proof_state.rw_no_analysis.as_ref().map(|rw| rw.add_to_rewrites(&mut lemmas_state.lemma_rewrites_no_analysis));
     }
     if lemma_proof_state.outcome == Some(Outcome::Invalid) {
-      lemmas_state.invalid_lemmas.insert(lemma_proof_state.prop.clone());
+      // lemmas_state.invalid_lemmas.insert(lemma_proof_state.prop.clone());
     }
   }
 

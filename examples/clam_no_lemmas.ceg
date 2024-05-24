@@ -325,6 +325,13 @@
   (len (rev (append x y)))
   (plus (len x) (len y))
 )
+(//
+  Searchers for necessary lemmas
+  (
+    (=?> (len (append ?x (Cons ?y ?z))) (S (len (append ?x ?z))))
+    (=?> (len (append ?v0 (Cons ?v1 Nil))) (S (len ?v0)))
+  )
+)
 
 (=== clam_7 (x y) ((List a) (List a))
   (len (qreva x y))
