@@ -661,16 +661,22 @@ impl LemmaTreeNode {
   /// FIXME: refactor this into separate parts for unifying holes using a match,
   /// "locking in" a hole, and propagating a match via its enodes.
   fn propagate_match<'a>(&mut self, timer: &Timer, m: ClassMatch, lemmas_state: &mut LemmasState, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
-    // if m.lhs == Id::from(3) && m.rhs == Id::from(1)
-    //   || m.lhs == Id::from(1) && m.rhs == Id::from(3) {
-    //     println!("pattern: {}", self.pattern);
-    //     println!("match subst: {:?}", m.subst);
-    // }
     if timer.timeout() {
       return PropagateMatchResult::default();
     }
+    // Nothing to propagate
     if self.pattern.holes.is_empty() {
       return PropagateMatchResult::default();
+    }
+    // The match isn't "live" any more because its corresponding lemma has been
+    // (dis)proven.
+    if let Some(lemma_proof_state) = lemma_proofs.get(&m.origin.lemma_id) {
+      match lemma_proof_state.outcome {
+        Some(Outcome::Valid) | Some(Outcome::Invalid) => {
+          return PropagateMatchResult::default();
+        }
+        _ => {}
+      }
     }
     let mut propagate_result = PropagateMatchResult::default();
     let (current_hole, _, _) = *self.pattern.holes.back().unwrap();
