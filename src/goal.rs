@@ -1782,7 +1782,9 @@ impl<'a> Goal<'a> {
       }
     }
     // println!("extracting lemmas from tree");
-    lemma_trees.values_mut().flat_map(|lemma_tree| lemma_tree.find_all_new_lemmas(timer, lemmas_state, goal_graph, lemma_proofs)).collect()
+    let res = lemma_trees.values_mut().flat_map(|lemma_tree| lemma_tree.find_all_new_lemmas(timer, lemmas_state, goal_graph, lemma_proofs)).collect();
+    // println!("done");
+    res
   }
 
   /// HACK: This should really be done as an analysis or baked into the language.
@@ -2169,6 +2171,19 @@ pub struct LemmasState {
   /// (lemma number, proof depth)
   pub all_lemmas: HashMap<Prop, (usize, usize)>,
   pub max_lemma_size: usize,
+  // HACK: when we prove LHS = RHS, we pick the smaller of these two to be the
+  // "normal" form.
+  //
+  // We add the not normal form to our list of rejected lemma subpatterns and
+  // afterwards we prune any branches of the lemma tree containing a rejected
+  // subpattern.
+  //
+  // The motivation for this is to prevent a duplication of theorized lemmas
+  // caused by proving a lemma. If we prove a = b, then we will see both the
+  // lemma (foo a) = (bar a) and (foo b) = (bar b), but to us these are the same
+  // lemma and both are (probably) as easy to prove as the other. Since we add a
+  // = b as a rewrite anyway, we can enforce that we only see one of the two.
+  pub rejected_lemma_subpatterns: Vec<Sexp>,
 }
 
 impl LemmasState {
@@ -2484,6 +2499,15 @@ impl<'a> ProofState<'a> {
     if lemma_proof_state.outcome == Some(Outcome::Valid) {
       //println!("new lemma: {}", lemma_proof_state.prop);
       // lemmas_state.proven_lemmas.insert(lemma_proof_state.prop.clone());
+
+      // HACK: track the larger (in terms of sexp size) of the lhs and rhs;
+      // we'll reject its occurrence in future lemmas from here on out to avoid
+      // duplication.
+      if sexp_size(&lemma_proof_state.prop.eq.lhs) < sexp_size(&lemma_proof_state.prop.eq.rhs) {
+        lemmas_state.rejected_lemma_subpatterns.push(lemma_proof_state.prop.eq.rhs.clone());
+      } else {
+        lemmas_state.rejected_lemma_subpatterns.push(lemma_proof_state.prop.eq.lhs.clone());
+      }
       lemma_proof_state.rw.as_ref().map(|rw| rw.add_to_rewrites(&mut lemmas_state.lemma_rewrites));
       lemma_proof_state.rw_no_analysis.as_ref().map(|rw| rw.add_to_rewrites(&mut lemmas_state.lemma_rewrites_no_analysis));
     }
@@ -2897,6 +2921,9 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
     if let Some(optimal) = frontier.into_iter().min_by_key(|index| {
       index.get_cost()
     }) {
+      if optimal.get_cost() > proof_state.lemmas_state.max_lemma_size {
+        println!("cost {} greater than {}", optimal.get_cost(), proof_state.lemmas_state.max_lemma_size);
+      }
       proof_state.lemmas_state.max_lemma_size = std::cmp::max(proof_state.lemmas_state.max_lemma_size, optimal.get_cost());
       self.next_goal = Some(optimal.clone());
       Ok(vec!(optimal.lemma_id))

@@ -5,7 +5,7 @@ use egg::{Symbol, Id, Pattern, SymbolLang, Subst, Searcher, Var};
 use itertools::{iproduct, Itertools};
 use symbolic_expressions::Sexp;
 
-use crate::{goal::{Eg, LemmaProofState, Outcome, LemmasState, Timer}, analysis::cvecs_equal, ast::{Type, Equation, Prop}, goal_graph::{GoalGraph, GoalIndex}, config::CONFIG};
+use crate::{goal::{Eg, LemmaProofState, Outcome, LemmasState, Timer, Goal}, analysis::cvecs_equal, ast::{Type, Equation, Prop, matches_subpattern, is_var}, goal_graph::{GoalGraph, GoalIndex}, config::CONFIG};
 
 const HOLE_VAR_PREFIX: &str = "var_";
 const HOLE_PATTERN_PREFIX: &str = "?";
@@ -63,16 +63,21 @@ impl Side {
     }
   }
 
-  fn subst_pattern(&self, hole: HoleIdx, hole_pattern: &PatternWithHoles, (lhs, rhs): (&PatternWithHoles, &PatternWithHoles)) -> (PatternWithHoles, PatternWithHoles) {
+  /// Returns (new_lhs, new_rhs, num_substs)
+  fn subst_pattern(&self, hole: HoleIdx, hole_pattern: &PatternWithHoles, (lhs, rhs): (&PatternWithHoles, &PatternWithHoles)) -> (PatternWithHoles, PatternWithHoles, usize) {
     match self {
       Self::Left => {
-        (lhs.subst_hole(hole, hole_pattern).0, rhs.clone())
+        let (new_lhs, lhs_substs) = lhs.subst_hole(hole, hole_pattern);
+        (new_lhs, rhs.clone(), lhs_substs)
       }
       Self::Right => {
-        (lhs.clone(), rhs.subst_hole(hole, hole_pattern).0)
+        let (new_rhs, rhs_substs) = rhs.subst_hole(hole, hole_pattern);
+        (lhs.clone(), new_rhs, rhs_substs)
       }
       Self::Both => {
-        (lhs.subst_hole(hole, hole_pattern).0, rhs.subst_hole(hole, hole_pattern).0)
+        let (new_lhs, lhs_substs) = lhs.subst_hole(hole, hole_pattern);
+        let (new_rhs, rhs_substs) = rhs.subst_hole(hole, hole_pattern);
+        (new_lhs, new_rhs, lhs_substs + rhs_substs)
       }
     }
   }
@@ -90,7 +95,8 @@ pub struct LemmaPattern {
   /// These are holes which we will not allow to be filled.
   locked_holes: Vec<(HoleIdx, Type, Side)>,
   next_hole_idx: usize,
-  // FIXME: track size
+  /// This is statically tracked.
+  size: usize,
 }
 
 impl Serialize for LemmaPattern {
@@ -117,40 +123,42 @@ impl PatternWithHoles {
   }
 
   /// Mutates the pattern to fill the hole.
-  fn fill_hole(&mut self, hole: HoleIdx, value: &PatternWithHoles) -> bool {
+  ///
+  /// The usize indicates how many substitutions actually happened.
+  fn fill_hole(&mut self, hole: HoleIdx, value: &PatternWithHoles) -> usize {
     match self {
       PatternWithHoles::Hole(h) if *h == hole => {
         *self = value.clone();
-        true
+        1
       }
       PatternWithHoles::Hole(_) => {
-        false
+        0
       }
       PatternWithHoles::Node(_, args) => {
-        args.iter_mut().any(|arg| arg.fill_hole(hole, value))
+        args.iter_mut().map(|arg| arg.fill_hole(hole, value)).sum()
       }
     }
   }
 
   /// Returns a new pattern where the hole is filled.
   ///
-  /// The bool indicates whether a substitution actually happened.
-  fn subst_hole(&self, hole: HoleIdx, value: &PatternWithHoles) -> (PatternWithHoles, bool) {
+  /// The usize indicates how many substitutions actually happened.
+  fn subst_hole(&self, hole: HoleIdx, value: &PatternWithHoles) -> (PatternWithHoles, usize) {
     match &self {
       PatternWithHoles::Hole(h) if *h == hole => {
-        (value.clone(), true)
+        (value.clone(), 1)
       }
       PatternWithHoles::Hole(_) => {
-        (self.clone(), false)
+        (self.clone(), 0)
       }
       PatternWithHoles::Node(op, args) => {
-        let mut hole_filled = false;
+        let mut holes_filled = 0;
         let new_pat = PatternWithHoles::Node(*op, args.iter().map(|arg| {
-          let (new_arg, arg_hole_filled) = arg.subst_hole(hole, value);
-          hole_filled |= arg_hole_filled;
+          let (new_arg, arg_holes_filled) = arg.subst_hole(hole, value);
+          holes_filled += arg_holes_filled;
           Box::new(new_arg)
         }).collect());
-        (new_pat, hole_filled)
+        (new_pat, holes_filled)
       }
     }
   }
@@ -238,17 +246,23 @@ impl LemmaPattern {
       holes: [(hole_1, ty.clone(), Side::Right), (hole_0, ty.clone(), Side::Left)].into(),
       locked_holes: vec!(),
       next_hole_idx: 2,
+      size: 2,
     }
   }
 
-  fn new_pattern_from_subst(&self, hole: HoleIdx, hole_pattern: &PatternWithHoles, side: &Side, new_holes: VecDeque<(HoleIdx, Type, Side)>, next_hole_idx: usize) -> LemmaPattern {
-    let (lhs, rhs) = side.subst_pattern(hole, hole_pattern, (&self.lhs, &self.rhs));
+  fn new_pattern_from_subst(&self, hole: HoleIdx, hole_pattern: &PatternWithHoles, hole_pattern_size: usize, side: &Side, new_holes: VecDeque<(HoleIdx, Type, Side)>, next_hole_idx: usize) -> LemmaPattern {
+    let (lhs, rhs, num_substs) = side.subst_pattern(hole, hole_pattern, (&self.lhs, &self.rhs));
+    // println!("current pattern {}, size {}, hole {}, hole pat {}, new size {}", self, self.size, hole, hole_pattern, self.size + (num_substs * (hole_pattern_size - 1)));
     LemmaPattern {
       lhs,
       rhs,
       holes: new_holes,
       locked_holes: self.locked_holes.clone(),
       next_hole_idx,
+      // The size gets increased by (hole_pattern_size - 1) for each substitution.
+      //
+      // This is because holes have a size of 1 on their own.
+      size: self.size + (num_substs * (hole_pattern_size - 1)),
     }
   }
 
@@ -281,7 +295,20 @@ impl LemmaPattern {
     // Add the current holes to the end (this is what we want because we pop
     // from the back).
     new_holes.extend(&mut holes_without_subst_hole);
-    self.new_pattern_from_subst(hole, &new_pattern, &side, new_holes, next_hole_idx)
+    // The new size is the number of args + the constructor.
+    //
+    // FIXME:
+    // HACK: we actually add an extra 1 to the sum if num_args > 0 because when
+    // we represent this as an sexp it becomes a list and for sexp size we
+    // add 1 to lists. it's dumb, i know, but we need to consistently
+    // switch to using LemmaPatterns everywhere otherwise our size values
+    // will be inconsistent.
+    let new_pattern_size = if num_args == 0 {
+      1
+    } else {
+      num_args + 2
+    };
+    self.new_pattern_from_subst(hole, &new_pattern, new_pattern_size, &side, new_holes, next_hole_idx)
   }
 
   /// Sets `hole_1` equal to `hole_2` in the new pattern.
@@ -305,13 +332,14 @@ impl LemmaPattern {
     let new_holes: VecDeque<_> = self.holes.iter().filter(|(curr_hole, _, _)| *curr_hole != hole_1)
       .cloned().collect();
     let hole_2_pattern = PatternWithHoles::Hole(hole_2);
-    let (lhs, rhs) = hole_1_side.subst_pattern(hole_1, &hole_2_pattern, (&self.lhs, &self.rhs));
+    let (lhs, rhs, _) = hole_1_side.subst_pattern(hole_1, &hole_2_pattern, (&self.lhs, &self.rhs));
     let lp = LemmaPattern {
       lhs,
       rhs,
       holes: new_holes,
       locked_holes: new_locked_holes,
       next_hole_idx: self.next_hole_idx,
+      size: self.size,
     };
     // println!("unifying {} and {} in {} produces {}", hole_1, hole_2, self, lp);
     lp
@@ -578,29 +606,31 @@ impl ClassMatch {
   }
 }
 
+// FIXME: I think we no longer need this; all of the allocs were taking a lot of
+// time. We aren't actually using its output so I think we can axe it.
 #[derive(Default, Clone)]
 pub struct PropagateMatchResult {
-  pub new_lemmas: Vec<(GoalIndex, Prop)>,
-  /// In theory we should only ever need the new lemmas, but these are used to
-  /// track dependencies in the goal graph.
-  ///
-  /// TODO: do a restructuring that obviates the need for this field - probably
-  /// we will want to thread the global lemma state through the lemma tree when
-  /// we propagate matches in order to annotate lemma tree nodes with their
-  /// lemma number as well as the parent relation that is tracked in the goal
-  /// graph.
-  ///
-  /// This also will probably mean putting all of the LemmaTreeNodes into a map
-  /// the same way we have all lemmas in a map somewhere so that we can jump
-  /// between them easily.
-  pub existing_lemmas: Vec<(GoalIndex, Prop)>,
+  // pub new_lemmas: Vec<(GoalIndex, Prop)>,
+  // /// In theory we should only ever need the new lemmas, but these are used to
+  // /// track dependencies in the goal graph.
+  // ///
+  // /// TODO: do a restructuring that obviates the need for this field - probably
+  // /// we will want to thread the global lemma state through the lemma tree when
+  // /// we propagate matches in order to annotate lemma tree nodes with their
+  // /// lemma number as well as the parent relation that is tracked in the goal
+  // /// graph.
+  // ///
+  // /// This also will probably mean putting all of the LemmaTreeNodes into a map
+  // /// the same way we have all lemmas in a map somewhere so that we can jump
+  // /// between them easily.
+  // pub existing_lemmas: Vec<(GoalIndex, Prop)>,
   pub num_propagated_matches: usize,
 }
 
 impl PropagateMatchResult {
   fn merge(&mut self, mut rhs: Self) {
-    self.new_lemmas.append(&mut rhs.new_lemmas);
-    self.existing_lemmas.append(&mut rhs.existing_lemmas);
+    // self.new_lemmas.append(&mut rhs.new_lemmas);
+    // self.existing_lemmas.append(&mut rhs.existing_lemmas);
     self.num_propagated_matches += rhs.num_propagated_matches;
   }
 }
@@ -691,6 +721,13 @@ impl LemmaTreeNode {
     if parent_lemma_state.outcome == Some(Outcome::Valid) || parent_lemma_state.outcome == Some(Outcome::Invalid) {
       return PropagateMatchResult::default();
     }
+
+    propagate_result.merge(self.propagate_match_lock_hole(timer, current_hole, &m, lemmas_state, goal_graph, lemma_proofs));
+    if !self.match_enode_propagation_allowed {
+      // If we aren't allowed to propagate via enodes, just return what we have
+      // so far.
+      return propagate_result;
+    }
     let goal = parent_lemma_state.goals.iter().find_map(|g| {
       if g.name == m.origin.name {
         Some(g)
@@ -698,8 +735,20 @@ impl LemmaTreeNode {
         None
       }
     }).unwrap();
+    propagate_result.merge(self.propagate_match_fill_with_enode(timer, current_hole, &m, goal, lemmas_state, goal_graph, lemma_proofs));
+    // if self.children.keys().any(|key| key.hole != current_hole) {
+    //   println!("current pattern: {}, current holes: {:?}, current locked holes: {:?}", self.pattern, self.pattern.holes, self.pattern.locked_holes);
+    //   self.children.keys().for_each(|key| {
+    //     println!("child edge fills hole {} with {:?}", key.hole, key.filled_with);
+    //   });
+    //   panic!("somehow there's a key that isn't equal to the current hole!");
+    // }
+    propagate_result
+  }
 
-    // Next, we will try to unify this hole with any existing locked holes.
+  fn propagate_match_lock_hole<'a>(&mut self, timer: &Timer, current_hole: HoleIdx, m: &ClassMatch, lemmas_state: &mut LemmasState, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
+    let mut propagate_result = PropagateMatchResult::default();
+    // We will try to unify this hole with any existing locked holes.
     let unifiable_holes = m.holes_unifiable_with(current_hole, self.pattern.locked_holes.iter().map(|(hole, _, _)| *hole));
     for other_hole in unifiable_holes {
       let edge = LemmaTreeEdge {
@@ -711,7 +760,7 @@ impl LemmaTreeNode {
       new_match.subst.remove(&current_hole).unwrap();
       if let Some(child_node) = self.children.get_mut(&edge) {
         propagate_result.merge(child_node.add_match(timer, new_match, lemmas_state, goal_graph, lemma_proofs));
-        propagate_result.existing_lemmas.push((m.origin.clone(), child_node.pattern.to_lemma()));
+        // propagate_result.existing_lemmas.push((m.origin.clone(), child_node.pattern.to_lemma()));
         propagate_result.num_propagated_matches += 1;
       // We only will create new nodes if there is a match.
       //
@@ -733,6 +782,10 @@ impl LemmaTreeNode {
         let lemma_idx = lemmas_state.find_or_make_fresh_lemma(pattern.to_lemma(), 0);
         // The lemma depth does not increase because we're just unifying holes.
         let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_depth, new_match.clone());
+        let eq = lemma_node.pattern.to_lemma().eq;
+        if lemmas_state.rejected_lemma_subpatterns.iter().any(|subpattern| matches_subpattern(&eq.lhs, subpattern, is_var) || matches_subpattern(&eq.rhs, subpattern, is_var) ) {
+          continue;
+        }
         // We force nodes created from unifying holes to be a leaf because otherwise we will have
         // many duplicates.
         //
@@ -740,7 +793,7 @@ impl LemmaTreeNode {
         // just remove the field entirely.
         // lemma_node.match_enode_propagation_allowed = false;
         propagate_result.merge(lemma_node.add_match(timer, new_match, lemmas_state, goal_graph, lemma_proofs));
-        propagate_result.new_lemmas.push((m.origin.clone(), lemma_node.pattern.to_lemma()));
+        // propagate_result.new_lemmas.push((m.origin.clone(), lemma_node.pattern.to_lemma()));
         // println!("current node pattern {}\n holes {:?}, locked holes {:?}", self.pattern, self.pattern.holes, self.pattern.locked_holes);
         // println!("new node pattern {}\n holes {:?}, locked holes {:?}", lemma_node.pattern, lemma_node.pattern.holes, lemma_node.pattern.locked_holes);
         self.children.insert(edge, lemma_node);
@@ -785,12 +838,12 @@ impl LemmaTreeNode {
       // }
       self.children.insert(lock_edge, new_node);
     }
-    if !self.match_enode_propagation_allowed {
-      // If we aren't allowed to propagate via enodes, just return what we have
-      // so far.
-      return propagate_result;
-    }
-    // Then, create/lookup each new LemmaTreeNode that comes from a refinement
+    propagate_result
+  }
+
+  fn propagate_match_fill_with_enode<'a>(&mut self, timer: &Timer, current_hole: HoleIdx, m: &ClassMatch, goal: &Goal<'a>, lemmas_state: &mut LemmasState, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
+    let mut propagate_result = PropagateMatchResult::default();
+    // Create/lookup each new LemmaTreeNode that comes from a refinement
     // of the current hole's matched class in the e-graph. For each e-node in
     // the e-class create or lookup a new LemmaTreeNode whose edge is the hole
     // being filled with that e-node's symbol.
@@ -811,7 +864,7 @@ impl LemmaTreeNode {
       });
       if let Some(child_node) = self.children.get_mut(&edge) {
         propagate_result.merge(child_node.add_match(timer, new_match, lemmas_state, goal_graph, lemma_proofs));
-        propagate_result.existing_lemmas.push((m.origin.clone(), child_node.pattern.to_lemma()));
+        // propagate_result.existing_lemmas.push((m.origin.clone(), child_node.pattern.to_lemma()));
       } else if m.cvecs_equal {
         // We only will follow this branch if it leads to something in the global vocabulary.
         //
@@ -825,20 +878,18 @@ impl LemmaTreeNode {
           let lemma_idx = lemmas_state.find_or_make_fresh_lemma(pattern.to_lemma(), 0);
           // The lemma depth increases because we do a subst.
           let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_depth + 1, new_match.clone());
+          let eq = lemma_node.pattern.to_lemma().eq;
+          if lemmas_state.rejected_lemma_subpatterns.iter().any(|subpattern| matches_subpattern(&eq.lhs, subpattern, is_var) || matches_subpattern(&eq.rhs, subpattern, is_var) ) {
+            continue;
+          }
           propagate_result.merge(lemma_node.add_match(timer, new_match, lemmas_state, goal_graph, lemma_proofs));
 
           self.children.insert(edge, lemma_node);
         }
       }
     }
-    // if self.children.keys().any(|key| key.hole != current_hole) {
-    //   println!("current pattern: {}, current holes: {:?}, current locked holes: {:?}", self.pattern, self.pattern.holes, self.pattern.locked_holes);
-    //   self.children.keys().for_each(|key| {
-    //     println!("child edge fills hole {} with {:?}", key.hole, key.filled_with);
-    //   });
-    //   panic!("somehow there's a key that isn't equal to the current hole!");
-    // }
     propagate_result
+
   }
 
   /// Attempts to propagate the next match, returning the number of new
@@ -868,6 +919,9 @@ impl LemmaTreeNode {
   ///
   /// If the node has not been attempted already, we add it to its matches.
   pub fn add_match<'a>(&mut self, timer: &Timer, m: ClassMatch, lemmas_state: &mut LemmasState, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
+    // if self.pattern.size != self.goal_index.get_cost() {
+    //   panic!("{}, {}", self.pattern, self.goal_index.full_exp);
+    // }
     let mut propagate_result = PropagateMatchResult::default();
     if !m.cvecs_equal {
       // We shouldn't have proven the lemma valid.
@@ -878,7 +932,7 @@ impl LemmaTreeNode {
     }
     // Defer doing anything more with the match if this node is outside the
     // size we are willing to consider. We will revisit it later.
-    if self.goal_index.get_cost() > lemmas_state.max_lemma_size {
+    if self.pattern.size > lemmas_state.max_lemma_size {
       propagate_result.num_propagated_matches += 1;
       self.current_matches.push_front(m);
       return propagate_result;
@@ -907,7 +961,7 @@ impl LemmaTreeNode {
 
   /// FIXME: this is needlessly inefficient
   pub fn find_all_new_lemmas<'a>(&mut self, timer: &Timer, lemmas_state: &mut LemmasState, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> Vec<(GoalIndex, usize, Prop, usize)> {
-    if self.goal_index.get_cost() > lemmas_state.max_lemma_size {
+    if self.pattern.size > lemmas_state.max_lemma_size {
       return vec!()
     }
     if timer.timeout() {

@@ -204,6 +204,20 @@ pub fn is_subterm(sub: &Expr, sup: &Expr) -> StructuralComparison {
   }
 }
 
+pub fn matches_subpattern<F>(expr: &Sexp, subpattern: &Sexp, is_var: F) -> bool
+where F: FnOnce(&str) -> bool + Copy {
+  // Either it matches at the root
+  if find_instantiations(subpattern, expr, is_var).is_some() {
+    return true;
+  }
+  match expr {
+    // Or it cannot match
+    Sexp::Empty | Sexp::String(_) => false,
+    // Or it matches on a subexpression
+    Sexp::List(list) => list.iter().any(|e| matches_subpattern(e, subpattern, is_var)),
+  }
+}
+
 /// Replace one variable with another in a RecExpr;
 /// also returns whether the variable was found
 pub fn replace_var(expr: &Expr, var: Symbol, replacement: Symbol) -> (Expr, bool) {
