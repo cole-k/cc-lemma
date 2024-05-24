@@ -1,11 +1,13 @@
 use std::cell::RefCell;
 use std::cmp::{Ordering, Reverse};
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::rc::{Rc, Weak};
 use colored::Colorize;
-use egg::{Analysis, EGraph, Id, Language, Rewrite, Runner, SymbolLang, Symbol};
-use itertools::Unique;
+use egg::{Analysis, EGraph, Id, Language, Rewrite, Runner, SymbolLang, Symbol, Pattern, rewrite};
+use itertools::{Itertools, Unique};
 use serde::Serialize;
+use symbolic_expressions::Sexp;
+use regex::Regex;
 use crate::ast::{Equation, Prop, sexp_size};
 use crate::config::CONFIG;
 use crate::goal::Goal;
@@ -116,13 +118,14 @@ impl GoalNode {
 
 pub struct LemmaInfo {
     root: StrongGoalRef,
-    lemma_id: usize
+    lemma_id: usize,
+    enodes: Option<(Id, Id)>
 }
 
 impl LemmaInfo {
-    fn new(root: StrongGoalRef, lemma_id: usize) -> LemmaInfo {
+    fn new(root: StrongGoalRef, lemma_id: usize, enodes: Option<(Id, Id)>) -> LemmaInfo {
         LemmaInfo {
-            root, lemma_id
+            root, lemma_id, enodes
         }
     }
 
@@ -133,7 +136,10 @@ impl LemmaInfo {
 
 pub struct GoalGraph {
     lemma_map: HashMap<usize, LemmaInfo>,
-    pub goal_map: HashMap<Symbol, StrongGoalRef>
+    pub goal_map: HashMap<Symbol, StrongGoalRef>,
+    egraph: EGraph<SymbolLang, ()>,
+    lemma_rewrites: Vec<Rewrite<SymbolLang, ()>>,
+    proven_lemmas: HashSet<usize>
 }
 
 impl GoalGraph {
@@ -141,7 +147,10 @@ impl GoalGraph {
         let goal = Rc::new(RefCell::new(GoalNode::new(root, None)));
         GoalGraph {
             goal_map: HashMap::from([(root.name, Rc::clone(&goal))]),
-            lemma_map: HashMap::from([(root.lemma_id, LemmaInfo::new(goal, root.lemma_id))])
+            lemma_map: HashMap::from([(root.lemma_id, LemmaInfo::new(goal, root.lemma_id, None))]),
+            egraph: EGraph::default(),
+            lemma_rewrites: Vec::default(),
+            proven_lemmas: HashSet::default()
         }
     }
 
@@ -206,11 +215,19 @@ impl GoalGraph {
         self.goal_map.extend(sub_goals.into_iter());
     }
 
+    fn get_lemma_enodes(&mut self, goal: &GoalIndex) -> (Id, Id){
+        let lhs = goal.full_exp.lhs.to_string().parse().unwrap();
+        let rhs = goal.full_exp.rhs.to_string().parse().unwrap();
+        (self.egraph.add_expr(&lhs), self.egraph.add_expr(&rhs))
+    }
+
     pub fn record_connector_lemma(&mut self, from: &GoalIndex, root: &GoalIndex) {
         if !self.lemma_map.contains_key(&root.lemma_id) {
+            println!("New cc lemma {}", root.full_exp);
             let goal = Rc::new(RefCell::new(GoalNode::new(root, None)));
             self.goal_map.insert(root.name, Rc::clone(&goal));
-            self.lemma_map.insert(root.lemma_id, LemmaInfo::new(goal, root.lemma_id));
+            let enodes = self.get_lemma_enodes(root);
+            self.lemma_map.insert(root.lemma_id, LemmaInfo::new(goal, root.lemma_id, Some(enodes)));
         }
 
         let goal_node = self.goal_map.get(&from.name).unwrap();
@@ -222,7 +239,9 @@ impl GoalGraph {
         root.get_status() == GoalNodeStatus::Valid
     }
 
-    fn get_working_goals(&self) -> (Vec<StrongGoalRef>, Vec<StrongGoalRef>) {
+    fn get_working_goals(&mut self) -> (Vec<StrongGoalRef>, Vec<StrongGoalRef>) {
+        self.update_proven_lemmas();
+
         let mut visited_lemmas = HashSet::new();
         let mut queue = VecDeque::new();
         let mut frontier_goals = Vec::new();
@@ -256,7 +275,7 @@ impl GoalGraph {
         }
         (waiting_goals, frontier_goals)
     }
-    pub fn get_frontier_goals(&self) -> Vec<GoalIndex> {
+    pub fn get_frontier_goals(&mut self) -> Vec<GoalIndex> {
         self.get_working_goals().1.iter().map(
             |raw_node| {
                 let node = raw_node.borrow();
@@ -265,7 +284,7 @@ impl GoalGraph {
         ).collect()
     }
 
-    pub fn get_waiting_goals(&self, raw_active_lemmas: Option<&HashSet<usize>>) -> Vec<GoalIndex> {
+    pub fn get_waiting_goals(&mut self, raw_active_lemmas: Option<&HashSet<usize>>) -> Vec<GoalIndex> {
         let mut res = self.get_working_goals().0;
         if CONFIG.saturate_only_parent {
             if let Some(active_lemmas) = raw_active_lemmas {
@@ -278,5 +297,116 @@ impl GoalGraph {
             let node = raw_node.borrow();
             GoalIndex::from_node(&node)
         }).collect()
+    }
+
+    pub fn saturate(&mut self) {
+        let runner = Runner::default()
+            .with_egraph(self.egraph.clone())
+            .run(&self.lemma_rewrites);
+        self.egraph = runner.egraph;
+    }
+
+    fn get_new_id(&self, id: (Id, Id)) -> (Id, Id) {
+        let x = self.egraph.find(id.0);
+        let y = self.egraph.find(id.1);
+        if x < y {(x, y)} else {(y, x)}
+    }
+
+    pub fn relink_related_lemmas(&mut self) {
+        self.saturate();
+        let mut repr_map = HashMap::new();
+        for lemma in self.lemma_map.values() {
+            if lemma.enodes.is_none() { continue; }
+            let nodes = lemma.enodes.unwrap();
+            let classes = self.get_new_id(nodes);
+
+            match repr_map.get_mut(&classes) {
+                None => {
+                    repr_map.insert(classes, lemma.lemma_id);
+                },
+                Some(id) => if *id > lemma.lemma_id {
+                    *id = lemma.lemma_id;
+                }
+            }
+        }
+
+        let mut repr_id_map = HashMap::new();
+        for lemma in self.lemma_map.values() {
+            if lemma.enodes.is_none () {
+                repr_id_map.insert(lemma.lemma_id, lemma.lemma_id);
+                continue;
+            }
+            let classes = self.get_new_id(lemma.enodes.unwrap());
+            if classes.0 == classes.1 {
+                continue;
+            } else {
+                repr_id_map.insert(lemma.lemma_id, repr_map[&classes]);
+            }
+        }
+
+        for goal in self.goal_map.values() {
+            let mut existing = HashSet::new();
+            for lemma in goal.borrow().connect_lemmas.iter() {
+                if let Some(new_id) = repr_id_map.get(lemma) {
+                    existing.insert(*new_id);
+                }
+            }
+            goal.borrow_mut().connect_lemmas = existing.into_iter().collect();
+        }
+    }
+
+    pub fn add_bid_lemma(&mut self, lhs: Sexp, rhs: Sexp) {
+        let id = self.lemma_rewrites.len();
+        let lhs: Pattern<_> = lhs.to_string().parse().unwrap();
+        let rhs: Pattern<_> = rhs.to_string().parse().unwrap();
+        let left_rewrite = Rewrite::new(format!("left-{}", id), lhs.clone(), rhs.clone()).unwrap();
+        self.lemma_rewrites.push(left_rewrite);
+        let right_rewrite = Rewrite::new(format!("right-{}", id), rhs.clone(), lhs.clone()).unwrap();
+        self.lemma_rewrites.push(right_rewrite);
+        self.relink_related_lemmas();
+    }
+
+    fn update_proven_lemmas(&mut self) {
+        let mut new_rewrites = Vec::new();
+        for lemma in self.lemma_map.values() {
+            if self.is_lemma_proven(lemma.lemma_id) && !self.proven_lemmas.contains(&lemma.lemma_id) {
+                self.proven_lemmas.insert(lemma.lemma_id);
+                let (left_vars, left_pattern) = build_pattern(&lemma.root.borrow().full_exp.lhs);
+                let (right_vars, right_pattern) = build_pattern(&lemma.root.borrow().full_exp.rhs);
+                if left_vars == right_vars {
+                    new_rewrites.push((left_pattern, right_pattern));
+                }
+            }
+        }
+        for (left, right) in new_rewrites.into_iter() {
+            self.add_bid_lemma(left, right);
+        }
+    }
+}
+
+fn build_pattern(exp: &Sexp) -> (BTreeSet<String>, Sexp) {
+    match exp {
+        Sexp::String(s) => {
+            let re = Regex::new(r"v\d+$").unwrap();
+            if re.is_match(s) {
+                let new_name = format!("?{}", s);
+                ([new_name.clone()].into(), Sexp::String(new_name))
+            } else {
+                ([].into(), exp.clone())
+            }
+        }
+        Sexp::List(lists) => {
+            let mut res = Vec::new();
+            let mut res_set = BTreeSet::new();
+
+            for (sub_set, sub_res) in lists.iter().map(|sub_exp| build_pattern(sub_exp)) {
+                res_set.extend(sub_set);
+                res.push(sub_res);
+            }
+            (res_set, Sexp::List(res))
+        }
+        Sexp::Empty => {
+            panic!("unexpected exp")
+        }
     }
 }

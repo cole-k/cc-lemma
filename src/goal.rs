@@ -2896,6 +2896,7 @@ impl GoalLevelPriorityQueue {
       );
       self.goal_graph.record_connector_lemma(&origin_index, &start_info);
     }
+    self.goal_graph.relink_related_lemmas();
   }
 
   fn insert_waiting<'a>(&mut self, index: &GoalIndex, related_lemmas: Vec<(GoalIndex, usize, Prop, usize)>,
