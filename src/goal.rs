@@ -1790,6 +1790,11 @@ impl<'a> Goal<'a> {
   /// HACK: This should really be done as an analysis or baked into the language.
   fn type_of_class(&self, class: Id) -> Option<Type> {
     let representatitve_op = self.egraph[class].data.canonical_form_data.get_enode().op;
+    // FIXME: We won't try to figure out the type of a partially applied
+    // function for now.
+    if representatitve_op.as_str() == APPLY {
+      return None;
+    }
     self.global_search_state
         .context
         .get(&representatitve_op)
@@ -2927,6 +2932,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
       }
       proof_state.lemmas_state.max_lemma_size = std::cmp::max(proof_state.lemmas_state.max_lemma_size, optimal.get_cost());
       self.next_goal = Some(optimal.clone());
+      // println!("Trying {} ({})", optimal.name, optimal.full_exp);
       Ok(vec!(optimal.lemma_id))
     } else {
       println!("report unknown because of an empty queue");
@@ -3005,6 +3011,18 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
         }
       }
       self.insert_waiting(&info, related_lemmas, related_goals, proof_state);
+      if let Some(outcome) = &proof_state.lemma_proofs.get(&lemma_index).unwrap().outcome {
+        let lemma_status = match outcome {
+          Outcome::Invalid => LemmaStatus::Invalid,
+          Outcome::Valid   => LemmaStatus::Valid,
+          Outcome::Unknown | Outcome::Timeout => LemmaStatus::Inconclusive,
+        };
+        // FIXME: this is a hack to record the outcome to the lemma trees.
+        // We really should probably fold the trees into the lemma state.
+        self.lemma_trees.values_mut().for_each(|lemma_tree| {
+          lemma_tree.record_lemma_result(lemma_index, lemma_status);
+        });
+      }
     } else {
       if lemma_proof_state.outcome.is_none() {
         self.goal_graph.record_goal_result(&info, GoalNodeStatus::Valid);
@@ -3012,11 +3030,11 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
         self.goal_graph.record_goal_result(&info, GoalNodeStatus::Invalid);
       }
       if self.goal_graph.is_lemma_proven(info.lemma_id) {
-        let state = proof_state.lemma_proofs.get_mut(&info.lemma_id).unwrap();
+        let state = proof_state.lemma_proofs.get_mut(&lemma_index).unwrap();
         state.outcome = Some(Outcome::Valid);
         println!("new lemma {}", state.prop);
       }
-      if let Some(outcome) = proof_state.lemma_proofs.get(&info.lemma_id).unwrap().outcome.clone() {
+      if let Some(outcome) = &proof_state.lemma_proofs.get(&lemma_index).unwrap().outcome {
         let lemma_status = match outcome {
           Outcome::Invalid => LemmaStatus::Invalid,
           Outcome::Valid   => LemmaStatus::Valid,
@@ -3028,9 +3046,9 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
           lemma_tree.record_lemma_result(lemma_index, lemma_status);
         });
         self.is_found_new_lemma = true;
-        if outcome == Outcome::Valid {
+        if outcome == &Outcome::Valid {
           self.goal_graph.record_lemma_result(info.lemma_id, GoalNodeStatus::Valid);
-        } else if outcome == Outcome::Invalid {
+        } else if outcome == &Outcome::Invalid {
           self.goal_graph.record_lemma_result(info.lemma_id, GoalNodeStatus::Invalid);
         } else {panic!();}
       }
