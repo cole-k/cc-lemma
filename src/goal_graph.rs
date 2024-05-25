@@ -223,7 +223,7 @@ impl GoalGraph {
 
     pub fn record_connector_lemma(&mut self, from: &GoalIndex, root: &GoalIndex) {
         if !self.lemma_map.contains_key(&root.lemma_id) {
-            println!("New cc lemma {}", root.full_exp);
+            // println!("New cc lemma {}", root.full_exp);
             let goal = Rc::new(RefCell::new(GoalNode::new(root, None)));
             self.goal_map.insert(root.name, Rc::clone(&goal));
             let enodes = self.get_lemma_enodes(root);

@@ -2498,7 +2498,7 @@ impl<'a> ProofState<'a> {
     //println!("  {:?}", lemmas_state.lemma_rewrites_no_analysis);
     if lemma_proof_state.outcome == Some(Outcome::Valid) {
       //println!("new lemma: {}", lemma_proof_state.prop);
-      // lemmas_state.proven_lemmas.insert(lemma_proof_state.prop.clone());
+      lemmas_state.proven_lemmas.insert(lemma_proof_state.prop.clone());
 
       // HACK: track the larger (in terms of sexp size) of the lhs and rhs;
       // we'll reject its occurrence in future lemmas from here on out to avoid
@@ -2968,6 +2968,18 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
       self.lemma_trees.values_mut().for_each(|lemma_tree| {
         lemma_tree.record_lemma_result(lemma_index, LemmaStatus::Invalid);
       });
+      return;
+    }
+
+    // TODO: do this for invalid lemmas?
+    if proof_state.lemmas_state.proven_lemmas.contains_leq(&lemma_state.prop) {
+        lemma_state.outcome = Some(Outcome::Valid);
+        self.goal_graph.record_lemma_result(info.lemma_id, GoalNodeStatus::Valid);
+        // FIXME: this is a hack to record the outcome to the lemma trees.
+        // We really should probably fold the trees into the lemma state.
+        self.lemma_trees.values_mut().for_each(|lemma_tree| {
+          lemma_tree.record_lemma_result(lemma_index, LemmaStatus::Valid);
+        });
       return;
     }
 

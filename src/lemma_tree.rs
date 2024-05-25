@@ -1024,6 +1024,6 @@ impl LemmaTreeNode {
     // Remove the current matches.
     self.current_matches.clear();
     // Do the same for all children.
-    self.children.values_mut().for_each(|child| child.mark_branch_valid());
+    self.children.clear();
   }
 }
