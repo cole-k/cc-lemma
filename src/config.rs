@@ -121,6 +121,9 @@ pub struct Args {
 
   #[clap(long = "num-free-vars-allowed", default_value = "1")]
   pub num_free_vars_allowed: usize,
+
+  #[clap(long = "max-num-cycles-followed", default_value = "3")]
+  pub max_num_cycles_followed: usize,
 }
 
 impl Args {
@@ -179,6 +182,7 @@ pub struct Config {
   pub reduce_proven_lemma: bool,
   pub output_lemma_tree: bool,
   pub num_free_vars_allowed: usize,
+  pub max_num_cycles_followed: usize,
 }
 
 impl Config {
@@ -243,6 +247,7 @@ impl Config {
       reduce_proven_lemma: args.reduce_proven_lemmas,
       output_lemma_tree: args.output_lemma_tree,
       num_free_vars_allowed: args.num_free_vars_allowed,
+      max_num_cycles_followed: args.max_num_cycles_followed,
     }
   }
 

@@ -51,7 +51,7 @@ pub struct GoalNode {
     pub lemma_id: usize,
     full_exp: Equation,
     father: Option<WeakGoalRef>,
-    status: GoalNodeStatus,
+    pub status: GoalNodeStatus,
     connect_lemmas: Vec<usize>,
     sub_goals: Vec<StrongGoalRef>,
     lemma_depth: usize,

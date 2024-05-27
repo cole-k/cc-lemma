@@ -1758,6 +1758,37 @@ impl<'a> Goal<'a> {
           if !cvecs_equal {
             continue;
           }
+          let class_1_canonical = &self.egraph[class_1.id].data.canonical_form_data;
+          let class_2_canonical = &self.egraph[class_2.id].data.canonical_form_data;
+          match (class_1_canonical, class_2_canonical) {
+            (CanonicalForm::Const(c1_node), CanonicalForm::Const(c2_node)) => {
+              let num_differing_children: usize = zip(c1_node.children(), c2_node.children()).map(|(child_1, child_2)|{
+                if child_1 != child_2 {
+                  0
+                } else {
+                  1
+                }
+              }).sum();
+              // There is a simpler CC lemma to prove.
+              //
+              // Consider for example the case when the canonical forms are
+              //   c1: (S (plus x x))
+              //   c2: (S (double x))
+              // In this case, the number of differing children is only 1.
+              // The differing children are
+              //   (plus x x) and (double x)
+              // However, we can be sure that if the cvec analysis deemed c1 and
+              // c2 equal, then it will deem these two differing children equal.
+              //
+              // Thus we won't waste our time trying to prove c1 == c2 when
+              // we could instead prove (plus x x) == (double x), which implies
+              // by congruence that c1 == c2.
+              if num_differing_children <= 1 {
+                continue;
+              }
+            }
+            _ => {}
+          }
           lemma_trees.entry(class_1_type)
                     .and_modify(|lemma_tree| {
                       let m = ClassMatch::top_match(origin.clone(), class_1.id, class_2.id, cvecs_equal);
@@ -2166,6 +2197,8 @@ impl std::fmt::Display for ProofLeaf {
 pub struct LemmasState {
   // FIXME: These are probably useless now
   pub proven_lemmas: MinElements<Prop>,
+  pub proven_lemma_ids: BTreeSet<usize>,
+  pub proven_goal_names: BTreeSet<Symbol>,
   pub invalid_lemmas: MaxElements<Prop>,
   pub lemma_rewrites: BTreeMap<String, Rw>,
   // FIXME: This is duplicated due to the type difference, in an ideal world we
@@ -2929,8 +2962,9 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
     }) {
       if optimal.get_cost() > proof_state.lemmas_state.max_lemma_size {
         println!("cost {} greater than {}", optimal.get_cost(), proof_state.lemmas_state.max_lemma_size);
+        proof_state.lemmas_state.max_lemma_size += 1;
       }
-      proof_state.lemmas_state.max_lemma_size = std::cmp::max(proof_state.lemmas_state.max_lemma_size, optimal.get_cost());
+      // proof_state.lemmas_state.max_lemma_size = std::cmp::max(proof_state.lemmas_state.max_lemma_size, optimal.get_cost());
       self.next_goal = Some(optimal.clone());
       // println!("Trying {} ({})", optimal.name, optimal.full_exp);
       Ok(vec!(optimal.lemma_id))
@@ -3026,6 +3060,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
     } else {
       if lemma_proof_state.outcome.is_none() {
         self.goal_graph.record_goal_result(&info, GoalNodeStatus::Valid);
+        proof_state.lemmas_state.proven_goal_names.insert(info.name);
       } else if lemma_proof_state.outcome == Some(Outcome::Invalid) {
         self.goal_graph.record_goal_result(&info, GoalNodeStatus::Invalid);
       }
@@ -3072,6 +3107,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
       for goal in proved_goals.into_iter() {
         // println!("  retry and prove ({}) {}", goal.lemma_id, goal.full_exp);
         self.goal_graph.record_goal_result(&goal, GoalNodeStatus::Valid);
+        proof_state.lemmas_state.proven_goal_names.insert(goal.name);
         if self.goal_graph.is_lemma_proven(goal.lemma_id) {
           let lemma_state = proof_state.lemma_proofs.get_mut(&goal.lemma_id).unwrap();
           if lemma_state.outcome.is_some() {continue;}
@@ -3081,6 +3117,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
           new_lemma.insert(goal.lemma_id);
 
           ProofState::handle_lemma_outcome(&mut proof_state.lemmas_state, lemma_state);
+          proof_state.lemmas_state.proven_lemma_ids.insert(goal.lemma_id);
           if goal.lemma_id == 0 {return;}
         }
       }

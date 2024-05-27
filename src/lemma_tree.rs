@@ -5,7 +5,7 @@ use egg::{Symbol, Id, Pattern, SymbolLang, Subst, Searcher, Var};
 use itertools::{iproduct, Itertools};
 use symbolic_expressions::Sexp;
 
-use crate::{goal::{Eg, LemmaProofState, Outcome, LemmasState, Timer, Goal}, analysis::cvecs_equal, ast::{Type, Equation, Prop, matches_subpattern, is_var}, goal_graph::{GoalGraph, GoalIndex}, config::CONFIG};
+use crate::{goal::{Eg, LemmaProofState, Outcome, LemmasState, Timer, Goal}, analysis::cvecs_equal, ast::{Type, Equation, Prop, matches_subpattern, is_var}, goal_graph::{GoalGraph, GoalIndex, GoalNodeStatus}, config::CONFIG};
 
 const HOLE_VAR_PREFIX: &str = "var_";
 const HOLE_PATTERN_PREFIX: &str = "?";
@@ -383,6 +383,54 @@ impl LemmaPattern {
     pattern_holes.is_subset(&all_holes) && all_holes.is_subset(&pattern_holes)
   }
 
+  /// Does a simple congruence check to see if a simpler lemma exists.
+  ///
+  /// Example:
+  ///
+  ///     (add ?0 (add ?1 ?2)) = (add ?0 (add ?2 ?1))
+  ///
+  /// The above lemma has a simpler lemma:
+  ///
+  ///     (add ?1 ?2) = (add ?2 ?1)
+  ///
+  /// The simpler lemma implies the original one by congruence.
+  ///
+  /// So we check the LHS and RHS of the lemma to see if they start with the
+  /// same symbol. If they do, we then check if all but one of their children
+  /// are equal (or if all of them are equal, although this is a trivial case
+  /// which shouldn't occur the way we generate lemmas). If this is true, then
+  /// we know that a simpler lemma exists. This is because our cvec analysis is
+  /// guaranteed to enumerate all pairs of e-classes with equal cvecs: the only
+  /// mismatched pair of children should therefore also have been enumerated and
+  /// we will already be proposing it as a lemma.
+  fn has_simpler_lemma(&self) -> bool {
+    match (&self.lhs, &self.rhs) {
+      (PatternWithHoles::Node(op1, children1), PatternWithHoles::Node(op2, children2)) if op1 == op2 => {
+        let mut au_pairs: Vec<_> = children1.iter().zip(children2.iter()).filter(|(child1, child2)| child1 != child2).collect();
+        // All pairs match except for 1 or fewer
+        if au_pairs.len() <= 1 {
+          return true;
+        }
+        // Additionally, we will check to see if one pair being equal will imply
+        // all the rest. Direction matters in this case.
+        //
+        // We want to consider the following lemma
+        //
+        // (add ?0 ?1) = add (?1 ?0)
+        //
+        // But not this lemma
+        //
+        // (add ?0 ?0) = (add ?1 ?1)
+        //
+        // Although it is not impossible that (?0 != ?1)
+        // but (add ?0 ?0 = add ?1 ?1).
+        let (au_child1, au_child2) = au_pairs.pop().unwrap();
+        au_pairs.into_iter().all(|(child1, child2)| child1 == au_child1 && child2 == au_child2)
+      }
+      _ => false
+    }
+  }
+
 }
 
 /// A data structure that represents a multipattern match of a [`LemmaPattern`].
@@ -397,8 +445,11 @@ pub struct ClassMatch {
   origin: GoalIndex,
   lhs: Id,
   rhs: Id,
-  /// What e-classes the holes in the pattern match to.
-  subst: BTreeMap<HoleIdx, Id>,
+  /// First field: what e-classes the holes in the pattern match to.
+  ///
+  /// Secon field: what e-classes have we visited on the path to the current
+  /// hole and how many times have we visited them?
+  subst: BTreeMap<HoleIdx, (Id, BTreeMap<Id, usize>)>,
   /// Whether the `lhs` and `rhs` cvecs are equal (we compute this once so we
   /// don't need to repeat the process).
   ///
@@ -417,8 +468,8 @@ impl ClassMatch {
   /// lhs is the pattern ?0 and rhs is the pattern ?1).
   pub fn top_match(origin: GoalIndex, lhs: Id, rhs: Id, cvecs_equal: bool) -> Self {
     let mut subst = BTreeMap::default();
-    subst.insert(0, lhs);
-    subst.insert(1, rhs);
+    subst.insert(0, (lhs, BTreeMap::default()));
+    subst.insert(1, (rhs, BTreeMap::default()));
     Self {
       origin,
       lhs,
@@ -508,7 +559,7 @@ impl Serialize for ClassMatch {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
   where
     S: Serializer {
-    let s = self.subst.iter().map(|(hole, class)| format!("{}: {}", hole, class)).join(", ");
+    let s = self.subst.iter().map(|(hole, (class, _past_classes))| format!("{}: {}", hole, class)).join(", ");
     serializer.serialize_str(&s)
   }
 }
@@ -551,6 +602,15 @@ enum FilledWith {
   Lock,
 }
 
+impl FilledWith {
+  fn is_enode(&self) -> bool {
+    match self {
+      Self::ENode(_) => true,
+      _ => false,
+    }
+  }
+}
+
 impl Serialize for FilledWith {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
   where
@@ -574,7 +634,7 @@ impl ClassMatch {
   /// Which pairs of holes could we unify while still keeping this match?
   fn unifiable_holes(&self) -> Vec<(HoleIdx, HoleIdx)> {
     let mut class_to_holes: HashMap<Id, Vec<HoleIdx>> = HashMap::new();
-    for (hole, class) in self.subst.iter() {
+    for (hole, (class, _past_classes)) in self.subst.iter() {
       class_to_holes.entry(*class)
                     .and_modify(|holes| holes.push(*hole))
                     .or_insert(vec!(*hole));
@@ -595,9 +655,9 @@ impl ClassMatch {
 
   /// Which holes can unify with this hole (other than itself)?
   fn holes_unifiable_with<I: IntoIterator<Item = HoleIdx>>(&self, hole: HoleIdx, hole_candidates: I) -> Vec<HoleIdx> {
-    let hole_class = self.subst[&hole];
+    let (hole_class, _past_classes) = &self.subst[&hole];
     hole_candidates.into_iter().filter_map(|other_hole| {
-      if hole != other_hole && hole_class == self.subst[&other_hole]  {
+      if hole != other_hole && *hole_class == self.subst[&other_hole].0  {
         Some(other_hole)
       } else {
         None
@@ -659,13 +719,14 @@ impl LemmaTreeNode {
         num_free_vars += 1;
       }
     });
-    let lemma_status = if num_free_vars > CONFIG.num_free_vars_allowed {
+    let lemma_status = if pattern.has_simpler_lemma() {
+      // FIXME: At the very least this should be a different enum.
+      // HACK: if there is a simpler lemma, we will declare this pattern valid
+      // (even though it isn't) so that its subtree gets killed.
+      // Some(LemmaStatus::Valid)
+      None
+    } else if num_free_vars > CONFIG.num_free_vars_allowed {
       Some(LemmaStatus::Invalid)
-    // doesn't seem to be necessary
-    // // FIXME: this is a HACK. We don't want to try proving internal nodes so we
-    // // set the node to inconclusive if it has holes still.
-    // } else if !pattern.holes.is_empty() {
-    //   Some(LemmaStatus::Inconclusive)
     } else {
       None
     };
@@ -757,7 +818,16 @@ impl LemmaTreeNode {
       };
       let mut new_match = m.clone();
       // Remove current_hole: we're replacing it with other_hole.
-      new_match.subst.remove(&current_hole).unwrap();
+      let (_class, prev_classes) = new_match.subst.remove(&current_hole).unwrap();
+      let (_, other_hole_prev_classes) = &mut new_match.subst.get_mut(&other_hole).unwrap();
+      // Merge the prev_classes from the two holes
+      prev_classes.into_iter().for_each(|(class, count)| {
+        other_hole_prev_classes.entry(class)
+                               .and_modify(|c| {
+                                 *c = std::cmp::max(*c, count);
+                               })
+                               .or_insert(count);
+      });
       if let Some(child_node) = self.children.get_mut(&edge) {
         propagate_result.merge(child_node.add_match(timer, new_match, lemmas_state, goal_graph, lemma_proofs));
         // propagate_result.existing_lemmas.push((m.origin.clone(), child_node.pattern.to_lemma()));
@@ -847,8 +917,8 @@ impl LemmaTreeNode {
     // of the current hole's matched class in the e-graph. For each e-node in
     // the e-class create or lookup a new LemmaTreeNode whose edge is the hole
     // being filled with that e-node's symbol.
-    let class = m.subst[&current_hole];
-    for node in &goal.egraph[class].nodes {
+    let (class, prev_classes) = &m.subst[&current_hole];
+    for node in &goal.egraph[*class].nodes {
       let edge = LemmaTreeEdge {
         hole: current_hole,
         filled_with: FilledWith::ENode(node.op),
@@ -860,7 +930,12 @@ impl LemmaTreeNode {
         // we create and assign them in the same order we will construct the
         // new match correctly.
         let new_hole = self.pattern.next_hole_idx + child_idx;
-        new_match.subst.insert(new_hole, *child_eclass);
+        let mut new_prev_classes = prev_classes.clone();
+        // Add 1 to the current eclass's count.
+        new_prev_classes.entry(*class).and_modify(|count| {
+          *count += 1;
+        }).or_insert(1);
+        new_match.subst.insert(new_hole, (*child_eclass, new_prev_classes));
       });
       if let Some(child_node) = self.children.get_mut(&edge) {
         propagate_result.merge(child_node.add_match(timer, new_match, lemmas_state, goal_graph, lemma_proofs));
@@ -923,6 +998,17 @@ impl LemmaTreeNode {
     //   panic!("{}, {}", self.pattern, self.goal_index.full_exp);
     // }
     let mut propagate_result = PropagateMatchResult::default();
+    // Once a lemma is proven (and therefore no longer active), don't propagate
+    // its matches.
+    if goal_graph.goal_map[&m.origin.name].as_ref().borrow().status != GoalNodeStatus::Unknown || lemmas_state.proven_goal_names.contains(&m.origin.name) || lemmas_state.proven_lemma_ids.contains(&m.origin.lemma_id) {
+      return propagate_result;
+    }
+    // If we've followed a cycle too much, don't consider this match.
+    if m.subst.values().any(|(_, prev_classes)| {
+      prev_classes.values().any(|count| *count > CONFIG.max_num_cycles_followed)
+    }) {
+      return propagate_result;
+    }
     if !m.cvecs_equal {
       // We shouldn't have proven the lemma valid.
       assert!(self.lemma_status != Some(LemmaStatus::Valid));
@@ -988,7 +1074,33 @@ impl LemmaTreeNode {
       Some(LemmaStatus::Inconclusive) | Some(LemmaStatus::Invalid) => {
         // Propagate its matches if they are now within the proper depth.
         self.propagate_all_matches(timer, lemmas_state, goal_graph, lemma_proofs);
-        self.children.values_mut().flat_map(|child| child.find_all_new_lemmas(timer, lemmas_state, goal_graph, lemma_proofs)).collect()
+        let num_enode_edges: usize = self.children.keys().map(|edge| {
+          if edge.filled_with.is_enode() {
+            1
+          } else {
+            0
+          }
+        }).sum();
+        // HACK: Prefer trying the single enode edge if there is only one. If
+        // we've already tried it, we will allow trying other edges.
+        //
+        // The thought is that if there are multiple enode edges, the
+        // generalized lemma would apply to different places in the e-graph; if
+        // not, then we should try its specialization first.
+        let skip_non_enode_edges = if num_enode_edges == 1 {
+          let (_, sole_enode_child) = self.children.iter().find(|(edge, _)| edge.filled_with.is_enode()).unwrap();
+          sole_enode_child.lemma_status.is_none() || sole_enode_child.lemma_status == Some(LemmaStatus::InQueue)
+        } else {
+          false
+        };
+        self.children.iter_mut().flat_map(|(edge, child)| {
+          // skip_non_enode_edges => edge has to be an enode
+          if !skip_non_enode_edges || edge.filled_with.is_enode() {
+            child.find_all_new_lemmas(timer, lemmas_state, goal_graph, lemma_proofs)
+          } else {
+            vec!()
+          }
+        }).collect()
       }
     }
   }
