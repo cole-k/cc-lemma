@@ -1,4 +1,4 @@
-use crate::ast::{Context, Env, Type, SSubst, resolve_sexp, Expr, is_constructor, is_var, mangle_name};
+use crate::ast::{Context, Env, Type, SSubst, resolve_sexp, Expr, is_constructor, is_var, mangle_name, Prop, substitute_sexp_map};
 use crate::config::CONFIG;
 use egg::*;
 use itertools::{repeat_n, Itertools};
@@ -111,6 +111,38 @@ where
   }).unwrap_or_else(|| {
     rng.gen_range(0..num_cons)
   })
+}
+
+/// Our normal cvec analysis uses a single egraph to do its checks, as well as
+/// caches random values. This is a function that naively generates a new egraph
+/// and random terms each time it checks.
+///
+/// In principle, an evaluator would be better than both approaches, but that
+/// takes time to write.
+pub fn has_counterexample_check(prop: &Prop, env: &Env, ctx: &Context, reductions: &Vec<Rewrite<SymbolLang, ()>>) -> bool {
+  for _ in 0..CONFIG.cvec_size {
+    let substs: Vec<(Sexp, Sexp)> = prop.params.iter().map(|(param, ty)| {
+      let rand_sexp = random_term_from_type(ty, env, ctx, CONFIG.cvec_term_max_depth);
+      (Sexp::String(param.to_string()), rand_sexp)
+    }).collect();
+    let rand_inst_lhs_sexp = substitute_sexp_map(&prop.eq.lhs, &substs);
+    let rand_inst_rhs_sexp = substitute_sexp_map(&prop.eq.rhs, &substs);
+    // println!("instantiated {} = {} to {} = {}", prop.eq.lhs, prop.eq.rhs, rand_inst_lhs_sexp, rand_inst_rhs_sexp);
+    let rand_inst_lhs_term = rand_inst_lhs_sexp.to_string().parse().unwrap();
+    let rand_inst_rhs_term = rand_inst_rhs_sexp.to_string().parse().unwrap();
+    let mut eg: EGraph<SymbolLang, ()> = EGraph::new(());
+    let lhs_id = eg.add_expr(&rand_inst_lhs_term);
+    let rhs_id = eg.add_expr(&rand_inst_rhs_term);
+    let runner = Runner::default()
+      .with_egraph(eg)
+        .with_iter_limit(10000000)
+      .run(reductions);
+    if runner.egraph.find(lhs_id) != runner.egraph.find(rhs_id) {
+      return true;
+    }
+  }
+  // panic!("counterexample check failed");
+  false
 }
 
 #[derive(Debug, Clone)]

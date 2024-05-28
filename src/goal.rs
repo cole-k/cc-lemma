@@ -15,7 +15,7 @@ use std::str::FromStr;
 use std::time::{Duration, Instant};
 use symbolic_expressions::{parser, Sexp};
 
-use crate::analysis::{CycleggAnalysis, CanonicalFormAnalysis, CanonicalForm, cvecs_equal, print_cvec, CvecAnalysis, Cvec};
+use crate::analysis::{CycleggAnalysis, CanonicalFormAnalysis, CanonicalForm, cvecs_equal, print_cvec, CvecAnalysis, Cvec, has_counterexample_check};
 use crate::ast::*;
 use crate::config::*;
 use crate::egraph::*;
@@ -30,6 +30,8 @@ pub type CvecRw = Rewrite<SymbolLang, ()>;
 pub const LEMMA_PREFIX: &str = "lemma";
 pub const CC_LEMMA_PREFIX: &str = "cc-lemma";
 pub const IH_EQUALITY_PREFIX: &str = "ih-equality-"; // TODO: remove
+
+pub const INVALID_LEMMA: usize = usize::MAX;
 
 /// Condition that checks whether it is sound to apply a lemma
 #[derive(Clone)]
@@ -1726,9 +1728,9 @@ impl<'a> Goal<'a> {
   /// Search for cc lemmas using the lemma tree instead of extraction.
   ///
   /// The cvec analysis needs to be saturated before this can be run.
-  fn search_for_cc_lemmas_using_lemma_tree(&self, timer: &Timer, origin: &GoalIndex, lemmas_state: &mut LemmasState, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>, lemma_trees: &mut BTreeMap<Type, LemmaTreeNode>, goal_graph: &GoalGraph) -> Vec<(GoalIndex, usize, Prop, usize)> {
+  fn search_for_cc_lemmas_using_lemma_tree(&self, timer: &Timer, origin: &GoalIndex, lemmas_state: &mut LemmasState, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>, lemma_trees: &mut BTreeMap<Type, LemmaTreeNode>, goal_graph: &mut GoalGraph) -> Vec<(GoalIndex, usize, Prop, usize)> {
     // self.egraph.analysis.cvec_analysis.saturate();
-    // println!("adding matches to lemma tree");
+    println!("adding matches to lemma tree");
     for class_1 in self.egraph.classes() {
       for class_2 in self.egraph.classes() {
         if class_1.id >= class_2.id {
@@ -1803,8 +1805,14 @@ impl<'a> Goal<'a> {
                       //
                       // We should probably make a function for making a new
                       // lemma tree from the lemmas state.
-                      let lemma_idx = lemmas_state.find_or_make_fresh_lemma(pattern.to_lemma(), 0);
-                      let mut root = LemmaTreeNode::from_pattern(pattern, lemma_idx, 0, m.clone());
+                      let lemma = pattern.to_lemma();
+                      let lemma_idx = if has_counterexample_check(&lemma, self.global_search_state.env, self.global_search_state.context, self.global_search_state.cvec_reductions) {
+                        INVALID_LEMMA
+                      } else {
+                        lemmas_state.find_or_make_fresh_lemma(lemma, 0)
+                      };
+                      let pattern_size = pattern.size;
+                      let mut root = LemmaTreeNode::from_pattern(pattern, lemma_idx, pattern_size, m.clone());
                       let _ = root.add_match(timer, m, lemmas_state, goal_graph, lemma_proofs);
                       root
                     });
@@ -1812,9 +1820,9 @@ impl<'a> Goal<'a> {
 
       }
     }
-    // println!("extracting lemmas from tree");
+    println!("extracting lemmas from tree");
     let res = lemma_trees.values_mut().flat_map(|lemma_tree| lemma_tree.find_all_new_lemmas(timer, lemmas_state, goal_graph, lemma_proofs)).collect();
-    // println!("done");
+    println!("done");
     res
   }
 
@@ -2479,7 +2487,7 @@ impl<'a> LemmaProofState<'a> {
       self.goals.extend(goals);
       let sub_goals = (pre_size..self.goals.len()).map(
 
-        |index| {GoalIndex::from_goal(&self.goals[index], goal_index.lemma_id, goal_index.lemma_depth + 1)}
+        |index| {GoalIndex::from_goal(&self.goals[index], goal_index.lemma_id, goal_index.lemma_size)}
       ).collect_vec();
       Some(sub_goals)
     } else {
@@ -2508,7 +2516,7 @@ impl<'a> LemmaProofState<'a> {
   }
 
   pub fn extract_lemmas(&self, goal_index: &GoalIndex, timer: &Timer, lemmas_state: &mut LemmasState, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>, lemma_trees: &mut BTreeMap<Type, LemmaTreeNode>,
-    goal_graph: &GoalGraph) -> Vec<(GoalIndex, usize, Prop, usize)> {
+    goal_graph: &mut GoalGraph) -> Vec<(GoalIndex, usize, Prop, usize)> {
     if !CONFIG.cc_lemmas {return vec![];}
     let goal = self.goals.iter().find(
       |goal| {goal.name == goal_index.name}
@@ -2924,13 +2932,13 @@ impl GoalLevelPriorityQueue {
   fn add_lemmas<'a>(&mut self, lemmas: Vec<(GoalIndex, usize, Prop, usize)>, proof_state: &mut ProofState<'a>) {
     if lemmas.is_empty() {return;}
     //println!("found lemmas for {}", info.full_exp);
-    for (origin_index, lemma_id, prop, lemma_depth) in lemmas {
+    for (origin_index, lemma_id, prop, lemma_size) in lemmas {
       //println!("  {}", prop);
       if proof_state.timer.timeout() {return;}
 
       self.prop_map.entry(lemma_id).or_insert(prop.clone());
       let start_info = GoalIndex::from_lemma(
-        get_lemma_name(lemma_id), prop.eq.clone(), lemma_id, lemma_depth
+        get_lemma_name(lemma_id), prop.eq.clone(), lemma_id, lemma_size
       );
       self.goal_graph.record_connector_lemma(&origin_index, &start_info);
     }
@@ -2966,7 +2974,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
       }
       // proof_state.lemmas_state.max_lemma_size = std::cmp::max(proof_state.lemmas_state.max_lemma_size, optimal.get_cost());
       self.next_goal = Some(optimal.clone());
-      // println!("Trying {} ({})", optimal.name, optimal.full_exp);
+      println!("Trying {} ({})", optimal.name, optimal.full_exp);
       Ok(vec!(optimal.lemma_id))
     } else {
       println!("report unknown because of an empty queue");
@@ -2985,7 +2993,15 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
     assert_eq!(info.lemma_id, lemma_index);
 
     if !proof_state.lemma_proofs.contains_key(&lemma_index) {
-      let prop = self.prop_map.get(&lemma_index).unwrap().clone();
+      let prop = self.prop_map.get(&lemma_index).unwrap_or_else(|| proof_state.lemmas_state.all_lemmas.iter()
+      // HACK: caused by us recording connector lemmas in the lemma_tree
+                                                                .find_map(|(prop, (lemma_id, _))| {
+                                                                  if *lemma_id == lemma_index {
+                                                                    Some(prop)
+                                                                  } else {
+                                                                    None
+                                                                  }
+                                                                }).unwrap()).clone();
       proof_state.lemma_proofs.insert(
         lemma_index, LemmaProofState::new(lemma_index, prop, &None, proof_state.global_search_state, 0)
       );
@@ -3000,7 +3016,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
     }
     let lemma_state = proof_state.lemma_proofs.get_mut(&lemma_index).unwrap();
     if lemma_state.outcome.is_some() {
-      // println!("{} {:?}", "already result".green(), lemma_state.outcome);
+      println!("{} {:?}", "already result".green(), lemma_state.outcome);
       assert_eq!(lemma_state.outcome, Some(Outcome::Invalid));
       self.goal_graph.record_lemma_result(info.lemma_id, GoalNodeStatus::Invalid);
       // FIXME: this is a hack to record the outcome to the lemma trees.
@@ -3034,7 +3050,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
     let lemma_proof_state = proof_state.lemma_proofs.get(&lemma_index).unwrap();
 
     if let Some(related_goals) = step_res {
-      let related_lemmas =  lemma_proof_state.extract_lemmas(&info, &proof_state.timer, &mut proof_state.lemmas_state, &proof_state.lemma_proofs, &mut self.lemma_trees, &self.goal_graph);
+      let related_lemmas =  lemma_proof_state.extract_lemmas(&info, &proof_state.timer, &mut proof_state.lemmas_state, &proof_state.lemma_proofs, &mut self.lemma_trees, &mut self.goal_graph);
 
       if CONFIG.verbose {
         println!("\nFrom {}", info.full_exp);
@@ -3249,7 +3265,7 @@ pub fn prove_top<'a>(goal_prop: Prop, goal_premise: Option<Equation>, global_sea
   let top_goal_lemma_number = proof_state.lemmas_state.find_or_make_fresh_lemma(goal_prop.clone(), 0);
   let top_goal_lemma_proof = LemmaProofState::new(top_goal_lemma_number, goal_prop, &goal_premise, global_search_state, 0);
 
-  let start_info = GoalIndex::from_goal(&top_goal_lemma_proof.goals[0], top_goal_lemma_number, 0);
+  let start_info = GoalIndex::from_goal(&top_goal_lemma_proof.goals[0], top_goal_lemma_number, top_level_lemma_size);
   proof_state.lemmas_state.max_lemma_size = top_level_lemma_size;
   let mut scheduler = GoalLevelPriorityQueue::new(&start_info);
   scheduler.prop_map.insert(top_goal_lemma_number, top_goal_lemma_proof.prop.clone());

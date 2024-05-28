@@ -471,6 +471,14 @@ fn explain_proof(
   // If it's not in the proof tree, it must be a leaf.
   if !proof_info.proof.contains_key(goal) {
   }
+  if !proof_info.proof.contains_key(goal) {
+    let mut str_explanation = String::new();
+    add_indentation(&mut str_explanation, depth);
+    str_explanation.push_str(&format!("-- Missing proof term: {}\n", goal));
+    add_indentation(&mut str_explanation, depth);
+    str_explanation.push_str(&"undefined\n");
+    return str_explanation;
+  }
   // Need to clone to avoid borrowing... unfortunately this is all because we need
   // a mutable reference to the explanations for some annoying reason
   let proof_term = proof_info.proof.get(goal).expect(&format!("Missing proof term: {}", goal)).clone();

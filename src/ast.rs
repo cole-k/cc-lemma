@@ -274,6 +274,24 @@ pub fn substitute_sexp(sexp: &Sexp, from: &Sexp, to: &Sexp) -> Sexp {
   }, sexp)
 }
 
+/// Same as substitute_sexp but takes a list of substitutions.
+pub fn substitute_sexp_map(sexp: &Sexp, subst: &[(Sexp, Sexp)]) -> Sexp {
+  map_sexp_sexp(|interior_sexp| {
+    if let Some(sub) = subst.iter().find_map(|(from, to)| {
+      if from == interior_sexp {
+        Some(to.clone())
+      } else {
+        None
+      }
+    }) {
+      Some(sub)
+    } else {
+      None
+    }
+  }, sexp)
+
+}
+
 /// Returns every subexpression in the sexp that contains a var, ignoring base
 /// cases. This is basically every subexpression we would consider to
 /// generalize.

@@ -5,7 +5,7 @@ use egg::{Symbol, Id, Pattern, SymbolLang, Subst, Searcher, Var};
 use itertools::{iproduct, Itertools};
 use symbolic_expressions::Sexp;
 
-use crate::{goal::{Eg, LemmaProofState, Outcome, LemmasState, Timer, Goal}, analysis::cvecs_equal, ast::{Type, Equation, Prop, matches_subpattern, is_var}, goal_graph::{GoalGraph, GoalIndex, GoalNodeStatus}, config::CONFIG};
+use crate::{goal::{Eg, LemmaProofState, Outcome, LemmasState, Timer, Goal, GlobalSearchState, INVALID_LEMMA}, analysis::{cvecs_equal, has_counterexample_check}, ast::{Type, Equation, Prop, matches_subpattern, is_var}, goal_graph::{GoalGraph, GoalIndex, GoalNodeStatus}, config::CONFIG};
 
 const HOLE_VAR_PREFIX: &str = "var_";
 const HOLE_PATTERN_PREFIX: &str = "?";
@@ -96,7 +96,7 @@ pub struct LemmaPattern {
   locked_holes: Vec<(HoleIdx, Type, Side)>,
   next_hole_idx: usize,
   /// This is statically tracked.
-  size: usize,
+  pub size: usize,
 }
 
 impl Serialize for LemmaPattern {
@@ -579,6 +579,7 @@ pub enum LemmaStatus {
   Invalid,
   Inconclusive,
   InQueue,
+  Dead,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Serialize)]
@@ -688,7 +689,7 @@ pub struct PropagateMatchResult {
 }
 
 impl PropagateMatchResult {
-  fn merge(&mut self, mut rhs: Self) {
+  fn merge(&mut self, rhs: Self) {
     // self.new_lemmas.append(&mut rhs.new_lemmas);
     // self.existing_lemmas.append(&mut rhs.existing_lemmas);
     self.num_propagated_matches += rhs.num_propagated_matches;
@@ -697,8 +698,8 @@ impl PropagateMatchResult {
 
 impl LemmaTreeNode {
   // FIXME: lemma_depth is unused and should be replaced by a size.
-  pub fn from_pattern(pattern: LemmaPattern, lemma_idx: usize, lemma_depth: usize, first_match: ClassMatch) -> LemmaTreeNode {
-    let goal_index = GoalIndex::from_lemma(Symbol::new(format!("lemma_{}", lemma_idx)), pattern.to_lemma().eq, lemma_idx, lemma_depth);
+  pub fn from_pattern(pattern: LemmaPattern, lemma_idx: usize, lemma_size: usize, first_match: ClassMatch) -> LemmaTreeNode {
+    let goal_index = GoalIndex::from_lemma(Symbol::new(format!("lemma_{}", lemma_idx)), pattern.to_lemma().eq, lemma_idx, lemma_size);
     // (sort of)
     // HACK: if any hole does not appear on both sides, we consider it a free variable.
     // If there are more free variables than allowed (by default we only allow 1), we
@@ -721,10 +722,11 @@ impl LemmaTreeNode {
     });
     let lemma_status = if pattern.has_simpler_lemma() {
       // FIXME: At the very least this should be a different enum.
-      // HACK: if there is a simpler lemma, we will declare this pattern valid
-      // (even though it isn't) so that its subtree gets killed.
-      // Some(LemmaStatus::Valid)
-      None
+      //
+      // HACK: if there is a simpler lemma, we will declare this pattern dead and not try it.
+      Some(LemmaStatus::Dead)
+    } else if lemma_idx == INVALID_LEMMA {
+      Some(LemmaStatus::Invalid)
     } else if num_free_vars > CONFIG.num_free_vars_allowed {
       Some(LemmaStatus::Invalid)
     } else {
@@ -751,7 +753,7 @@ impl LemmaTreeNode {
   ///
   /// FIXME: refactor this into separate parts for unifying holes using a match,
   /// "locking in" a hole, and propagating a match via its enodes.
-  fn propagate_match<'a>(&mut self, timer: &Timer, m: ClassMatch, lemmas_state: &mut LemmasState, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
+  fn propagate_match<'a>(&mut self, timer: &Timer, m: ClassMatch, lemmas_state: &mut LemmasState, goal_graph: &mut GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
     if timer.timeout() {
       return PropagateMatchResult::default();
     }
@@ -775,20 +777,14 @@ impl LemmaTreeNode {
     //
     // TODO: refactor the goal graph to couple it better with the lemma tree.
     // This is incredibly gross.
-    let goal_node = goal_graph.goal_map[&m.origin.name].as_ref().borrow();
-    let parent_lemma_state = &lemma_proofs[&goal_node.lemma_id];
+    // let goal_node = goal_graph.goal_map[&m.origin.name].as_ref().borrow();
+    let parent_lemma_state = &lemma_proofs[&goal_graph.goal_map[&m.origin.name].as_ref().borrow().lemma_id];
     // If this goal's lemma has been proven or invalidated, then we won't
     // propagate it.
     if parent_lemma_state.outcome == Some(Outcome::Valid) || parent_lemma_state.outcome == Some(Outcome::Invalid) {
       return PropagateMatchResult::default();
     }
 
-    propagate_result.merge(self.propagate_match_lock_hole(timer, current_hole, &m, lemmas_state, goal_graph, lemma_proofs));
-    if !self.match_enode_propagation_allowed {
-      // If we aren't allowed to propagate via enodes, just return what we have
-      // so far.
-      return propagate_result;
-    }
     let goal = parent_lemma_state.goals.iter().find_map(|g| {
       if g.name == m.origin.name {
         Some(g)
@@ -796,6 +792,13 @@ impl LemmaTreeNode {
         None
       }
     }).unwrap();
+
+    propagate_result.merge(self.propagate_match_lock_hole(timer, current_hole, &m, goal, lemmas_state, goal_graph, lemma_proofs));
+    if !self.match_enode_propagation_allowed {
+      // If we aren't allowed to propagate via enodes, just return what we have
+      // so far.
+      return propagate_result;
+    }
     propagate_result.merge(self.propagate_match_fill_with_enode(timer, current_hole, &m, goal, lemmas_state, goal_graph, lemma_proofs));
     // if self.children.keys().any(|key| key.hole != current_hole) {
     //   println!("current pattern: {}, current holes: {:?}, current locked holes: {:?}", self.pattern, self.pattern.holes, self.pattern.locked_holes);
@@ -807,7 +810,7 @@ impl LemmaTreeNode {
     propagate_result
   }
 
-  fn propagate_match_lock_hole<'a>(&mut self, timer: &Timer, current_hole: HoleIdx, m: &ClassMatch, lemmas_state: &mut LemmasState, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
+  fn propagate_match_lock_hole<'a>(&mut self, timer: &Timer, current_hole: HoleIdx, m: &ClassMatch, goal: &Goal<'a>, lemmas_state: &mut LemmasState, goal_graph: &mut GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
     let mut propagate_result = PropagateMatchResult::default();
     // We will try to unify this hole with any existing locked holes.
     let unifiable_holes = m.holes_unifiable_with(current_hole, self.pattern.locked_holes.iter().map(|(hole, _, _)| *hole));
@@ -845,15 +848,18 @@ impl LemmaTreeNode {
       // this lemma will probably take time.
       } else if m.cvecs_equal {
         let pattern = self.pattern.unify_holes(current_hole, other_hole);
-        // We always will make a lemma, even though we might suspect it is
-        // invalid.
-        //
         // TODO: look up the lemma's result if it has one.
-        let lemma_idx = lemmas_state.find_or_make_fresh_lemma(pattern.to_lemma(), 0);
-        // The lemma depth does not increase because we're just unifying holes.
-        let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_depth, new_match.clone());
-        let eq = lemma_node.pattern.to_lemma().eq;
-        if lemmas_state.rejected_lemma_subpatterns.iter().any(|subpattern| matches_subpattern(&eq.lhs, subpattern, is_var) || matches_subpattern(&eq.rhs, subpattern, is_var) ) {
+        let lemma = pattern.to_lemma();
+        let lemma_idx = if has_counterexample_check(&lemma, goal.global_search_state.env, goal.global_search_state.context, goal.global_search_state.cvec_reductions) {
+          INVALID_LEMMA
+        } else {
+          lemmas_state.find_or_make_fresh_lemma(lemma, 0)
+        };
+        let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_size, new_match.clone());
+        let prop = lemma_node.pattern.to_lemma();
+        // Kill the branch if it has a rejected subpattern.
+        if lemmas_state.rejected_lemma_subpatterns.iter().any(|subpattern| matches_subpattern(&prop.eq.lhs, subpattern, is_var) || matches_subpattern(&prop.eq.rhs, subpattern, is_var) ) {
+          lemma_node.lemma_status = Some(LemmaStatus::Dead);
           continue;
         }
         // We force nodes created from unifying holes to be a leaf because otherwise we will have
@@ -911,7 +917,7 @@ impl LemmaTreeNode {
     propagate_result
   }
 
-  fn propagate_match_fill_with_enode<'a>(&mut self, timer: &Timer, current_hole: HoleIdx, m: &ClassMatch, goal: &Goal<'a>, lemmas_state: &mut LemmasState, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
+  fn propagate_match_fill_with_enode<'a>(&mut self, timer: &Timer, current_hole: HoleIdx, m: &ClassMatch, goal: &Goal<'a>, lemmas_state: &mut LemmasState, goal_graph: &mut GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
     let mut propagate_result = PropagateMatchResult::default();
     // Create/lookup each new LemmaTreeNode that comes from a refinement
     // of the current hole's matched class in the e-graph. For each e-node in
@@ -950,11 +956,17 @@ impl LemmaTreeNode {
         if let Some(ty) = goal.global_search_state.context.get(&node.op) {
           // println!("holes: {:?}, locked holes: {:?}", self.pattern.holes, self.pattern.locked_holes);
           let pattern = self.pattern.subst_hole(current_hole, node.op, ty);
-          let lemma_idx = lemmas_state.find_or_make_fresh_lemma(pattern.to_lemma(), 0);
-          // The lemma depth increases because we do a subst.
-          let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_depth + 1, new_match.clone());
-          let eq = lemma_node.pattern.to_lemma().eq;
-          if lemmas_state.rejected_lemma_subpatterns.iter().any(|subpattern| matches_subpattern(&eq.lhs, subpattern, is_var) || matches_subpattern(&eq.rhs, subpattern, is_var) ) {
+          let lemma = pattern.to_lemma();
+          let lemma_idx = if has_counterexample_check(&lemma, goal.global_search_state.env, goal.global_search_state.context, goal.global_search_state.cvec_reductions) {
+            INVALID_LEMMA
+          } else {
+            lemmas_state.find_or_make_fresh_lemma(lemma, 0)
+          };
+          let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_size, new_match.clone());
+          let prop = lemma_node.pattern.to_lemma();
+          // Kill the branch if it has a rejected subpattern.
+          if lemmas_state.rejected_lemma_subpatterns.iter().any(|subpattern| matches_subpattern(&prop.eq.lhs, subpattern, is_var) || matches_subpattern(&prop.eq.rhs, subpattern, is_var) ) {
+            lemma_node.lemma_status = Some(LemmaStatus::Dead);
             continue;
           }
           propagate_result.merge(lemma_node.add_match(timer, new_match, lemmas_state, goal_graph, lemma_proofs));
@@ -970,7 +982,7 @@ impl LemmaTreeNode {
   /// Attempts to propagate the next match, returning the number of new
   /// [`LemmaTreeNode`]s we create in the process (`None` if there are no
   /// matches to propagate - this could either be because the matches ).
-  fn propagate_next_match<'a>(&mut self, timer: &Timer, lemmas_state: &mut LemmasState, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
+  fn propagate_next_match<'a>(&mut self, timer: &Timer, lemmas_state: &mut LemmasState, goal_graph: &mut GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
     match self.current_matches.pop_back() {
       Some(m) => {
         self.propagate_match(timer, m, lemmas_state, goal_graph, lemma_proofs)
@@ -979,7 +991,7 @@ impl LemmaTreeNode {
     }
   }
 
-  fn propagate_all_matches<'a>(&mut self, timer: &Timer, lemmas_state: &mut LemmasState, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
+  fn propagate_all_matches<'a>(&mut self, timer: &Timer, lemmas_state: &mut LemmasState, goal_graph: &mut GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
     let mut propagation_result = PropagateMatchResult::default();
     while let Some(m) = self.current_matches.pop_back() {
       propagation_result.merge(self.propagate_match(timer, m, lemmas_state, goal_graph, lemma_proofs));
@@ -993,7 +1005,7 @@ impl LemmaTreeNode {
   /// `Some(_)`), then we send the match along to the node's children.
   ///
   /// If the node has not been attempted already, we add it to its matches.
-  pub fn add_match<'a>(&mut self, timer: &Timer, m: ClassMatch, lemmas_state: &mut LemmasState, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
+  pub fn add_match<'a>(&mut self, timer: &Timer, m: ClassMatch, lemmas_state: &mut LemmasState, goal_graph: &mut GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
     // if self.pattern.size != self.goal_index.get_cost() {
     //   panic!("{}, {}", self.pattern, self.goal_index.full_exp);
     // }
@@ -1016,6 +1028,14 @@ impl LemmaTreeNode {
       // validity.
       self.lemma_status = Some(LemmaStatus::Invalid);
     }
+    match self.lemma_status {
+      Some(LemmaStatus::InQueue) | Some(LemmaStatus::Inconclusive) => {
+        if m.cvecs_equal {
+          goal_graph.record_connector_lemma(&m.origin, &self.goal_index);
+        }
+      }
+      _ => {}
+    }
     // Defer doing anything more with the match if this node is outside the
     // size we are willing to consider. We will revisit it later.
     if self.pattern.size > lemmas_state.max_lemma_size {
@@ -1025,9 +1045,10 @@ impl LemmaTreeNode {
     }
     // println!("{}, {}, {}", self.goal_index.get_cost(), self.pattern.to_lemma().size(), lemmas_state.max_lemma_size);
     match self.lemma_status {
-      Some(LemmaStatus::Valid) => {
+      Some(LemmaStatus::Valid) | Some(LemmaStatus::Dead) => {
         // Nothing to do here: the node is valid so we don't need any more
         // matches.
+        self.current_matches.clear();
       }
       Some(_) => {
         // Recursively propagate this match downwards
@@ -1046,7 +1067,7 @@ impl LemmaTreeNode {
   }
 
   /// FIXME: this is needlessly inefficient
-  pub fn find_all_new_lemmas<'a>(&mut self, timer: &Timer, lemmas_state: &mut LemmasState, goal_graph: &GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> Vec<(GoalIndex, usize, Prop, usize)> {
+  pub fn find_all_new_lemmas<'a>(&mut self, timer: &Timer, lemmas_state: &mut LemmasState, goal_graph: &mut GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> Vec<(GoalIndex, usize, Prop, usize)> {
     if self.pattern.size > lemmas_state.max_lemma_size {
       return vec!()
     }
@@ -1061,12 +1082,14 @@ impl LemmaTreeNode {
         self.current_matches.iter().for_each(|m| {
           goal_idxs.entry(m.origin.name).or_insert_with(|| m.origin.clone());
         });
-        goal_idxs.into_values().map(|goal_idx| (goal_idx, self.lemma_idx, self.pattern.to_lemma(), self.goal_index.lemma_depth)).collect()
+        goal_idxs.into_values().map(|goal_idx| (goal_idx, self.lemma_idx, self.pattern.to_lemma(), self.pattern.size)).collect()
       }
       // It's been proven, no need to try it.
       //
       // Or it's already in the queue, so we don't need to try it.
-      Some(LemmaStatus::Valid) | Some(LemmaStatus::InQueue) => {
+      //
+      // Or it's dead, so we don't need to try it.
+      Some(LemmaStatus::Valid) | Some(LemmaStatus::InQueue) | Some(LemmaStatus::Dead) => {
         vec!()
       }
       // We've attempted it but don't have any results, so we should check its
@@ -1119,7 +1142,7 @@ impl LemmaTreeNode {
     // If the lemma hasn't been attempted or has been proven valid, we don't
     // need to check its children.
     match self.lemma_status {
-      None | Some(LemmaStatus::Valid) | Some(LemmaStatus::InQueue) => {
+      None | Some(LemmaStatus::Valid) | Some(LemmaStatus::InQueue) | Some(LemmaStatus::Dead) => {
         return;
       }
       _ => {}

@@ -54,7 +54,7 @@ pub struct GoalNode {
     pub status: GoalNodeStatus,
     connect_lemmas: Vec<usize>,
     sub_goals: Vec<StrongGoalRef>,
-    lemma_depth: usize,
+    lemma_size: usize,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -64,16 +64,13 @@ pub struct GoalIndex {
     pub lemma_id: usize,
     #[serde(skip_serializing)]
     pub full_exp: Equation,
-    /// A proxy for the size of the lemma: how many times have we substituted a
-    /// hole in the lemma?
-    ///
-    /// This is _not_ equal to the maximum AST depth of the lemma, but instead
-    /// tracks how many non-hole nodes there are in the lemma.
+    /// The size of the parent lemma (its own cost may be different because it
+    /// may be case split)
     ///
     /// FIXME: This should eventually be used in lieu of the lemma AST size we use
     /// in our goal priority queue. Or we should switch to using something like
     /// https://github.com/mlb2251/lambdas.
-    pub lemma_depth: usize,
+    pub lemma_size: usize,
 }
 
 impl GoalIndex {
@@ -86,20 +83,20 @@ impl GoalIndex {
             name: node.name,
             lemma_id: node.lemma_id,
             full_exp: node.full_exp.clone(),
-            lemma_depth: node.lemma_depth,
+            lemma_size: node.lemma_size,
         }
     }
-    pub fn from_goal(goal: &Goal, lemma_id: usize, lemma_depth: usize) -> GoalIndex {
+    pub fn from_goal(goal: &Goal, lemma_id: usize, lemma_size: usize) -> GoalIndex {
         GoalIndex {
             name: goal.name,
             lemma_id, full_exp: goal.full_expr.clone(),
-            lemma_depth,
+            lemma_size,
         }
     }
 
-    pub fn from_lemma(lemma_name: Symbol, expr: Equation, lemma_id: usize, lemma_depth: usize) -> GoalIndex {
+    pub fn from_lemma(lemma_name: Symbol, expr: Equation, lemma_id: usize, lemma_size: usize) -> GoalIndex {
         GoalIndex {
-            name: lemma_name, full_exp: expr, lemma_id, lemma_depth
+            name: lemma_name, full_exp: expr, lemma_id, lemma_size
         }
     }
 }
@@ -111,7 +108,7 @@ impl GoalNode {
             full_exp: goal.full_exp.clone(),
             father, status: GoalNodeStatus::Unknown,
             connect_lemmas: Vec::new(), sub_goals: Vec::new(),
-            lemma_depth: goal.lemma_depth,
+            lemma_size: goal.lemma_size,
         }
     }
 }
