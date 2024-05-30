@@ -19,9 +19,9 @@ I kept the examples directory because it will be necessary for tests.
 
 In addition to doing changes to generally improve code quality, we have some
 major changes we want to make the main proof search algorithm, specifically how
-lemma discovery is done. Although we don't expect that this will change our
-theoretical capability, we expect there may be (significant) efficiency gains.
-Or losses...
+we extract and track lemmas from pairs of e-classes we deem possibly equivalent.
+Although we don't expect that these changes will affect our theoretical capabilities,
+we expect there may be (significant) efficiency gains. Or losses...
 
 After we do this, we'll merge the history of the remaining files back in.
 
