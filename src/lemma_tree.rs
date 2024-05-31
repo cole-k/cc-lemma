@@ -461,6 +461,11 @@ pub struct ClassMatch {
   /// enumerate them anyway, their propagation probably doesn't take too long
   /// and they are useful to clear out trivially invalid lemmas.
   cvecs_equal: bool,
+  /// How many times have we generalized a term on this match?
+  ///
+  /// This corresponds to "locking" a hole on the match when the hole
+  /// contains something that isn't a var.
+  num_generalizations: usize,
 }
 
 impl ClassMatch {
@@ -475,7 +480,8 @@ impl ClassMatch {
       lhs,
       rhs,
       subst,
-      cvecs_equal
+      cvecs_equal,
+      num_generalizations: 0,
     }
   }
 }
@@ -727,6 +733,8 @@ impl LemmaTreeNode {
       Some(LemmaStatus::Dead)
     } else if num_free_vars > CONFIG.num_free_vars_allowed {
       Some(LemmaStatus::Invalid)
+    // } else if !pattern.holes.is_empty() {
+    //   Some(LemmaStatus::Invalid)
     } else {
       None
     };
@@ -849,7 +857,7 @@ impl LemmaTreeNode {
         // TODO: look up the lemma's result if it has one.
         let lemma = pattern.to_lemma();
         // If any holes are not vars, then this is a generalized lemma.
-        let is_generalized = m.subst.values().any(|(class, _)|{
+        let is_generalized = new_match.subst.values().any(|(class, _)|{
           match goal.egraph[*class].data.canonical_form_data {
             CanonicalForm::Var(_) => false,
             _ => true,
@@ -859,6 +867,7 @@ impl LemmaTreeNode {
         // state invalid before righting it.
         let mut lemma_node = LemmaTreeNode::from_pattern(pattern, INVALID_LEMMA, self.goal_index.lemma_size, new_match.clone());
         if lemma_node.lemma_status.is_none() {
+          // assert_eq!(is_generalized, new_match.num_generalizations > 0);
           if is_generalized && has_counterexample_check(&lemma, goal.global_search_state.env, goal.global_search_state.context, goal.global_search_state.cvec_reductions) {
             lemma_node.lemma_status = Some(LemmaStatus::Invalid);
           } else {
@@ -869,9 +878,9 @@ impl LemmaTreeNode {
           }
         }
         // Kill the branch if it has a rejected subpattern.
-        if lemma_node.lemma_status.is_none() && lemmas_state.rejected_lemma_subpatterns.iter().any(|subpattern| matches_subpattern(&lemma.eq.lhs, subpattern, is_var) || matches_subpattern(&lemma.eq.rhs, subpattern, is_var) ) {
-          lemma_node.lemma_status = Some(LemmaStatus::Dead);
-        }
+        // if lemma_node.lemma_status.is_none() && lemmas_state.rejected_lemma_subpatterns.iter().any(|subpattern| matches_subpattern(&lemma.eq.lhs, subpattern, is_var) || matches_subpattern(&lemma.eq.rhs, subpattern, is_var) ) {
+        //   lemma_node.lemma_status = Some(LemmaStatus::Dead);
+        // }
         // We force nodes created from unifying holes to be a leaf because otherwise we will have
         // many duplicates.
         //
@@ -892,8 +901,23 @@ impl LemmaTreeNode {
       hole: current_hole,
       filled_with: FilledWith::Lock,
     };
+    let mut new_match = m.clone();
+    // If we lock a hole that isn't a variable, this means we are doing a
+    // generalization.
+    match &goal.egraph[new_match.subst[&current_hole].0].data.canonical_form_data {
+      CanonicalForm::Var(_) => {},
+      _ => {
+        new_match.num_generalizations += 1;
+      }
+    }
+    // The only time we can generalize is at this point (unifying a hole implies
+    // that we do the same generalization in both places), so we check here that
+    // we aren't doing too many first.
+    if new_match.num_generalizations > CONFIG.max_num_generalizations {
+      return propagate_result;
+    }
     if let Some(child_node) = self.children.get_mut(&lock_edge) {
-      propagate_result.merge(child_node.add_match(timer, m.clone(), lemmas_state, goal_graph, lemma_proofs));
+      propagate_result.merge(child_node.add_match(timer, new_match, lemmas_state, goal_graph, lemma_proofs));
       // The lemma for the child is the same, so we won't add it to the propagation list
       propagate_result.num_propagated_matches += 1;
     } else {
@@ -915,7 +939,7 @@ impl LemmaTreeNode {
       let hole_info = new_node.pattern.holes.remove(hole_loc).unwrap();
       new_node.pattern.locked_holes.push(hole_info);
       // Now propagate the match.
-      propagate_result.merge(new_node.add_match(timer ,m.clone(), lemmas_state, goal_graph, lemma_proofs));
+      propagate_result.merge(new_node.add_match(timer ,new_match, lemmas_state, goal_graph, lemma_proofs));
       propagate_result.num_propagated_matches += 1;
       // println!("current node pattern {}\n holes {:?}, locked holes {:?}", self.pattern, self.pattern.holes, self.pattern.locked_holes);
       // println!("new node pattern {}\n holes {:?}, locked holes {:?}", new_node.pattern, new_node.pattern.holes, new_node.pattern.locked_holes);
@@ -971,13 +995,14 @@ impl LemmaTreeNode {
           // state invalid before righting it.
           let mut lemma_node = LemmaTreeNode::from_pattern(pattern, INVALID_LEMMA, self.goal_index.lemma_size, new_match.clone());
           // If any holes are not vars, then this is a generalized lemma.
-          let is_generalized = m.subst.values().any(|(class, _)|{
+          let is_generalized = new_match.subst.values().any(|(class, _)|{
             match goal.egraph[*class].data.canonical_form_data {
               CanonicalForm::Var(_) => false,
               _ => true,
             }
           });
           if lemma_node.lemma_status.is_none() {
+            // assert_eq!(is_generalized, new_match.num_generalizations > 0);
             if is_generalized && has_counterexample_check(&lemma, goal.global_search_state.env, goal.global_search_state.context, goal.global_search_state.cvec_reductions) {
               lemma_node.lemma_status = Some(LemmaStatus::Invalid);
             } else {
@@ -988,9 +1013,9 @@ impl LemmaTreeNode {
             }
           }
           // Kill the branch if it has a rejected subpattern.
-          if lemma_node.lemma_status.is_none() && lemmas_state.rejected_lemma_subpatterns.iter().any(|subpattern| matches_subpattern(&lemma.eq.lhs, subpattern, is_var) || matches_subpattern(&lemma.eq.rhs, subpattern, is_var) ) {
-            lemma_node.lemma_status = Some(LemmaStatus::Dead);
-          }
+          // if lemma_node.lemma_status.is_none() && lemmas_state.rejected_lemma_subpatterns.iter().any(|subpattern| matches_subpattern(&lemma.eq.lhs, subpattern, is_var) || matches_subpattern(&lemma.eq.rhs, subpattern, is_var) ) {
+          //   lemma_node.lemma_status = Some(LemmaStatus::Dead);
+          // }
           propagate_result.merge(lemma_node.add_match(timer, new_match, lemmas_state, goal_graph, lemma_proofs));
 
           self.children.insert(edge, lemma_node);
@@ -1032,6 +1057,9 @@ impl LemmaTreeNode {
     //   panic!("{}, {}", self.pattern, self.goal_index.full_exp);
     // }
     let mut propagate_result = PropagateMatchResult::default();
+    if timer.timeout() {
+      return propagate_result;
+    }
     // Once a lemma is proven (and therefore no longer active), don't propagate
     // its matches.
     if goal_graph.goal_map[&m.origin.name].as_ref().borrow().status != GoalNodeStatus::Unknown || lemmas_state.proven_goal_names.contains(&m.origin.name) || lemmas_state.proven_lemma_ids.contains(&m.origin.lemma_id) {
@@ -1119,28 +1147,35 @@ impl LemmaTreeNode {
       Some(LemmaStatus::Inconclusive) | Some(LemmaStatus::Invalid) => {
         // Propagate its matches if they are now within the proper depth.
         self.propagate_all_matches(timer, lemmas_state, goal_graph, lemma_proofs);
-        let num_enode_edges: usize = self.children.keys().map(|edge| {
-          if edge.filled_with.is_enode() {
-            1
-          } else {
-            0
-          }
-        }).sum();
-        // HACK: Prefer trying the single enode edge if there is only one. If
-        // we've already tried it, we will allow trying other edges.
+        // NOTE: I think this doesn't make any sense because of the fact that
+        // matches exhibit symmetry, i.e. there may be one branch where we have
+        // (add ?0 ?1) = ?2 expanding ?0 into (S _) and in another we have ?0 =
+        // (add ?1 ?2) expanding ?1 into Z. This would imply it is valid to
+        // consider the generalization, but we never would because the lemma
+        // exists in two separate branches.
         //
-        // The thought is that if there are multiple enode edges, the
-        // generalized lemma would apply to different places in the e-graph; if
-        // not, then we should try its specialization first.
-        let skip_non_enode_edges = if num_enode_edges == 1 {
-          let (_, sole_enode_child) = self.children.iter().find(|(edge, _)| edge.filled_with.is_enode()).unwrap();
-          sole_enode_child.lemma_status.is_none() || sole_enode_child.lemma_status == Some(LemmaStatus::InQueue)
-        } else {
-          false
-        };
+        // let num_enode_edges: usize = self.children.keys().map(|edge| {
+        //   if edge.filled_with.is_enode() {
+        //     1
+        //   } else {
+        //     0
+        //   }
+        // }).sum();
+        // // HACK: Prefer trying the single enode edge if there is only one. If
+        // // we've already tried it, we will allow trying other edges.
+        // //
+        // // The thought is that if there are multiple enode edges, the
+        // // generalized lemma would apply to different places in the e-graph; if
+        // // not, then we should try its specialization first.
+        // let skip_non_enode_edges = if num_enode_edges == 1 {
+        //   let (_, sole_enode_child) = self.children.iter().find(|(edge, _)| edge.filled_with.is_enode()).unwrap();
+        //   sole_enode_child.lemma_status != Some(LemmaStatus::Inconclusive) && sole_enode_child.lemma_status != Some(LemmaStatus::Invalid)
+        // } else {
+        //   false
+        // };
         self.children.iter_mut().flat_map(|(edge, child)| {
           // skip_non_enode_edges => edge has to be an enode
-          if !skip_non_enode_edges || edge.filled_with.is_enode() {
+          if true || edge.filled_with.is_enode() {
             child.find_all_new_lemmas(timer, lemmas_state, goal_graph, lemma_proofs)
           } else {
             vec!()

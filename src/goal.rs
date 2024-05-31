@@ -2993,6 +2993,9 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
   }
 
   fn handle_lemma<'a>(&mut self, lemma_index: Self::LemmaIndex, proof_state: &mut ProofState<'a>) {
+    if proof_state.timer.timeout() {
+      return;
+    }
     assert!(self.next_goal.is_some());
     let info = self.next_goal.clone().unwrap();
     //println!("{} {:?}", "Current".red(), info);
@@ -3022,7 +3025,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
     }
     let lemma_state = proof_state.lemma_proofs.get_mut(&lemma_index).unwrap();
     if lemma_state.outcome.is_some() {
-      println!("{} {:?}", "already result".green(), lemma_state.outcome);
+      // println!("{} {:?}", "already result".green(), lemma_state.outcome);
       assert_eq!(lemma_state.outcome, Some(Outcome::Invalid));
       self.goal_graph.record_lemma_result(info.lemma_id, GoalNodeStatus::Invalid);
       // FIXME: this is a hack to record the outcome to the lemma trees.
@@ -3067,18 +3070,17 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
         }
       }
       self.insert_waiting(&info, related_lemmas, related_goals, proof_state);
-      if let Some(outcome) = &proof_state.lemma_proofs.get(&lemma_index).unwrap().outcome {
-        let lemma_status = match outcome {
-          Outcome::Invalid => LemmaStatus::Invalid,
-          Outcome::Valid   => LemmaStatus::Valid,
-          Outcome::Unknown | Outcome::Timeout => LemmaStatus::Inconclusive,
-        };
-        // FIXME: this is a hack to record the outcome to the lemma trees.
-        // We really should probably fold the trees into the lemma state.
-        self.lemma_trees.values_mut().for_each(|lemma_tree| {
-          lemma_tree.record_lemma_result(lemma_index, lemma_status);
-        });
-      }
+      let outcome = &proof_state.lemma_proofs.get(&lemma_index).unwrap().outcome;
+      let lemma_status = match outcome {
+        Some(Outcome::Invalid) => LemmaStatus::Invalid,
+        Some(Outcome::Valid)   => LemmaStatus::Valid,
+        Some(Outcome::Unknown) | Some(Outcome::Timeout) | None => LemmaStatus::Inconclusive,
+      };
+      // FIXME: this is a hack to record the outcome to the lemma trees.
+      // We really should probably fold the trees into the lemma state.
+      self.lemma_trees.values_mut().for_each(|lemma_tree| {
+        lemma_tree.record_lemma_result(lemma_index, lemma_status);
+      });
     } else {
       if lemma_proof_state.outcome.is_none() {
         self.goal_graph.record_goal_result(&info, GoalNodeStatus::Valid);
@@ -3091,24 +3093,23 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
         state.outcome = Some(Outcome::Valid);
         println!("new lemma {}", state.prop);
       }
-      if let Some(outcome) = &proof_state.lemma_proofs.get(&lemma_index).unwrap().outcome {
-        let lemma_status = match outcome {
-          Outcome::Invalid => LemmaStatus::Invalid,
-          Outcome::Valid   => LemmaStatus::Valid,
-          Outcome::Unknown | Outcome::Timeout => LemmaStatus::Inconclusive,
-        };
-        // FIXME: this is a hack to record the outcome to the lemma trees.
-        // We really should probably fold the trees into the lemma state.
-        self.lemma_trees.values_mut().for_each(|lemma_tree| {
-          lemma_tree.record_lemma_result(lemma_index, lemma_status);
-        });
-        self.is_found_new_lemma = true;
-        if outcome == &Outcome::Valid {
-          self.goal_graph.record_lemma_result(info.lemma_id, GoalNodeStatus::Valid);
-        } else if outcome == &Outcome::Invalid {
-          self.goal_graph.record_lemma_result(info.lemma_id, GoalNodeStatus::Invalid);
-        } else {panic!();}
-      }
+      let outcome = &proof_state.lemma_proofs.get(&lemma_index).unwrap().outcome;
+      let lemma_status = match outcome {
+        Some(Outcome::Invalid) => LemmaStatus::Invalid,
+        Some(Outcome::Valid)   => LemmaStatus::Valid,
+        Some(Outcome::Unknown) | Some(Outcome::Timeout) | None => LemmaStatus::Inconclusive,
+      };
+      // FIXME: this is a hack to record the outcome to the lemma trees.
+      // We really should probably fold the trees into the lemma state.
+      self.lemma_trees.values_mut().for_each(|lemma_tree| {
+        lemma_tree.record_lemma_result(lemma_index, lemma_status);
+      });
+      self.is_found_new_lemma = true;
+      if outcome == &Some(Outcome::Valid) {
+        self.goal_graph.record_lemma_result(info.lemma_id, GoalNodeStatus::Valid);
+      } else if outcome == &Some(Outcome::Invalid) {
+        self.goal_graph.record_lemma_result(info.lemma_id, GoalNodeStatus::Invalid);
+      } else if outcome.is_some() {panic!();}
     }
   }
 
@@ -3117,6 +3118,12 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
     new_lemma.insert(_lemma);
 
     while !new_lemma.is_empty() {
+      if proof_state.timer.timeout() {
+        return;
+      }
+      // println!("trying to prove additional lemmas...");
+      // self.goal_graph.update_proven_lemmas();
+      // self.goal_graph.relink_related_lemmas();
       let proved_goals: Vec<_> = self.goal_graph.get_waiting_goals(Some(&new_lemma)).into_iter().filter(
         |info| {
           let state = proof_state.lemma_proofs.get_mut(&info.lemma_id).unwrap();
@@ -3144,6 +3151,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
         }
       }
     }
+    // println!("done");
 
     // self.re_extract_lemmas(proof_state);
   }

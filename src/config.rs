@@ -124,6 +124,9 @@ pub struct Args {
 
   #[clap(long = "max-num-cycles-followed", default_value = "3")]
   pub max_num_cycles_followed: usize,
+
+  #[clap(long = "max-num-generalizations", default_value = "2")]
+  pub max_num_generalizations: usize,
 }
 
 impl Args {
@@ -183,6 +186,7 @@ pub struct Config {
   pub output_lemma_tree: bool,
   pub num_free_vars_allowed: usize,
   pub max_num_cycles_followed: usize,
+  pub max_num_generalizations: usize,
 }
 
 impl Config {
@@ -248,6 +252,7 @@ impl Config {
       output_lemma_tree: args.output_lemma_tree,
       num_free_vars_allowed: args.num_free_vars_allowed,
       max_num_cycles_followed: args.max_num_cycles_followed,
+      max_num_generalizations: args.max_num_generalizations,
     }
   }
 
