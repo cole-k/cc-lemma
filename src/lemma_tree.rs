@@ -5,7 +5,7 @@ use egg::{Symbol, Id, Pattern, SymbolLang, Subst, Searcher, Var};
 use itertools::{iproduct, Itertools};
 use symbolic_expressions::Sexp;
 
-use crate::{goal::{Eg, LemmaProofState, Outcome, LemmasState, Timer, Goal, GlobalSearchState, INVALID_LEMMA}, analysis::{cvecs_equal, has_counterexample_check}, ast::{Type, Equation, Prop, matches_subpattern, is_var}, goal_graph::{GoalGraph, GoalIndex, GoalNodeStatus}, config::CONFIG};
+use crate::{goal::{Eg, LemmaProofState, Outcome, LemmasState, Timer, Goal, GlobalSearchState, INVALID_LEMMA}, analysis::{cvecs_equal, has_counterexample_check, CanonicalForm}, ast::{Type, Equation, Prop, matches_subpattern, is_var}, goal_graph::{GoalGraph, GoalIndex, GoalNodeStatus}, config::CONFIG};
 
 const HOLE_VAR_PREFIX: &str = "var_";
 const HOLE_PATTERN_PREFIX: &str = "?";
@@ -518,9 +518,9 @@ pub struct LemmaTreeNode {
   /// The pattern which represents the current lemma.
   pattern: LemmaPattern,
   /// The index of the lemma corresponding to this node in the LemmaTree
-  lemma_idx: usize,
+  pub lemma_idx: usize,
   /// The GoalIndex that is associated with this lemma in the GoalGraph.
-  goal_index: GoalIndex,
+  pub goal_index: GoalIndex,
   /// These matches are transient: we will propagate them through the e-graph if
   /// we cannot prove the lemma this node represents (or if it is an invalid
   /// lemma).
@@ -530,7 +530,7 @@ pub struct LemmaTreeNode {
   current_matches: VecDeque<ClassMatch>,
   /// What's the status of the lemma? (`None` if we haven't attempted this
   /// lemma).
-  lemma_status: Option<LemmaStatus>,
+  pub lemma_status: Option<LemmaStatus>,
   /// Are we allowed to propagate matches by filling a hole with the contents of
   /// its matched eclass?
   ///
@@ -725,8 +725,6 @@ impl LemmaTreeNode {
       //
       // HACK: if there is a simpler lemma, we will declare this pattern dead and not try it.
       Some(LemmaStatus::Dead)
-    } else if lemma_idx == INVALID_LEMMA {
-      Some(LemmaStatus::Invalid)
     } else if num_free_vars > CONFIG.num_free_vars_allowed {
       Some(LemmaStatus::Invalid)
     } else {
@@ -850,17 +848,29 @@ impl LemmaTreeNode {
         let pattern = self.pattern.unify_holes(current_hole, other_hole);
         // TODO: look up the lemma's result if it has one.
         let lemma = pattern.to_lemma();
-        let lemma_idx = if has_counterexample_check(&lemma, goal.global_search_state.env, goal.global_search_state.context, goal.global_search_state.cvec_reductions) {
-          INVALID_LEMMA
-        } else {
-          lemmas_state.find_or_make_fresh_lemma(lemma, 0)
-        };
-        let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_size, new_match.clone());
-        let prop = lemma_node.pattern.to_lemma();
+        // If any holes are not vars, then this is a generalized lemma.
+        let is_generalized = m.subst.values().any(|(class, _)|{
+          match goal.egraph[*class].data.canonical_form_data {
+            CanonicalForm::Var(_) => false,
+            _ => true,
+          }
+        });
+        // FIXME: This is super hacky. We temporarily make the lemma node's
+        // state invalid before righting it.
+        let mut lemma_node = LemmaTreeNode::from_pattern(pattern, INVALID_LEMMA, self.goal_index.lemma_size, new_match.clone());
+        if lemma_node.lemma_status.is_none() {
+          if is_generalized && has_counterexample_check(&lemma, goal.global_search_state.env, goal.global_search_state.context, goal.global_search_state.cvec_reductions) {
+            lemma_node.lemma_status = Some(LemmaStatus::Invalid);
+          } else {
+            let lemma_idx = lemmas_state.find_or_make_fresh_lemma(lemma.clone(), 0);
+            lemma_node.lemma_idx = lemma_idx;
+            lemma_node.goal_index.lemma_id = lemma_idx;
+            lemma_node.goal_index.name = Symbol::new(&format!("lemma_{}", lemma_idx));
+          }
+        }
         // Kill the branch if it has a rejected subpattern.
-        if lemmas_state.rejected_lemma_subpatterns.iter().any(|subpattern| matches_subpattern(&prop.eq.lhs, subpattern, is_var) || matches_subpattern(&prop.eq.rhs, subpattern, is_var) ) {
+        if lemma_node.lemma_status.is_none() && lemmas_state.rejected_lemma_subpatterns.iter().any(|subpattern| matches_subpattern(&lemma.eq.lhs, subpattern, is_var) || matches_subpattern(&lemma.eq.rhs, subpattern, is_var) ) {
           lemma_node.lemma_status = Some(LemmaStatus::Dead);
-          continue;
         }
         // We force nodes created from unifying holes to be a leaf because otherwise we will have
         // many duplicates.
@@ -957,17 +967,29 @@ impl LemmaTreeNode {
           // println!("holes: {:?}, locked holes: {:?}", self.pattern.holes, self.pattern.locked_holes);
           let pattern = self.pattern.subst_hole(current_hole, node.op, ty);
           let lemma = pattern.to_lemma();
-          let lemma_idx = if has_counterexample_check(&lemma, goal.global_search_state.env, goal.global_search_state.context, goal.global_search_state.cvec_reductions) {
-            INVALID_LEMMA
-          } else {
-            lemmas_state.find_or_make_fresh_lemma(lemma, 0)
-          };
-          let mut lemma_node = LemmaTreeNode::from_pattern(pattern, lemma_idx, self.goal_index.lemma_size, new_match.clone());
-          let prop = lemma_node.pattern.to_lemma();
+          // FIXME: This is super hacky. We temporarily make the lemma node's
+          // state invalid before righting it.
+          let mut lemma_node = LemmaTreeNode::from_pattern(pattern, INVALID_LEMMA, self.goal_index.lemma_size, new_match.clone());
+          // If any holes are not vars, then this is a generalized lemma.
+          let is_generalized = m.subst.values().any(|(class, _)|{
+            match goal.egraph[*class].data.canonical_form_data {
+              CanonicalForm::Var(_) => false,
+              _ => true,
+            }
+          });
+          if lemma_node.lemma_status.is_none() {
+            if is_generalized && has_counterexample_check(&lemma, goal.global_search_state.env, goal.global_search_state.context, goal.global_search_state.cvec_reductions) {
+              lemma_node.lemma_status = Some(LemmaStatus::Invalid);
+            } else {
+              let lemma_idx = lemmas_state.find_or_make_fresh_lemma(lemma.clone(), 0);
+              lemma_node.lemma_idx = lemma_idx;
+              lemma_node.goal_index.lemma_id = lemma_idx;
+              lemma_node.goal_index.name = Symbol::new(&format!("lemma_{}", lemma_idx));
+            }
+          }
           // Kill the branch if it has a rejected subpattern.
-          if lemmas_state.rejected_lemma_subpatterns.iter().any(|subpattern| matches_subpattern(&prop.eq.lhs, subpattern, is_var) || matches_subpattern(&prop.eq.rhs, subpattern, is_var) ) {
+          if lemma_node.lemma_status.is_none() && lemmas_state.rejected_lemma_subpatterns.iter().any(|subpattern| matches_subpattern(&lemma.eq.lhs, subpattern, is_var) || matches_subpattern(&lemma.eq.rhs, subpattern, is_var) ) {
             lemma_node.lemma_status = Some(LemmaStatus::Dead);
-            continue;
           }
           propagate_result.merge(lemma_node.add_match(timer, new_match, lemmas_state, goal_graph, lemma_proofs));
 

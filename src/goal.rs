@@ -1730,7 +1730,7 @@ impl<'a> Goal<'a> {
   /// The cvec analysis needs to be saturated before this can be run.
   fn search_for_cc_lemmas_using_lemma_tree(&self, timer: &Timer, origin: &GoalIndex, lemmas_state: &mut LemmasState, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>, lemma_trees: &mut BTreeMap<Type, LemmaTreeNode>, goal_graph: &mut GoalGraph) -> Vec<(GoalIndex, usize, Prop, usize)> {
     // self.egraph.analysis.cvec_analysis.saturate();
-    println!("adding matches to lemma tree");
+    // println!("adding matches to lemma tree");
     for class_1 in self.egraph.classes() {
       for class_2 in self.egraph.classes() {
         if class_1.id >= class_2.id {
@@ -1806,13 +1806,19 @@ impl<'a> Goal<'a> {
                       // We should probably make a function for making a new
                       // lemma tree from the lemmas state.
                       let lemma = pattern.to_lemma();
-                      let lemma_idx = if has_counterexample_check(&lemma, self.global_search_state.env, self.global_search_state.context, self.global_search_state.cvec_reductions) {
-                        INVALID_LEMMA
-                      } else {
-                        lemmas_state.find_or_make_fresh_lemma(lemma, 0)
-                      };
                       let pattern_size = pattern.size;
-                      let mut root = LemmaTreeNode::from_pattern(pattern, lemma_idx, pattern_size, m.clone());
+                      // pass INVALID_LEMMA initially, if it's not invalid we'll generate a lemma for it.
+                      let mut root = LemmaTreeNode::from_pattern(pattern, INVALID_LEMMA, pattern_size, m.clone());
+                      if root.lemma_status.is_none() {
+                        if has_counterexample_check(&lemma, self.global_search_state.env, self.global_search_state.context, self.global_search_state.cvec_reductions) {
+                          root.lemma_status = Some(LemmaStatus::Invalid);
+                        } else {
+                          let lemma_idx = lemmas_state.find_or_make_fresh_lemma(lemma, 0);
+                          root.lemma_idx = lemma_idx;
+                          root.goal_index.lemma_id = lemma_idx;
+                          root.goal_index.name = Symbol::new(&format!("lemma_{}", lemma_idx));
+                        }
+                      }
                       let _ = root.add_match(timer, m, lemmas_state, goal_graph, lemma_proofs);
                       root
                     });
@@ -1820,9 +1826,9 @@ impl<'a> Goal<'a> {
 
       }
     }
-    println!("extracting lemmas from tree");
+    // println!("extracting lemmas from tree");
     let res = lemma_trees.values_mut().flat_map(|lemma_tree| lemma_tree.find_all_new_lemmas(timer, lemmas_state, goal_graph, lemma_proofs)).collect();
-    println!("done");
+    // println!("done");
     res
   }
 
@@ -2974,7 +2980,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
       }
       // proof_state.lemmas_state.max_lemma_size = std::cmp::max(proof_state.lemmas_state.max_lemma_size, optimal.get_cost());
       self.next_goal = Some(optimal.clone());
-      println!("Trying {} ({})", optimal.name, optimal.full_exp);
+      // println!("Trying {} ({})", optimal.name, optimal.full_exp);
       Ok(vec!(optimal.lemma_id))
     } else {
       println!("report unknown because of an empty queue");
