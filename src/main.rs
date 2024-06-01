@@ -48,7 +48,9 @@ fn main() -> Result<()> {
         continue;
       }
     }
-    let global_search_state = GlobalSearchState::new(&parser_state.env, &parser_state.context, &reductions, &parser_state.cvec_rules, &defns, &raw_goal.local_searchers);
+    // NOTE: we localize defs for proving but not for eval'ing cvecs. Since
+    // they're in a hashmap I expect this won't incur efficiency hits.
+    let global_search_state = GlobalSearchState::new(&parser_state.env, &parser_state.context, &reductions, &parser_state.cvec_rules, &defns, &raw_goal.local_searchers, &parser_state.defns_for_eval);
 
     let mut goal = Goal::top(
       Symbol::new(&raw_goal.name),

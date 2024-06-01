@@ -7,6 +7,7 @@ use crate::ast::*;
 use crate::config::CONFIG;
 use crate::egraph::{ConditionalSearcher, DestructiveApplier};
 use crate::goal::*;
+use crate::lemma_tree::{FnDefs, parse_fn_defn};
 
 fn make_rewrite_for_defn<A>(name: &str, args: &Sexp, value: &Sexp, is_axiom: bool) -> Rewrite<SymbolLang, A>
   where
@@ -47,7 +48,11 @@ pub struct RawGoal {
 pub struct ParserState {
   pub env: Env,
   pub context: Context,
+  // This is what we use for proving
   pub defns: Defns,
+  // This is what we use for evaluating concrete terms.
+  // Yes, they should probably be the same.
+  pub defns_for_eval: FnDefs,
   pub rules: Vec<Rw>,
   pub cvec_rules: Vec<CvecRw>,
   pub raw_goals: Vec<RawGoal>,
@@ -310,10 +315,21 @@ pub fn parse_file(filename: &str) -> Result<ParserState, SexpError> {
           &mangled_value,
           decl_kind == "axiom"
         ));
-        // HACK: add the same rules to a list of rewrites for cvecs. This is
-        // only done because we don't have a good way of storing rules that can
-        // work as both Rw and CvecRw.
+        // We will only track non-axioms in our definitions used for evaluating
         if decl_kind != "axiom" {
+          let args_list = match mangled_args.clone() {
+            Sexp::Empty => panic!("empty arguments for function"),
+            // Wrap the arg in a list
+            Sexp::String(arg) => vec!(Sexp::String(arg)),
+            Sexp::List(args)  => args,
+          };
+          let def = parse_fn_defn(&args_list, &mangled_value);
+          state.defns_for_eval.entry(Symbol::new(mangled_name.clone())).and_modify(|defs| {
+            defs.push(def.clone())
+          }).or_insert_with(|| vec!(def.clone()));
+          // HACK: add the same rules to a list of rewrites for cvecs. This is
+          // only done because we don't have a good way of storing rules that can
+          // work as both Rw and CvecRw.
           state.cvec_rules.push(make_rewrite_for_defn(&mangled_name, &mangled_args, &mangled_value, false));
         }
 
