@@ -1748,6 +1748,11 @@ impl<'a> Goal<'a> {
         let class_1_type = class_1_type.unwrap();
         let class_2_type = class_2_type.unwrap();
 
+        // Cannot theorize lemmas about arrows
+        if class_1_type.is_arrow() || class_1_type.is_arrow() {
+          continue;
+        }
+
         // FIXME: types should be interned, like strings. This comparison
         // probably happens a lot.
         if class_1_type != class_2_type {

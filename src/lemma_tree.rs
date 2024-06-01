@@ -855,9 +855,13 @@ impl LemmaTreeNode {
     // FIXME: Figure out a better heuristic for invalidating intermediate lemmas
     // that are too general.
     let mut num_free_vars = 0;
-    pattern.holes.iter().chain(pattern.locked_holes.iter()).for_each(|(_hole, _ty, side)| {
+    let mut has_arrow = false;
+    pattern.holes.iter().chain(pattern.locked_holes.iter()).for_each(|(_hole, ty, side)| {
       if side != &Side::Both {
         num_free_vars += 1;
+      }
+      if ty.is_arrow() {
+        has_arrow = true;
       }
     });
     let lemma_status = if pattern.has_simpler_lemma() {
@@ -867,6 +871,9 @@ impl LemmaTreeNode {
     //   Some(LemmaStatus::Invalid)
     // // } else if !pattern.holes.is_empty() {
     // //   Some(LemmaStatus::Invalid)
+    // NOTE: We don't know how to do a counterexample check for arrows.
+    } else if has_arrow {
+      Some(LemmaStatus::Dead)
     } else {
       None
     };
