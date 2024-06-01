@@ -297,6 +297,17 @@ impl GoalGraph {
     }
 
     pub fn saturate(&mut self) {
+        self.egraph = EGraph::default();
+
+        for (index, lemma_info) in self.lemma_map.iter_mut() {
+            if lemma_info.enodes.is_some() {
+                let full_exp = &lemma_info.root.borrow().full_exp;
+                let lhs = full_exp.lhs.to_string().parse().unwrap();
+                let rhs = full_exp.rhs.to_string().parse().unwrap();
+                lemma_info.enodes = Some((self.egraph.add_expr(&lhs), self.egraph.add_expr(&rhs)));
+            }
+        }
+
         let runner = Runner::default()
             .with_egraph(self.egraph.clone())
             .run(&self.lemma_rewrites);
@@ -316,6 +327,7 @@ impl GoalGraph {
             if lemma.enodes.is_none() { continue; }
             let nodes = lemma.enodes.unwrap();
             let classes = self.get_new_id(nodes);
+            // println!("{} {}.{}", lemma.root.borrow().full_exp, classes.0, classes.1);
 
             match repr_map.get_mut(&classes) {
                 None => {
@@ -328,16 +340,20 @@ impl GoalGraph {
         }
 
         let mut repr_id_map = HashMap::new();
-        for lemma in self.lemma_map.values() {
+        let mut removed = HashSet::new();
+        for (index, lemma) in self.lemma_map.iter() {
             if lemma.enodes.is_none () {
                 repr_id_map.insert(lemma.lemma_id, lemma.lemma_id);
                 continue;
             }
             let classes = self.get_new_id(lemma.enodes.unwrap());
             if classes.0 == classes.1 {
-                continue;
+                removed.insert(*index);
             } else {
                 repr_id_map.insert(lemma.lemma_id, repr_map[&classes]);
+                if lemma.lemma_id != repr_map[&classes] {
+                    removed.insert(*index);
+                }
             }
         }
 
@@ -350,9 +366,13 @@ impl GoalGraph {
             }
             goal.borrow_mut().connect_lemmas = existing.into_iter().collect();
         }
+        for removed_id in removed.iter() {
+            self.lemma_map.remove(removed_id);
+        }
     }
 
     pub fn add_bid_lemma(&mut self, lhs: Sexp, rhs: Sexp) {
+        println!("New bid lemma {} <=> {}", lhs, rhs);
         let id = self.lemma_rewrites.len();
         let lhs: Pattern<_> = lhs.to_string().parse().unwrap();
         let rhs: Pattern<_> = rhs.to_string().parse().unwrap();
@@ -365,9 +385,11 @@ impl GoalGraph {
 
     fn update_proven_lemmas(&mut self) {
         let mut new_rewrites = Vec::new();
+        // println!("#lemmas {}, size(e-graph) {}", self.lemma_map.values().len(), self.egraph.total_number_of_nodes());
         for lemma in self.lemma_map.values() {
             if self.is_lemma_proven(lemma.lemma_id) && !self.proven_lemmas.contains(&lemma.lemma_id) {
                 self.proven_lemmas.insert(lemma.lemma_id);
+                // println!("try proven lemmas {} <=> {}", lemma.root.borrow().full_exp.lhs, lemma.root.borrow().full_exp.rhs);
                 let (left_vars, left_pattern) = build_pattern(&lemma.root.borrow().full_exp.lhs);
                 let (right_vars, right_pattern) = build_pattern(&lemma.root.borrow().full_exp.rhs);
                 if left_vars == right_vars {

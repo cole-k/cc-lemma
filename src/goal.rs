@@ -2974,6 +2974,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
     if let Some(optimal) = frontier.into_iter().min_by_key(|index| {
       index.get_cost()
     }) {
+      // println!("Try lemma {}", optimal.full_exp);
       if optimal.get_cost() > proof_state.lemmas_state.max_lemma_size {
         println!("cost {} greater than {}", optimal.get_cost(), proof_state.lemmas_state.max_lemma_size);
         proof_state.lemmas_state.max_lemma_size += 1;
