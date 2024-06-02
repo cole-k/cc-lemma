@@ -867,8 +867,8 @@ impl LemmaTreeNode {
     let lemma_status = if pattern.has_simpler_lemma() {
       // HACK: if there is a simpler lemma, we will declare this pattern dead and not try it.
       Some(LemmaStatus::Dead)
-    // } else if num_free_vars > CONFIG.num_free_vars_allowed {
-    //   Some(LemmaStatus::Invalid)
+    } else if num_free_vars > CONFIG.num_free_vars_allowed {
+    Some(LemmaStatus::Invalid)
     // // } else if !pattern.holes.is_empty() {
     // //   Some(LemmaStatus::Invalid)
     // NOTE: We don't know how to do a counterexample check for arrows.
