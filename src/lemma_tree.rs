@@ -5,7 +5,7 @@ use egg::{Symbol, Id, Pattern, SymbolLang, Subst, Searcher, Var};
 use itertools::{iproduct, Itertools};
 use symbolic_expressions::Sexp;
 
-use crate::{goal::{Eg, LemmaProofState, Outcome, LemmasState, Timer, Goal, GlobalSearchState, INVALID_LEMMA}, analysis::{cvecs_equal, has_counterexample_check, CanonicalForm, random_term_from_type}, ast::{Type, Equation, Prop, matches_subpattern, is_var}, goal_graph::{GoalGraph, GoalIndex, GoalNodeStatus}, config::CONFIG};
+use crate::{goal::{LemmaProofState, Outcome, LemmasState, Timer, Goal, GlobalSearchState, INVALID_LEMMA}, analysis::{CanonicalForm, random_term_from_type_max_depth}, ast::{Type, Equation, Prop}, goal_graph::{GoalGraph, GoalIndex, GoalNodeStatus}, config::CONFIG};
 
 const HOLE_VAR_PREFIX: &str = "var_";
 const HOLE_PATTERN_PREFIX: &str = "?";
@@ -898,7 +898,7 @@ impl LemmaTreeNode {
     for _ in 0..CONFIG.cvec_size {
       let rand_subst = self.pattern.holes.iter().chain(self.pattern.locked_holes.iter())
         .map(|(hole, ty, _)| {
-          let rand_sexp = random_term_from_type(ty, global_search_state.env, global_search_state.context, CONFIG.cvec_term_max_depth);
+          let rand_sexp = random_term_from_type_max_depth(ty, global_search_state.env, global_search_state.context, CONFIG.cvec_term_max_depth);
           (*hole, sexp_to_pattern(&rand_sexp))
       }).collect();
       let mut rand_subst_lhs = self.pattern.lhs.subst_holes(&rand_subst).0;

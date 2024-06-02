@@ -17,13 +17,22 @@ use symbolic_expressions::Sexp;
 // evaluation code and use an e-graph to evaluate the terms. This allows us to
 // store them compactly, too.
 
-pub fn random_term_from_type(
+pub fn random_term_from_type_max_depth(
   ty: &Type,
   env: &Env,
   ctx: &Context,
   max_depth: usize,
 ) -> Sexp {
-  random_term_from_type_with_weight::<usize>(ty, env, ctx, max_depth, &BTreeMap::default())
+  random_term_from_type_with_weight_max_depth::<usize>(ty, env, ctx, max_depth, &BTreeMap::default())
+}
+
+pub fn random_term_from_type_max_size(
+  ty: &Type,
+  env: &Env,
+  ctx: &Context,
+  max_size: usize,
+) -> Sexp {
+  random_term_from_type_with_weight_max_size::<usize>(ty, env, ctx, max_size, &BTreeMap::default())
 }
 
 /// Generates random terms that are up to `max_depth` deep. Constructors are depth 0.
@@ -38,7 +47,7 @@ pub fn random_term_from_type(
 /// terms with depth bigger than `max_depth`, but I suspect that this will not be
 /// much of an issue. If it is, then we will need to precompute the `has_base_case`
 /// check for all types and figure out the minimum depth for each type.
-pub fn random_term_from_type_with_weight<W>(
+pub fn random_term_from_type_with_weight_max_depth<W>(
   ty: &Type,
   env: &Env,
   ctx: &Context,
@@ -92,7 +101,81 @@ where
       // We do a saturating subtraction here because max_depth could be 0 if
       // there are no base cases. This is why the max depth might end up
       // greater in a pathological case.
-      random_term_from_type_with_weight(&resolved_arg, env, ctx, max_depth.saturating_sub(1), constructor_weights)
+      random_term_from_type_with_weight_max_depth(&resolved_arg, env, ctx, max_depth.saturating_sub(1), constructor_weights)
+    }).collect();
+
+    children.insert(0, Sexp::String(con.to_string()));
+    return Sexp::List(children);
+  }
+}
+
+/// Generates random terms that have an AST size of at most `max_size`.
+///
+/// Terms are not guaranteed to be smaller than `max_size`, but we make a best
+/// effort to ensure it.
+///
+/// Takes the same arguments as random_term_from_type_with_weight_max_depth.
+pub fn random_term_from_type_with_weight_max_size<W>(
+  ty: &Type,
+  env: &Env,
+  ctx: &Context,
+  max_size: usize,
+  constructor_weights: &BTreeMap<String, WeightedIndex<W>>,
+) -> Sexp
+where
+  W: SampleUniform + PartialOrd,
+{
+  let (dt_name, arg_types) = ty.datatype().unwrap();
+  let (vars, cons) = env.get(&Symbol::from_str(dt_name).unwrap()).or_else(|| {
+    // this should be a type variable we can't look up
+    assert!(dt_name.starts_with(char::is_lowercase));
+    env.get(&Symbol::from_str(&mangle_name("Bool")).unwrap())
+  }).unwrap();
+  let type_var_map: SSubst = zip(vars.iter().cloned(), arg_types.iter().map(|arg_type| arg_type.repr.clone())).collect();
+
+  // Has any base cases (terms that are not obviously recursive)? This could be
+  // precomputed to speed things up.
+  let is_base_case = |dt_name: &String, args: &Vec<Type>| -> bool {
+    args.iter().all(|name| {!name.to_string().contains(dt_name)})
+  } ;
+  let has_base_case = cons.iter().any(|con| {
+    let con_ty = ctx.get(con).unwrap();
+    let (args, _ret) = con_ty.args_ret();
+    is_base_case(dt_name, &args)
+  });
+
+  let mut rng = thread_rng();
+
+  let weights_opt = constructor_weights.get(dt_name);
+
+  loop {
+    let ind = random_constructor_index(weights_opt, cons.len(), &mut rng);
+    let con = cons[ind];
+    let con_ty = ctx.get(&con).unwrap();
+    let (args, _ret) = con_ty.args_ret();
+    // If all of the other cases are too big and there is a base case to reach
+    // and we haven't reached one, keep going.
+    //
+    // NOTE: I think there is the possibility for infinite loops here if the
+    // weights are wrong (e.g. base cases all have 0 weights).
+    if args.len() > (max_size - 1) && has_base_case && !is_base_case(dt_name, &args) {
+      continue;
+    }
+
+    if args.len() == 0 {
+      return Sexp::String(con.to_string());
+    }
+    // Divide up the remaining size randomly. We subtract 1 to account for the
+    // size of the constructor.
+    let child_sizes = split_randomly(max_size - 1, args.len(), &mut rng);
+    let mut children: Vec<Sexp> = args.iter().zip(child_sizes.into_iter()).map(|(arg, child_size)| {
+      // Substitute over the type. This could be more efficient if we skipped
+      // when the type_var_map is empty.
+      let resolved_arg = Type::new(resolve_sexp(&arg.repr, &type_var_map));
+      // We do a saturating subtraction here because max_depth could be 0 if
+      // there are no base cases. This is why the max depth might end up
+      // greater in a pathological case.
+      random_term_from_type_with_weight_max_size(&resolved_arg, env, ctx, child_size, constructor_weights)
     }).collect();
 
     children.insert(0, Sexp::String(con.to_string()));
@@ -113,6 +196,32 @@ where
   })
 }
 
+fn split_randomly<R>(n: usize, num_parts: usize, rng: &mut R) -> Vec<usize>
+where
+  R: Rng
+{
+  if num_parts == 0 || num_parts > n {
+    panic!("impossible to split {} into {} parts", n, num_parts);
+  }
+
+  let mut parts = vec![0; num_parts];
+
+  // Generate random cut points
+  let mut cut_points: Vec<usize> = (1..n).collect();
+  cut_points.shuffle(rng);
+  cut_points.truncate(num_parts - 1);
+  cut_points.sort_unstable();
+
+  let mut prev_cut = 0;
+  for (i, cut) in cut_points.into_iter().enumerate() {
+    parts[i] = cut - prev_cut;
+    prev_cut = cut;
+  }
+  parts[num_parts - 1] = n - prev_cut;
+
+  parts
+}
+
 /// Our normal cvec analysis uses a single egraph to do its checks, as well as
 /// caches random values. This is a function that naively generates a new egraph
 /// and random terms each time it checks.
@@ -122,7 +231,7 @@ where
 pub fn has_counterexample_check(prop: &Prop, env: &Env, ctx: &Context, reductions: &Vec<Rewrite<SymbolLang, ()>>) -> bool {
   for _ in 0..CONFIG.cvec_size {
     let substs: Vec<(Sexp, Sexp)> = prop.params.iter().map(|(param, ty)| {
-      let rand_sexp = random_term_from_type(ty, env, ctx, CONFIG.cvec_term_max_depth);
+      let rand_sexp = random_term_from_type_max_depth(ty, env, ctx, CONFIG.cvec_term_max_depth);
       (Sexp::String(param.to_string()), rand_sexp)
     }).collect();
     let rand_inst_lhs_sexp = substitute_sexp_map(&prop.eq.lhs, &substs);
@@ -240,7 +349,7 @@ impl CvecAnalysis {
       loop {
         try_number += 1;
         // For now, we don't pass weights in
-        let new_sexp = random_term_from_type(ty, env, ctx, self.term_max_depth);
+        let new_sexp = random_term_from_type_max_depth(ty, env, ctx, self.term_max_depth);
         let new_term = new_sexp.to_string().parse().unwrap();
         let new_id = self.cvec_egraph.borrow_mut().add_expr(&new_term);
         // If we haven't generated this already or we're out of tries,
