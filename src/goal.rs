@@ -1,5 +1,5 @@
 use crate::goal_graph::{GoalGraph, GoalIndex, GoalNode, GoalNodeStatus};
-use crate::lemma_tree::{LemmaTreeNode, ClassMatch, LemmaPattern, LemmaStatus};
+use crate::lemma_tree::{LemmaTreeNode, ClassMatch, LemmaPattern, LemmaStatus, FnDefs};
 use colored::Colorize;
 use egg::*;
 use itertools::Itertools;
@@ -502,12 +502,13 @@ pub struct GlobalSearchState<'a> {
   /// Searchers for whether the LHS and RHS of some rewrite appears in our
   /// e-graph.
   pub searchers: &'a Vec<ConditionalSearcher<Pattern<SymbolLang>, Pattern<SymbolLang>>>,
+  /// Definitions used for evaluating cvecs
+  pub defs_for_eval: &'a FnDefs,
 }
 
 impl<'a> GlobalSearchState<'a> {
-  pub fn new(env: &'a Env, context: &'a Context, reductions: &'a Vec<Rw>, cvec_reductions: &'a Vec<CvecRw>, defns: &'a Defns, searchers: &'a Vec<ConditionalSearcher<Pattern<SymbolLang>, Pattern<SymbolLang>>>) -> Self { Self { env, context, reductions, cvec_reductions, defns, searchers } }
+    pub fn new(env: &'a Env, context: &'a Context, reductions: &'a Vec<Rw>, cvec_reductions: &'a Vec<CvecRw>, defns: &'a Defns, searchers: &'a Vec<ConditionalSearcher<Pattern<SymbolLang>, Pattern<SymbolLang>>>, defs_for_eval: &'a FnDefs) -> Self { Self { env, context, reductions, cvec_reductions, defns, searchers, defs_for_eval } }
 }
-
 
 
 fn rewrite_expr(expr: &Equation, name: &String, term: &Sexp) -> Equation {
@@ -1747,6 +1748,11 @@ impl<'a> Goal<'a> {
         let class_1_type = class_1_type.unwrap();
         let class_2_type = class_2_type.unwrap();
 
+        // Cannot theorize lemmas about arrows
+        if class_1_type.is_arrow() || class_1_type.is_arrow() {
+          continue;
+        }
+
         // FIXME: types should be interned, like strings. This comparison
         // probably happens a lot.
         if class_1_type != class_2_type {
@@ -2964,7 +2970,17 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
   type LemmaIndex = usize;
 
   fn next_lemma_batch<'a>(&mut self, _top_level_lemma_number: usize, proof_state: &mut ProofState<'a>) -> Result<Vec<Self::LemmaIndex>, Outcome> {
+    // println!("getting frontier");
     let frontier = self.goal_graph.get_frontier_goals();
+    // In an edge case, we prove the top-level lemma and exit early from
+    // get_frontier_goals to avoid hitting a cycle. So we need to handle this
+    // case separately.
+    if self.goal_graph.is_lemma_proven(0) {
+      // It says "Err" here but only because Rust doesn't have a nice Either
+      // type.
+      return Err(Outcome::Valid);
+    }
+    // println!("got frontier");
 
     /*println!("frontier");
     for goal in frontier.iter() {
@@ -3029,11 +3045,6 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
       // println!("{} {:?}", "already result".green(), lemma_state.outcome);
       assert_eq!(lemma_state.outcome, Some(Outcome::Invalid));
       self.goal_graph.record_lemma_result(info.lemma_id, GoalNodeStatus::Invalid);
-      // FIXME: this is a hack to record the outcome to the lemma trees.
-      // We really should probably fold the trees into the lemma state.
-      self.lemma_trees.values_mut().for_each(|lemma_tree| {
-        lemma_tree.record_lemma_result(lemma_index, LemmaStatus::Invalid);
-      });
       return;
     }
 
@@ -3041,11 +3052,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
     if proof_state.lemmas_state.proven_lemmas.contains_leq(&lemma_state.prop) {
         lemma_state.outcome = Some(Outcome::Valid);
         self.goal_graph.record_lemma_result(info.lemma_id, GoalNodeStatus::Valid);
-        // FIXME: this is a hack to record the outcome to the lemma trees.
-        // We really should probably fold the trees into the lemma state.
-        self.lemma_trees.values_mut().for_each(|lemma_tree| {
-          lemma_tree.record_lemma_result(lemma_index, LemmaStatus::Valid);
-        });
+        proof_state.lemmas_state.proven_lemma_ids.insert(info.lemma_id);
       return;
     }
 
@@ -3071,17 +3078,6 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
         }
       }
       self.insert_waiting(&info, related_lemmas, related_goals, proof_state);
-      let outcome = &proof_state.lemma_proofs.get(&lemma_index).unwrap().outcome;
-      let lemma_status = match outcome {
-        Some(Outcome::Invalid) => LemmaStatus::Invalid,
-        Some(Outcome::Valid)   => LemmaStatus::Valid,
-        Some(Outcome::Unknown) | Some(Outcome::Timeout) | None => LemmaStatus::Inconclusive,
-      };
-      // FIXME: this is a hack to record the outcome to the lemma trees.
-      // We really should probably fold the trees into the lemma state.
-      self.lemma_trees.values_mut().for_each(|lemma_tree| {
-        lemma_tree.record_lemma_result(lemma_index, lemma_status);
-      });
     } else {
       if lemma_proof_state.outcome.is_none() {
         self.goal_graph.record_goal_result(&info, GoalNodeStatus::Valid);
@@ -3095,16 +3091,6 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
         println!("new lemma {}", state.prop);
       }
       let outcome = &proof_state.lemma_proofs.get(&lemma_index).unwrap().outcome;
-      let lemma_status = match outcome {
-        Some(Outcome::Invalid) => LemmaStatus::Invalid,
-        Some(Outcome::Valid)   => LemmaStatus::Valid,
-        Some(Outcome::Unknown) | Some(Outcome::Timeout) | None => LemmaStatus::Inconclusive,
-      };
-      // FIXME: this is a hack to record the outcome to the lemma trees.
-      // We really should probably fold the trees into the lemma state.
-      self.lemma_trees.values_mut().for_each(|lemma_tree| {
-        lemma_tree.record_lemma_result(lemma_index, lemma_status);
-      });
       self.is_found_new_lemma = true;
       if outcome == &Some(Outcome::Valid) {
         self.goal_graph.record_lemma_result(info.lemma_id, GoalNodeStatus::Valid);
@@ -3115,6 +3101,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
   }
 
   fn on_proven_lemma<'a>(&mut self, _lemma: usize, proof_state: &mut ProofState<'a>) {
+    proof_state.lemmas_state.proven_lemma_ids.insert(_lemma);
     let mut new_lemma = HashSet::new();
     new_lemma.insert(_lemma);
 
@@ -3123,14 +3110,20 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
         return;
       }
       // println!("trying to prove additional lemmas...");
-      // self.goal_graph.update_proven_lemmas();
-      // self.goal_graph.relink_related_lemmas();
       let proved_goals: Vec<_> = self.goal_graph.get_waiting_goals(Some(&new_lemma)).into_iter().filter(
         |info| {
           let state = proof_state.lemma_proofs.get_mut(&info.lemma_id).unwrap();
           state.try_finish(info.name, &mut proof_state.lemmas_state)
         }
       ).collect();
+
+      // In an edge case, we prove the top-level lemma and exit early from
+      // get_waiting_goals to avoid hitting a cycle. So we need to handle this
+      // case separately.
+      if self.goal_graph.is_lemma_proven(0) {
+        proof_state.lemma_proofs.get_mut(&0).unwrap().outcome = Some(Outcome::Valid);
+        return;
+      }
 
       new_lemma.clear();
 
@@ -3152,8 +3145,8 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
         }
       }
     }
-    // println!("done");
 
+    // println!("done");
     // self.re_extract_lemmas(proof_state);
   }
 }

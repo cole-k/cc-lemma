@@ -1,11 +1,11 @@
 use serde::{Serialize, Serializer, ser::{SerializeStruct, SerializeSeq}};
-use std::{collections::{BTreeMap, BTreeSet, VecDeque, HashMap, HashSet}, borrow::Borrow, str::FromStr};
+use std::{collections::{BTreeMap, BTreeSet, VecDeque, HashMap, HashSet}, borrow::Borrow, str::FromStr, time::Instant};
 
 use egg::{Symbol, Id, Pattern, SymbolLang, Subst, Searcher, Var};
 use itertools::{iproduct, Itertools};
 use symbolic_expressions::Sexp;
 
-use crate::{goal::{Eg, LemmaProofState, Outcome, LemmasState, Timer, Goal, GlobalSearchState, INVALID_LEMMA}, analysis::{cvecs_equal, has_counterexample_check, CanonicalForm}, ast::{Type, Equation, Prop, matches_subpattern, is_var}, goal_graph::{GoalGraph, GoalIndex, GoalNodeStatus}, config::CONFIG};
+use crate::{goal::{Eg, LemmaProofState, Outcome, LemmasState, Timer, Goal, GlobalSearchState, INVALID_LEMMA}, analysis::{cvecs_equal, has_counterexample_check, CanonicalForm, random_term_from_type}, ast::{Type, Equation, Prop, matches_subpattern, is_var}, goal_graph::{GoalGraph, GoalIndex, GoalNodeStatus}, config::CONFIG};
 
 const HOLE_VAR_PREFIX: &str = "var_";
 const HOLE_PATTERN_PREFIX: &str = "?";
@@ -18,7 +18,7 @@ type GoalName = Symbol;
 ///
 /// However, when we make patterns containing holes into [`Sexp`]s to be used in
 /// [`Prop`]s, we render them as `var_0`, `var_1`, etc.
-type HoleIdx  = usize;
+type HoleIdx  = Symbol;
 
 /// A pattern that corresponds to one side of a lemma. We draw inspiration from
 /// Stitch's patterns.
@@ -32,7 +32,7 @@ type HoleIdx  = usize;
 /// TODO: The representation could probably be made more efficient by use of
 /// mutable references, etc.
 #[derive(PartialEq, Eq, Clone)]
-enum PatternWithHoles {
+pub enum PatternWithHoles {
   /// A hole to be filled in eventually with another PatternWithHoles.
   Hole(HoleIdx),
   /// These are akin to the Nodes in SymbolLang.
@@ -113,7 +113,118 @@ impl Serialize for LemmaPattern {
   }
 }
 
+/// Receives args and result of a function as s-expressions and converts them to PatternWithHoles
+pub fn parse_fn_defn(args: &Vec<Sexp>, to: &Sexp) -> (Vec<PatternWithHoles>, PatternWithHoles) {
+  return (args.iter().map(sexp_to_pattern).collect_vec(), sexp_to_pattern(to));
+}
+
+/// Converts a Sexp to a PatternWithHoles
+fn sexp_to_pattern(from: &Sexp) -> PatternWithHoles {
+  match from {
+    Sexp::Empty => {
+      todo!("can't happen");
+    }
+    Sexp::String(s) => {
+      if s.starts_with("?") {
+        return PatternWithHoles::Hole(Symbol::from(s.to_string().clone()));
+      }
+      return PatternWithHoles::Node(Symbol::from(s), vec![]);
+    }
+    Sexp::List(args) => {
+      let mut new_args = vec![];
+      for arg in args[1..].into_iter() {
+        new_args.push(Box::new(sexp_to_pattern(arg)));
+      }
+      return PatternWithHoles::Node(Symbol::from(args[0].string().unwrap()), new_args);
+    }
+  }
+}
+
+/// Maps from a function's name to each separate definition.
+///
+/// Each definition consists of a list of arguments that must match as well as a
+/// substitution.
+pub type FnDefs = HashMap<Symbol, Vec<(Vec<PatternWithHoles>, PatternWithHoles)>>;
+
 impl PatternWithHoles {
+  /// Finds the values we need to instantiate all holes to so self matches actual
+  fn find_instantiations(&self, actual: &PatternWithHoles) -> Option<HashMap<HoleIdx, PatternWithHoles>> {
+    let mut instantiations = HashMap::new();
+    let successful_instantiation = self.find_instantiations_helper(&actual, &mut instantiations);
+    if successful_instantiation {
+      Some(instantiations)
+    } else {
+      // The instantiations are bogus/partial if it is not successful
+      None
+    }
+  }
+
+  fn find_instantiations_helper(&self, actual: &PatternWithHoles, instantiations_map: &mut HashMap<HoleIdx, PatternWithHoles>) -> bool {
+    match (&self, actual) {
+      (PatternWithHoles::Hole(hole_idx), _) => {
+        // This pattern is just a hole that needs to be filled with actual
+        let instantiation = actual.clone();
+        if let Some(existing_instantiation) = instantiations_map.get(hole_idx) {
+          // Past instantiations must agree
+          &instantiation == existing_instantiation
+        } else {
+          instantiations_map.insert(hole_idx.clone(), instantiation);
+          true
+        }
+      }
+      (PatternWithHoles::Node(_, _), PatternWithHoles::Hole(_)) => {
+        // Can't possibly match
+        false
+      }
+      (PatternWithHoles::Node(name_self, args_self), PatternWithHoles::Node(name_actual, args_actual)) => {
+        // Go over the args of both patterns and instantiate each arg
+        if args_self.len() != args_actual.len() || name_self != name_actual {
+          return false;
+        }
+        // Call this function for each arg in the pattern (with the corresponding arg from actual)
+        args_self
+            .iter()
+            .zip(args_actual.iter())
+            .all(|(arg_self, arg_actual)| {
+              arg_self.find_instantiations_helper(arg_actual, instantiations_map)
+            })
+      }
+    }
+  }
+
+  /// Receives function definitions and evaluates the pattern according to them,
+  /// mutating the current pattern in the process.
+  pub fn eval(&mut self, fn_defs: &FnDefs) {
+    match self {
+      // Cannot eval a hole
+      Self::Hole(_) => {},
+      Self::Node(name, actual_args) => {
+        // First recursively evaluate all arguments.
+        actual_args.iter_mut().for_each(|actual_arg| actual_arg.eval(fn_defs));
+        // Then recursively evaluate the current if it is a function.
+        //
+        // NOTE: We assume that if it's not defined then it must be a
+        // constructor (i.e. not in need of evaluation).
+        if let Some(defs) = fn_defs.get(name) {
+          for (def_args, def_rhs) in defs {
+            let mut instantiations_map = HashMap::new();
+            // Try to match all of the args against the actuals (mutating the map
+            // in the process)
+            if def_args.iter().zip(actual_args.iter()).all(|(def_arg, actual_arg)| {
+              def_arg.find_instantiations_helper(actual_arg, &mut instantiations_map)
+            }) {
+              // If they all match, then perfrom the subst
+              *self = def_rhs.subst_holes(&instantiations_map).0;
+              // Continue evaluating
+              self.eval(fn_defs);
+              return;
+            }
+          }
+        }
+      }
+    }
+  }
+
   /// Is it a leaf (either a Hole or a Node without arguments)?
   fn is_leaf(&self) -> bool {
     match self {
@@ -161,6 +272,28 @@ impl PatternWithHoles {
         (new_pat, holes_filled)
       }
     }
+  }
+
+  fn subst_holes(&self, subst: &HashMap<HoleIdx, PatternWithHoles>) -> (PatternWithHoles, usize) {
+    match &self {
+      PatternWithHoles::Hole(h) => {
+        if let Some(new) = subst.get(&h) {
+          (new.clone(), 1)
+        } else {
+          (self.clone(), 0)
+        }
+      }
+      PatternWithHoles::Node(op, args) => {
+        let mut holes_filled = 0;
+        let new_pat = PatternWithHoles::Node(*op, args.iter().map(|arg| {
+          let (new_arg, arg_holes_filled) = arg.subst_holes(subst);
+          holes_filled += arg_holes_filled;
+          Box::new(new_arg)
+        }).collect());
+        (new_pat, holes_filled)
+      }
+    }
+
   }
 
   /// Returns all holes in the Pattern
@@ -236,8 +369,8 @@ impl LemmaPattern {
 
   /// The root pattern of type `ty`; its LHS and RHS are unconstrained.
   pub fn empty_pattern(ty: Type) -> LemmaPattern {
-    let hole_0 = 0;
-    let hole_1 = 1;
+    let hole_0 = Symbol::new("0");
+    let hole_1 = Symbol::new("1");
 
     LemmaPattern {
       lhs: PatternWithHoles::Hole(hole_0),
@@ -282,7 +415,7 @@ impl LemmaPattern {
       .enumerate()
       .map(|(arg_idx, arg_ty)| {
         let new_hole = self.next_hole_idx + arg_idx;
-        (new_hole, arg_ty, side.clone())
+        (Symbol::new(format!("{}", new_hole)), arg_ty, side.clone())
       }).collect();
     let next_hole_idx = self.next_hole_idx + num_args;
     let new_pattern = PatternWithHoles::Node(node, new_holes.iter().map(|(hole, _, _)| {
@@ -376,8 +509,8 @@ impl LemmaPattern {
   }
 
   fn is_consistent(&self) -> bool {
-    let pattern_holes: BTreeSet<usize> = self.lhs.holes().union(&self.rhs.holes()).cloned().collect();
-    let all_holes: BTreeSet<usize> = self.holes.iter().chain(self.locked_holes.iter()).map(|(hole, _, _)| {
+    let pattern_holes: BTreeSet<HoleIdx> = self.lhs.holes().union(&self.rhs.holes()).cloned().collect();
+    let all_holes: BTreeSet<HoleIdx> = self.holes.iter().chain(self.locked_holes.iter()).map(|(hole, _, _)| {
       *hole
     }).collect();
     pattern_holes.is_subset(&all_holes) && all_holes.is_subset(&pattern_holes)
@@ -473,8 +606,8 @@ impl ClassMatch {
   /// lhs is the pattern ?0 and rhs is the pattern ?1).
   pub fn top_match(origin: GoalIndex, lhs: Id, rhs: Id, cvecs_equal: bool) -> Self {
     let mut subst = BTreeMap::default();
-    subst.insert(0, (lhs, BTreeMap::default()));
-    subst.insert(1, (rhs, BTreeMap::default()));
+    subst.insert(Symbol::new("0"), (lhs, BTreeMap::default()));
+    subst.insert(Symbol::new("1"), (rhs, BTreeMap::default()));
     Self {
       origin,
       lhs,
@@ -590,6 +723,7 @@ pub enum LemmaStatus {
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Serialize)]
 struct LemmaTreeEdge {
+  #[serde(serialize_with = "crate::utils::serialize_symbol")]
   hole: HoleIdx,
   filled_with: FilledWith,
 }
@@ -721,20 +855,25 @@ impl LemmaTreeNode {
     // FIXME: Figure out a better heuristic for invalidating intermediate lemmas
     // that are too general.
     let mut num_free_vars = 0;
-    pattern.holes.iter().chain(pattern.locked_holes.iter()).for_each(|(_hole, _ty, side)| {
+    let mut has_arrow = false;
+    pattern.holes.iter().chain(pattern.locked_holes.iter()).for_each(|(_hole, ty, side)| {
       if side != &Side::Both {
         num_free_vars += 1;
       }
+      if ty.is_arrow() {
+        has_arrow = true;
+      }
     });
     let lemma_status = if pattern.has_simpler_lemma() {
-      // FIXME: At the very least this should be a different enum.
-      //
       // HACK: if there is a simpler lemma, we will declare this pattern dead and not try it.
       Some(LemmaStatus::Dead)
+    } else if has_arrow {
+      Some(LemmaStatus::Dead)
     } else if num_free_vars > CONFIG.num_free_vars_allowed {
-      Some(LemmaStatus::Invalid)
-    // } else if !pattern.holes.is_empty() {
-    //   Some(LemmaStatus::Invalid)
+    Some(LemmaStatus::Invalid)
+    // // } else if !pattern.holes.is_empty() {
+    // //   Some(LemmaStatus::Invalid)
+    // NOTE: We don't know how to do a counterexample check for arrows.
     } else {
       None
     };
@@ -751,6 +890,30 @@ impl LemmaTreeNode {
       children: BTreeMap::default(),
       first_match,
     }
+  }
+
+  fn has_counterexample(&self, global_search_state: &GlobalSearchState) -> bool {
+    // println!("{}", self.pattern);
+    // let start_time = Instant::now();
+    for _ in 0..CONFIG.cvec_size {
+      let rand_subst = self.pattern.holes.iter().chain(self.pattern.locked_holes.iter())
+        .map(|(hole, ty, _)| {
+          let rand_sexp = random_term_from_type(ty, global_search_state.env, global_search_state.context, CONFIG.cvec_term_max_depth);
+          (*hole, sexp_to_pattern(&rand_sexp))
+      }).collect();
+      let mut rand_subst_lhs = self.pattern.lhs.subst_holes(&rand_subst).0;
+      rand_subst_lhs.eval(global_search_state.defs_for_eval);
+      let mut rand_subst_rhs = self.pattern.rhs.subst_holes(&rand_subst).0;
+      rand_subst_rhs.eval(global_search_state.defs_for_eval);
+      if rand_subst_lhs != rand_subst_rhs {
+        // let end_time = Instant::now();
+        // println!("{}us to find counterexample", (end_time - start_time).as_micros());
+        return true;
+      }
+    }
+    // let end_time = Instant::now();
+    // println!("{}us to fail to find counterexample", (end_time - start_time).as_micros());
+    false
   }
 
   /// Attempts to propagate the match, returning the number of new
@@ -868,7 +1031,7 @@ impl LemmaTreeNode {
         let mut lemma_node = LemmaTreeNode::from_pattern(pattern, INVALID_LEMMA, self.goal_index.lemma_size, new_match.clone());
         if lemma_node.lemma_status.is_none() {
           // assert_eq!(is_generalized, new_match.num_generalizations > 0);
-          if is_generalized && has_counterexample_check(&lemma, goal.global_search_state.env, goal.global_search_state.context, goal.global_search_state.cvec_reductions) {
+          if is_generalized && lemma_node.has_counterexample(&goal.global_search_state) {
             lemma_node.lemma_status = Some(LemmaStatus::Invalid);
           } else {
             let lemma_idx = lemmas_state.find_or_make_fresh_lemma(lemma.clone(), 0);
@@ -975,7 +1138,7 @@ impl LemmaTreeNode {
         new_prev_classes.entry(*class).and_modify(|count| {
           *count += 1;
         }).or_insert(1);
-        new_match.subst.insert(new_hole, (*child_eclass, new_prev_classes));
+        new_match.subst.insert(Symbol::new(&format!("{}", new_hole)), (*child_eclass, new_prev_classes));
       });
       if let Some(child_node) = self.children.get_mut(&edge) {
         propagate_result.merge(child_node.add_match(timer, new_match, lemmas_state, goal_graph, lemma_proofs));
@@ -1003,7 +1166,7 @@ impl LemmaTreeNode {
           });
           if lemma_node.lemma_status.is_none() {
             // assert_eq!(is_generalized, new_match.num_generalizations > 0);
-            if is_generalized && has_counterexample_check(&lemma, goal.global_search_state.env, goal.global_search_state.context, goal.global_search_state.cvec_reductions) {
+            if is_generalized && lemma_node.has_counterexample(&goal.global_search_state) {
               lemma_node.lemma_status = Some(LemmaStatus::Invalid);
             } else {
               let lemma_idx = lemmas_state.find_or_make_fresh_lemma(lemma.clone(), 0);
@@ -1060,6 +1223,8 @@ impl LemmaTreeNode {
     if timer.timeout() {
       return propagate_result;
     }
+    // We will lazily update the status of this node based on the proof state.
+    self.update_lemma_status(lemma_proofs);
     // Once a lemma is proven (and therefore no longer active), don't propagate
     // its matches.
     if goal_graph.goal_map[&m.origin.name].as_ref().borrow().status != GoalNodeStatus::Unknown || lemmas_state.proven_goal_names.contains(&m.origin.name) || lemmas_state.proven_lemma_ids.contains(&m.origin.lemma_id) {
@@ -1124,6 +1289,8 @@ impl LemmaTreeNode {
     if timer.timeout() {
       return vec!()
     }
+    // We will lazily update the status of this node based on the proof state.
+    self.update_lemma_status(lemma_proofs);
     match self.lemma_status {
       // We haven't tried this lemma yet
       None => {
@@ -1217,5 +1384,26 @@ impl LemmaTreeNode {
     self.current_matches.clear();
     // Do the same for all children.
     self.children.clear();
+  }
+
+  fn update_lemma_status<'a>(&mut self, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) {
+    if let Some(proof_state) = lemma_proofs.get(&self.lemma_idx) {
+      self.lemma_status = proof_state.outcome.as_ref().map(|outcome| {
+        match outcome {
+          Outcome::Valid => {
+            assert!(self.lemma_status != Some(LemmaStatus::Invalid));
+            LemmaStatus::Valid
+          }
+          Outcome::Invalid => {
+            assert!(self.lemma_status != Some(LemmaStatus::Valid));
+            LemmaStatus::Invalid
+          }
+          Outcome::Timeout | Outcome::Unknown => {
+            assert!(self.lemma_status.is_none() || self.lemma_status == Some(LemmaStatus::Inconclusive));
+            LemmaStatus::Inconclusive
+          }
+        }
+      });
+    }
   }
 }
