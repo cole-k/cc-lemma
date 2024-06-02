@@ -371,8 +371,8 @@ impl GoalGraph {
         }
     }
 
-    pub fn add_bid_lemma(&mut self, lhs: Sexp, rhs: Sexp) {
-        println!("New bid lemma {} <=> {}", lhs, rhs);
+    pub fn add_bidir_lemma(&mut self, lhs: Sexp, rhs: Sexp) {
+        // println!("New bid lemma {} <=> {}", lhs, rhs);
         let id = self.lemma_rewrites.len();
         let lhs: Pattern<_> = lhs.to_string().parse().unwrap();
         let rhs: Pattern<_> = rhs.to_string().parse().unwrap();
@@ -392,13 +392,33 @@ impl GoalGraph {
                 // println!("try proven lemmas {} <=> {}", lemma.root.borrow().full_exp.lhs, lemma.root.borrow().full_exp.rhs);
                 let (left_vars, left_pattern) = build_pattern(&lemma.root.borrow().full_exp.lhs);
                 let (right_vars, right_pattern) = build_pattern(&lemma.root.borrow().full_exp.rhs);
+                // We only will use bidirectional lemmas to shrink our candidate
+                // lemma set. It is unsound to use unidirectional lemmas.
+                //
+                // A simple example: suppose you prove the lemma a => b that is unidirectional.
+                //
+                // If you have candidates
+                //
+                // a = c
+                // b = c
+                //
+                // Our analysis will use this unidirectional lemma to observe
+                // that these candidates are the same and pick one of the two
+                // arbitrarily.
+                //
+                // However, we only know for sure that under the lemma a => b, a
+                // = c implies b = c. We don't know the opposite direction holes
+                // because we don't have the lemma b => a.
+                //
+                // Ideally, we would somehow track which lemma we can eliminate
+                // (perhaps via an e-class analysis), but we don't yet.
                 if left_vars == right_vars {
                     new_rewrites.push((left_pattern, right_pattern));
                 }
             }
         }
         for (left, right) in new_rewrites.into_iter() {
-            self.add_bid_lemma(left, right);
+            self.add_bidir_lemma(left, right);
         }
     }
 }
