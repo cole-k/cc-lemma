@@ -1,5 +1,7 @@
 use crate::ast::{Context, Env, Type, SSubst, resolve_sexp, Expr, is_constructor, is_var, mangle_name, Prop, substitute_sexp_map};
 use crate::config::CONFIG;
+use crate::goal::GlobalSearchState;
+use crate::lemma_tree::{PatternWithHoles, sexp_to_pattern, FnDefs};
 use egg::*;
 use itertools::{repeat_n, Itertools};
 use rand::{thread_rng, Rng};
@@ -8,6 +10,7 @@ use rand::distributions::weighted::WeightedIndex;
 use rand::distributions::Distribution;
 use rand::seq::SliceRandom;
 use std::cell::RefCell;
+use std::iter::repeat;
 use std::{collections::{BTreeMap, BTreeSet}, iter::zip, str::FromStr};
 use symbolic_expressions::Sexp;
 
@@ -57,12 +60,29 @@ pub fn random_term_from_type_with_weight_max_depth<W>(
 where
   W: SampleUniform + PartialOrd,
 {
-  let (dt_name, arg_types) = ty.datatype().unwrap();
-  let (vars, cons) = env.get(&Symbol::from_str(dt_name).unwrap()).or_else(|| {
-    // this should be a type variable we can't look up
+  let mut rng = thread_rng();
+  // Techncially we will generate the same kind of random value for any arrow we
+  // don't know how to make random terms for.
+  //
+  // It seems vanishingly unlikely that this will cause problems.
+  let mut gen_rand_const = |prefix| {
+    let rand_k = format!("{}{}",prefix,rng.gen_range(0..CONFIG.cvec_num_random_terms_per_type));
+    Sexp::String(rand_k)
+  };
+  let dt_res = ty.datatype();
+  if dt_res.is_err() {
+    // Generate a random constant for arrows since we don't know how to generate
+    // things of type arrow.
+    return gen_rand_const("arr");
+  }
+  let (dt_name, arg_types) = dt_res.unwrap();
+  let dt_symb = Symbol::new(dt_name);
+  if !env.contains_key(&dt_symb) {
+    // This must be a type variable
     assert!(dt_name.starts_with(char::is_lowercase));
-    env.get(&Symbol::from_str(&mangle_name("Bool")).unwrap())
-  }).unwrap();
+    return gen_rand_const(dt_name);
+  }
+  let (vars, cons) = env.get(&dt_symb).unwrap();
   let type_var_map: SSubst = zip(vars.iter().cloned(), arg_types.iter().map(|arg_type| arg_type.repr.clone())).collect();
 
   // Has any base cases (depth 0 terms)? This could be precomputed to speed
@@ -75,8 +95,6 @@ where
     let (args, _ret) = con_ty.args_ret();
     is_base_case(dt_name, &args)
   });
-
-  let mut rng = thread_rng();
 
   let weights_opt = constructor_weights.get(dt_name);
 
@@ -125,6 +143,7 @@ pub fn random_term_from_type_with_weight_max_size<W>(
 where
   W: SampleUniform + PartialOrd,
 {
+  todo!("incorporate random gen from max_depth version");
   let (dt_name, arg_types) = ty.datatype().unwrap();
   let (vars, cons) = env.get(&Symbol::from_str(dt_name).unwrap()).or_else(|| {
     // this should be a type variable we can't look up
@@ -256,7 +275,6 @@ pub fn has_counterexample_check(prop: &Prop, env: &Env, ctx: &Context, reduction
 
 #[derive(Debug, Clone)]
 pub struct CvecAnalysis {
-  pub cvec_egraph: RefCell<EGraph<SymbolLang, ()>>,
   // NOTE: It would help if we could somehow cache the random terms we
   // generate for each type and reuse them when making other types.
   //
@@ -271,7 +289,7 @@ pub struct CvecAnalysis {
   /// instantiate a Cvec for a given variable. Each of these vectors
   /// will be of length `num_random_terms_per_type` and as such may
   /// not have distinct Ids.
-  type_to_random_terms: Vec<(Type, Vec<Id>)>,
+  type_to_random_terms: Vec<(Type, Vec<PatternWithHoles>)>,
   /// Number of terms in the Cvec. This must be less than or equal to
   /// num_random_terms_per_type.
   cvec_size: usize,
@@ -283,32 +301,18 @@ pub struct CvecAnalysis {
   num_rolls: usize,
   /// How many random terms will we generate per type?
   num_random_terms_per_type: usize,
-  pub reductions: Vec<Rewrite<SymbolLang, ()>>,
-  /// This is necessary to avoid infinitely looping when we rebuild the e-graph
-  /// analysis for cycles. We will update analyses that have older timestamps, but
-  /// break the loop when we try to merge analyses with the same timestamp.
+  /// Used so that we can force updates to the contents of this egraph.
   pub current_timestamp: usize,
-  // TODO: Add hashmap from Cvec to Id that we can use to efficiently find
-  // candidate equalities.
-
-  // FIXME: it's an implementation detail that we don't thread the global environment
-  // and contex through to the CvecAnalysis. It's worth doing that so we can make
-  // cvecs variables when they are merged in instead of making their value Stuck until
-  // we can set them manually.
-  //
-  // This will probably allow us to remove the timestamp (almost) entirely
 }
 
 impl Default for CvecAnalysis {
   fn default() -> Self {
     Self {
-      cvec_egraph: RefCell::new(EGraph::new(())),
       type_to_random_terms: Vec::new(),
       cvec_size: CONFIG.cvec_size,
       term_max_depth: CONFIG.cvec_term_max_depth,
       num_rolls: CONFIG.cvec_num_rolls,
       num_random_terms_per_type: CONFIG.cvec_num_random_terms_per_type,
-      reductions: vec!(),
       current_timestamp: 0,
     }
   }
@@ -318,19 +322,17 @@ impl CvecAnalysis {
   pub fn new(cvec_size: usize, term_max_depth: usize, max_tries_to_make_distinct_term: usize, num_random_terms_per_type: usize, reductions: Vec<Rewrite<SymbolLang, ()>>) -> Self {
     assert!(cvec_size < num_random_terms_per_type, "num_random_terms_per_type must be greater than cvec_size");
     Self {
-      cvec_egraph: RefCell::new(EGraph::new(())),
       type_to_random_terms: Vec::new(),
       cvec_size,
       term_max_depth,
       num_rolls: max_tries_to_make_distinct_term,
       num_random_terms_per_type,
-      reductions,
       current_timestamp: 0,
     }
   }
 
   // We have to do this because Sexps aren't orderable or hashable...
-  fn lookup_ty(&self, ty: &Type) -> Option<Vec<Id>> {
+  fn lookup_ty(&self, ty: &Type) -> Option<Vec<PatternWithHoles>> {
     for (other_ty, terms) in self.type_to_random_terms.iter() {
       if ty == other_ty {
         return Some(terms.clone());
@@ -342,98 +344,51 @@ impl CvecAnalysis {
 
   /// Returns a vector of length `num_random_terms`. We try to ensure they're
   /// distinct but there's a chance that they aren't.
-  fn initialize_ty(&mut self, ty: &Type, env: &Env, ctx: &Context) -> Vec<Id> {
-    let mut random_term_ids = Vec::new();
+  fn initialize_ty(&mut self, ty: &Type, global_context: &Context, env: &Env) -> Vec<PatternWithHoles> {
+    let mut random_terms = Vec::new();
     for _ in 0..self.num_random_terms_per_type {
       let mut try_number = 0;
       loop {
         try_number += 1;
         // For now, we don't pass weights in
-        let new_sexp = random_term_from_type_max_depth(ty, env, ctx, self.term_max_depth);
-        let new_term = new_sexp.to_string().parse().unwrap();
-        let new_id = self.cvec_egraph.borrow_mut().add_expr(&new_term);
-        // If we haven't generated this already or we're out of tries,
-        // add the term and break.
-        if !random_term_ids.contains(&new_id) || try_number == self.num_rolls {
-          random_term_ids.push(new_id);
+        let new_sexp = random_term_from_type_max_depth(ty, env, global_context, self.term_max_depth);
+        let new_term = sexp_to_pattern(&new_sexp);
+        if !random_terms.contains(&new_term) || try_number == self.num_rolls {
+          random_terms.push(new_term);
           break;
         }
       }
     }
     // Save these random terms for reuse.
-    self.type_to_random_terms.push((ty.clone(), random_term_ids.clone()));
-    random_term_ids
+    self.type_to_random_terms.push((ty.clone(), random_terms.clone()));
+    random_terms
   }
 
   /// Makes a cvec by picking randomly without repetition from the vector of
   /// random term ids generated for its type.
-  pub fn make_cvec_for_type(&mut self, ty: &Type, env: &Env, ctx: &Context) -> Cvec {
-    let random_terms = self.lookup_ty(ty).unwrap_or_else(|| self.initialize_ty(ty, env, ctx));
+  pub fn make_cvec_for_type(&mut self, ty: &Type, global_context: &Context, env: &Env) -> Cvec {
+    // println!("making cvec for {}", ty);
+    let random_terms = self.lookup_ty(ty).unwrap_or_else(|| self.initialize_ty(ty, global_context, env));
     let mut rng = thread_rng();
-    let cvec = random_terms.choose_multiple(&mut rng, self.cvec_size).map(|id| *id).collect();
-    Cvec::Cvec(cvec)
-
-  }
-
-  pub fn saturate(&mut self) {
-    /*println!("reductions");
-    for rewrite in self.reductions.iter() {
-      println!("  {:?}", rewrite);
-    }*/
-    self.cvec_egraph.replace_with(|egraph|{
-      let runner = Runner::default()
-        .with_egraph(egraph.to_owned())
-          .with_iter_limit(10000000)
-        .run(&self.reductions);
-      runner.egraph
+    let mut terms = Vec::with_capacity(self.cvec_size);
+    random_terms.choose_multiple(&mut rng, self.cvec_size).for_each(|term|{
+      // println!("term: {}", term);
+      terms.push(term.clone());
     });
-  }
-
-}
-
-/// Returns None for incomparable types (contradictions)
-pub fn cvecs_equal(cvec_analysis: &CvecAnalysis, cvec_1: &Cvec, cvec_2: &Cvec) -> Option<bool> {
-  match (cvec_1, cvec_2) {
-    (Cvec::Cvec(cv1), Cvec::Cvec(cv2)) => {
-      Some(zip(cv1.iter(), cv2.iter()).all(|(id1, id2)| {
-        let resolved_id1 = cvec_analysis.cvec_egraph.borrow_mut().find(*id1);
-        let resolved_id2 = cvec_analysis.cvec_egraph.borrow_mut().find(*id2);
-        resolved_id1 == resolved_id2
-      }))
-    }
-    _ => None,
-  }
-
-}
-
-pub fn print_cvec(cvec_analysis: &CvecAnalysis, cvec: &Cvec) {
-  match cvec {
-    Cvec::Cvec(cv1) => {
-      let eg = cvec_analysis.cvec_egraph.borrow();
-      let extractor = Extractor::new(&eg, AstSize);
-      let terms = cv1.iter().map(|cv_id| {
-        extractor.find_best(*cv_id).1.to_string()
-      }).join(",");
-      println!("cvec: {}", terms);
-    }
-    Cvec::Stuck => {
-      println!("Stuck");
+    Cvec {
+      terms,
     }
   }
+
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Cvec {
-  /// Vector of CvecAnalysis.cvec_size Ids corresponding to random terms.
-  ///
-  /// In the base case (when they're assigned to variables), these should
-  /// all be distinct Ids if the type permits it (e.g. Booleans only have
-  /// two distinct values), but once we construct Cvecs recursively there
-  /// is no guarantee of distinct valuations.
-  Cvec(Vec<Id>),
-  /// We don't know how to evaluate this cvec yet (possibly because we haven't
-  /// given information about it)
-  Stuck,
+pub struct Cvec {
+  /// Vector of CvecAnalysis.cvec_size random terms.
+  pub terms: Vec<PatternWithHoles>,
+  // /// We don't know how to evaluate this cvec yet (possibly because we haven't
+  // /// given information about it)
+  // Stuck,
   // /// Cvecs that we will not check for contradictions. These most often come
   // /// from case splits. Variables previously can take on a range of values,
   // /// but after a case split, they are narrowed.
@@ -479,102 +434,47 @@ impl Cvec {
   //   }
   // }
 
-  /// Calls get on Cvecs.
-  /// Always fails for stuck or contradictory cvecs.
-  pub fn get_at_index(&self, index: usize) -> Option<&Id> {
-    match self {
-      Cvec::Cvec(cv) => cv.get(index),
-      _ => None,
-    }
-  }
-
   fn make(egraph: &EGraph<SymbolLang, CycleggAnalysis>, enode: &SymbolLang) -> (Self, usize) {
     // println!("making cvec for enode: {}", enode);
-    let mut max_child_timestamp = egraph.analysis.cvec_analysis.current_timestamp;
+    let mut max_child_timestamp = egraph.analysis.cvec_analysis.borrow().current_timestamp;
     if enode.is_leaf() {
-      // if egraph.analysis.global_ctx.contains_key(&enode.op) {
-      //   println!("making dummy cvec for {}", &enode.op);
-      // }
-      // We can't evaluate vars (we need outside input, i.e. type information to create them)
-      // This could be resolved by having a type information analysis.
-      //
-      // The second check is to verify that this isn't a function.
-      if is_var(&enode.op.to_string()) && !egraph.analysis.global_ctx.contains_key(&enode.op) {
-        return (Cvec::Stuck, max_child_timestamp);
-      } else {
-        // This cvec is for a value like Z or Leaf, so make a concrete cvec out of it.
-        let id = egraph.analysis.cvec_analysis.cvec_egraph.borrow_mut().add(enode.clone());
-        let cvec = repeat_n(id, egraph.analysis.cvec_analysis.cvec_size).collect();
-        return (Cvec::Cvec(cvec), max_child_timestamp);
+      // println!("op: {}", enode.op);
+      if is_constructor(enode.op.as_str()) {
+        return (Cvec {terms: repeat_n(PatternWithHoles::Node(enode.op, vec!()), egraph.analysis.cvec_analysis.borrow().cvec_size).collect()}, max_child_timestamp);
       }
+      let ty = egraph.analysis.local_ctx.get(&enode.op).unwrap_or_else(|| egraph.analysis.global_ctx.get(&enode.op).unwrap());
+      return (egraph.analysis.cvec_analysis.borrow_mut().make_cvec_for_type(ty, &egraph.analysis.global_ctx, &egraph.analysis.env), max_child_timestamp);
     }
 
     let op = enode.op;
 
-    let mut new_cvec = Vec::new();
+    let mut new_cvec = Vec::with_capacity(egraph.analysis.cvec_analysis.borrow().cvec_size);
     // The max size of a Cvec should be this
-    for i in 0..egraph.analysis.cvec_analysis.cvec_size {
+    for i in 0..egraph.analysis.cvec_analysis.borrow().cvec_size {
       // Get the ith element of each cvec.
-      let opt_children = enode.children().iter().map(|child| {
+      let child_args = enode.children().iter().map(|child| {
         max_child_timestamp = std::cmp::max(max_child_timestamp, egraph[*child].data.timestamp);
-        egraph[*child].data.cvec_data.get_at_index(i).map(|id| *id)
+        Box::new(egraph[*child].data.cvec_data.terms[i].clone())
       }).collect();
-      match opt_children {
-        // If it's stuck, then propagate that it's stuck
-        // NOTE: we don't update the timestamp because we don't use its children from which it would've
-        // gotten a fresher timestamp
-        None => return (Cvec::Stuck, egraph.analysis.cvec_analysis.current_timestamp),
-        Some(cvec_children) => {
-          let new_enode = SymbolLang::new(op, cvec_children);
-          let id = egraph.analysis.cvec_analysis.cvec_egraph.borrow_mut().add(new_enode);
-          new_cvec.push(id);
-        }
-      }
+      let mut new_term = PatternWithHoles::Node(op, child_args);
+      new_term.eval(&egraph.analysis.defs_for_eval);
+      new_cvec.push(new_term);
     }
-    (Cvec::Cvec(new_cvec), max_child_timestamp)
+    (Cvec {terms: new_cvec}, max_child_timestamp)
   }
 
-  fn merge(&mut self, a_timestamp: usize, b: Self, b_timestamp: usize, egraph: &RefCell<EGraph<SymbolLang, ()>>) -> DidMerge {
+  fn merge(&mut self, a_timestamp: usize, b: Self, b_timestamp: usize) -> DidMerge {
     // println!("merging cvecs: {:?} and {:?} ({} is newer) {} < {}", self, b, if a_timestamp < b_timestamp {"second"} else {"first"}, a_timestamp, b_timestamp);
-    // Always replace a stuck cvec
-    // *self = b;
-    // return DidMerge(false, false);
-    match (&self, &b) {
-      (Cvec::Stuck, Cvec::Cvec(_)) => {
-        // println!("taking {:?}", b);
-        *self = b;
-        DidMerge(true, false)
-      }
-      (Cvec::Cvec(cv1), Cvec::Cvec(cv2)) => {
-        let different = zip(cv1.iter(), cv2.iter()).any(|(id1, id2)|{
-          let resolved_id1 = egraph.borrow_mut().find(*id1);
-          let resolved_id2 = egraph.borrow_mut().find(*id2);
-          if resolved_id1 != resolved_id2 {
-            // let borrowed_egraph = &egraph.borrow();
-            // let extractor = Extractor::new(borrowed_egraph, AstSize);
-            // let expr1 = extractor.find_best(resolved_id1).1;
-            // let expr2 = extractor.find_best(resolved_id2).1;
-            // println!("differing cvecs: {} {}", expr1, expr2);
-          }
-          resolved_id1 != resolved_id2
-        });
-        if different && a_timestamp < b_timestamp {
-          // println!("taking {:?}", b);
-          *self = b;
-          DidMerge(true, false)
-        } else {
-          // println!("keeping {:?}", self);
-          DidMerge(false, true)
-        }
-      }
-      (Cvec::Cvec(_), Cvec::Stuck) => {
-        // println!("keeping {:?}", self);
-        DidMerge(false, true)
-      }
-      (Cvec::Stuck, Cvec::Stuck) => {
-        // println!("keeping {:?}", self);
-        DidMerge(false, false)
-      }
+    let different = zip(self.terms.iter(), b.terms.iter()).any(|(term1, term2)|{
+      term1 != term2
+    });
+    if different && a_timestamp < b_timestamp {
+      // println!("taking {:?}", b);
+      *self = b;
+      DidMerge(true, false)
+    } else {
+      // println!("keeping {:?}", self);
+      DidMerge(false, true)
     }
 
     // // FIXME: why do we infinitely loop if we don't return
@@ -602,6 +502,10 @@ impl Cvec {
     //   // so we can use either Cvec.
     //   _ => DidMerge(false, false),
     // }
+  }
+
+  pub fn print(&self) {
+    println!("{}", self.terms.iter().map(|term| format!("{}", term)).join(", "));
   }
 }
 
@@ -781,13 +685,15 @@ impl CanonicalFormAnalysis {
   }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct CycleggAnalysis {
-  pub cvec_analysis: CvecAnalysis,
+  pub cvec_analysis: RefCell<CvecAnalysis>,
   pub blocking_vars: BTreeSet<Symbol>,
   pub case_split_vars: BTreeSet<Symbol>,
   pub local_ctx: Context,
   pub global_ctx: Context,
+  pub defs_for_eval: FnDefs,
+  pub env: Env,
 }
 
 #[derive(Debug, Clone)]
@@ -812,32 +718,7 @@ impl Analysis<SymbolLang> for CycleggAnalysis {
   type Data = CycleggData;
 
   fn merge(&mut self, a: &mut Self::Data, b: Self::Data) -> DidMerge {
-    // let cvec_result =
-    //   match (a.force_update_cvec, b.force_update_cvec) {
-    //     // Without any force updates, do the contradiction check
-    //     (false, false) => {
-    //       a.cvec_data.merge(b.cvec_data, &self.cvec_analysis.cvec_egraph)
-    //     }
-    //     // Otherwise, we need to figure out which we take, breaking ties
-    //     // by using age.
-    //     (true, false) => {
-    //       DidMerge(false, true)
-    //     }
-    //     (false, true) => {
-    //       a.cvec_data = b.cvec_data;
-    //       DidMerge(true, false)
-    //     }
-    //     (true, true) => {
-    //       if a.age > b.age {
-    //         DidMerge(false, true)
-    //       } else {
-    //         a.cvec_data = b.cvec_data;
-    //         DidMerge(true, false)
-    //       }
-    //     }
-    //   };
-    // self.cvec_analysis.saturate();
-    a.cvec_data.merge(a.timestamp, b.cvec_data, b.timestamp, &self.cvec_analysis.cvec_egraph)
+    a.cvec_data.merge(a.timestamp, b.cvec_data, b.timestamp)
       | merge_max(&mut a.timestamp, b.timestamp)
       | a.canonical_form_data.merge(b.canonical_form_data)
   }

@@ -5,7 +5,7 @@ use egg::{Symbol, Id, Pattern, SymbolLang, Subst, Searcher, Var};
 use itertools::{iproduct, Itertools};
 use symbolic_expressions::Sexp;
 
-use crate::{goal::{LemmaProofState, Outcome, LemmasState, Timer, Goal, GlobalSearchState, INVALID_LEMMA}, analysis::{CanonicalForm, random_term_from_type_max_depth}, ast::{Type, Equation, Prop}, goal_graph::{GoalGraph, GoalIndex, GoalNodeStatus}, config::CONFIG};
+use crate::{goal::{LemmaProofState, Outcome, LemmasState, Timer, Goal, GlobalSearchState, INVALID_LEMMA}, analysis::{CanonicalForm, random_term_from_type_max_depth}, ast::{Type, Equation, Prop, APPLY}, goal_graph::{GoalGraph, GoalIndex, GoalNodeStatus}, config::CONFIG};
 
 const HOLE_VAR_PREFIX: &str = "var_";
 const HOLE_PATTERN_PREFIX: &str = "?";
@@ -31,7 +31,7 @@ type HoleIdx  = Symbol;
 ///
 /// TODO: The representation could probably be made more efficient by use of
 /// mutable references, etc.
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum PatternWithHoles {
   /// A hole to be filled in eventually with another PatternWithHoles.
   Hole(HoleIdx),
@@ -119,7 +119,7 @@ pub fn parse_fn_defn(args: &Vec<Sexp>, to: &Sexp) -> (Vec<PatternWithHoles>, Pat
 }
 
 /// Converts a Sexp to a PatternWithHoles
-fn sexp_to_pattern(from: &Sexp) -> PatternWithHoles {
+pub fn sexp_to_pattern(from: &Sexp) -> PatternWithHoles {
   match from {
     Sexp::Empty => {
       todo!("can't happen");
@@ -201,6 +201,19 @@ impl PatternWithHoles {
       Self::Node(name, actual_args) => {
         // First recursively evaluate all arguments.
         actual_args.iter_mut().for_each(|actual_arg| actual_arg.eval(fn_defs));
+        if *name == Symbol::new(APPLY) {
+          let (fn_arg, args) = actual_args.split_first().unwrap();
+          match fn_arg.borrow() {
+            Self::Node(fn_name, fn_name_args) if fn_name_args.is_empty() => {
+              *self = Self::Node(*fn_name, args.to_vec());
+              self.eval(fn_defs);
+              return;
+            }
+            _ => {
+              return;
+            }
+          }
+        }
         // Then recursively evaluate the current if it is a function.
         //
         // NOTE: We assume that if it's not defined then it must be a

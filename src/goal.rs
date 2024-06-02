@@ -15,7 +15,7 @@ use std::str::FromStr;
 use std::time::{Duration, Instant};
 use symbolic_expressions::{parser, Sexp};
 
-use crate::analysis::{CycleggAnalysis, CanonicalFormAnalysis, CanonicalForm, cvecs_equal, print_cvec, CvecAnalysis, Cvec, has_counterexample_check};
+use crate::analysis::{CycleggAnalysis, CanonicalFormAnalysis, CanonicalForm, CvecAnalysis, Cvec, has_counterexample_check};
 use crate::ast::*;
 use crate::config::*;
 use crate::egraph::*;
@@ -139,20 +139,6 @@ impl Soundness {
   }
 }
 
-fn get_cvec_constructor(analysis: &CvecAnalysis, data: &Cvec) -> Option<Symbol>{
-  match data {
-    Cvec::Stuck => None,
-    Cvec::Cvec(id_list) => {
-      if id_list.is_empty() {return None;}
-      let first_id = id_list.first().unwrap();
-      for node in analysis.cvec_egraph.borrow()[*first_id].nodes.iter() {
-        if node.children.is_empty() {return Some(node.op);}
-      }
-      return None;
-    }
-  }
-}
-
 impl SearchCondition<SymbolLang, CycleggAnalysis> for Soundness {
   // FIXME: needs to be updated to accurately handle dealing with cases where
   // we can skip the soundness check on some variables because they are not blocking
@@ -213,7 +199,7 @@ struct TypeRestriction {
 }
 
 
-impl<'a> SearchCondition<SymbolLang, CycleggAnalysis> for TypeRestriction {
+impl SearchCondition<SymbolLang, CycleggAnalysis> for TypeRestriction {
   fn check(&self, egraph: &EGraph<SymbolLang, CycleggAnalysis>, eclass: Id, subst: &Subst) -> bool {
     let mut res = true;
     let op = egraph[eclass].nodes.first().unwrap().op;
@@ -593,8 +579,14 @@ impl<'a> Goal<'a> {
     premise: &Option<Equation>,
     global_search_state: GlobalSearchState<'a>,
   ) -> Self {
+    let local_context: Context = prop.params.iter().map(|(name, ty)| {
+      (*name, ty.clone())
+    }).collect();
     let mut egraph: Eg = EGraph::default().with_explanations_enabled();
     egraph.analysis.global_ctx = global_search_state.context.clone();
+    egraph.analysis.env = global_search_state.env.clone();
+    egraph.analysis.defs_for_eval = global_search_state.defs_for_eval.clone();
+    egraph.analysis.local_ctx = local_context.clone();
     let eq = ETermEquation::new(&prop.eq, &mut egraph, false);
     let premise = premise
         .as_ref()
@@ -608,7 +600,7 @@ impl<'a> Goal<'a> {
       grounding_instantiations: vec![var_classes.clone()],
       egraph,
       lemmas: BTreeMap::new(),
-      local_context: Context::new(),
+      local_context,
       top_level_params: prop.params.iter().map(|(x, _)| *x).collect(),
       case_split_vars: BTreeSet::new(),
       guard_exprs: BTreeMap::new(),
@@ -619,64 +611,18 @@ impl<'a> Goal<'a> {
       global_search_state,
       full_expr: prop.eq.clone()
     };
-    // FIXME: this could really also be a reference. Probably not necessary
-    // for efficiency reason but yeah.
-    res.egraph.analysis.cvec_analysis.reductions = global_search_state.cvec_reductions.clone();
     for (name, ty) in &prop.params {
       res.add_scrutinee(*name, &ty, 0);
-      res.local_context.insert(*name, ty.clone());
     }
-    res.egraph.analysis.local_ctx = res.local_context.clone();
-    res.build_cvecs();
     res
   }
 
-  /// Construct cvecs for the goal's parameters. We need type information in order
-  /// to construct these, so they cannot be created automatically.
-  // FIXME: This currently does not work for any goal other than the top-level goal.
-  fn build_cvecs(&mut self) {
-    // Update the timestamp so that we ensure the new cvecs are applied.
-    self.egraph.analysis.cvec_analysis.current_timestamp += 1;
-    // Annoyingly, we need to collect these values before we iterate over them
-    // to avoid mutably borrowing self. I think it's worth it so that we can
-    // factor out the add_cvec_for_class function which is used elsewhere.
-    let var_tys: Vec<(Id, Type)> = self.top_level_params.iter().map(|param|{
-      let ty = self.local_context[param].clone();
-      let var_id = self.var_classes[param];
-      (var_id, ty)
-    }).collect();
-    for (var_id, ty) in var_tys {
-      self.add_cvec_for_class(var_id, &ty);
-    }
-    self.egraph.analysis.cvec_analysis.saturate();
-    self.egraph.rebuild();
-  }
-
-  /// Constructs a cvec for the class at id with type ty.
-  ///
-  /// It's important to update the current timestamp before calling this function.
-  ///
-  /// Returns whether it made a cvec (we don't make cvecs for arrow types
-  /// because we don't know how to make arbitrary functions).
-  fn add_cvec_for_class(&mut self, id: Id, ty: &Type) -> bool {
-    if ty.is_arrow() {
-      return false;
-    }
-    let cvec = self.egraph.analysis.cvec_analysis.make_cvec_for_type(&ty, self.global_search_state.env, &self.global_search_state.context);
-    let mut analysis = self.egraph[id].data.clone();
-    analysis.timestamp = self.egraph.analysis.cvec_analysis.current_timestamp;
-    analysis.cvec_data = cvec;
-    self.egraph.set_analysis_data(id, analysis);
-    true
-  }
-
-  pub fn cvecs_valid(&mut self) -> Option<bool> {
-    self.egraph.analysis.cvec_analysis.saturate();
+  pub fn cvecs_valid(&mut self) -> bool {
     let lhs_cvec = &self.egraph[self.eq.lhs.id].data.cvec_data;
     let rhs_cvec = &self.egraph[self.eq.rhs.id].data.cvec_data;
     //print_cvec(&self.egraph.analysis.cvec_analysis, lhs_cvec);
     //print_cvec(&self.egraph.analysis.cvec_analysis, rhs_cvec);
-    cvecs_equal(&self.egraph.analysis.cvec_analysis, lhs_cvec, rhs_cvec)
+    lhs_cvec.terms == rhs_cvec.terms
   }
 
   /// Saturate the goal by applying all available rewrites
@@ -1204,6 +1150,7 @@ impl<'a> Goal<'a> {
       self
           .local_context
           .insert(fresh_var, BOOL_TYPE.parse().unwrap());
+      self.egraph.analysis.local_ctx.insert(fresh_var, BOOL_TYPE.parse().unwrap());
       // We are adding the new scrutinee to the front of the deque,
       // because we want to split conditions first, since they don't introduce new variables
       self.scrutinees.push_front(Scrutinee::new_guard(fresh_var));
@@ -1269,7 +1216,7 @@ impl<'a> Goal<'a> {
 
       // We will update the timestamp of the cvec analysis so that we enforce
       // the update when we generate a cvec.
-      new_goal.egraph.analysis.cvec_analysis.current_timestamp += 1;
+      new_goal.egraph.analysis.cvec_analysis.borrow_mut().current_timestamp += 1;
       let mut pre_expr = self.full_expr.clone();
 
       for (i, arg_type) in con_args.iter().enumerate() {
@@ -1278,14 +1225,13 @@ impl<'a> Goal<'a> {
         fresh_vars.push(fresh_var);
         // Add new variable to context
         new_goal.local_context.insert(fresh_var, arg_type.clone());
+        new_goal.egraph.analysis.local_ctx.insert(fresh_var, arg_type.clone());
         // The depth of a scrutinee tracks how many ancestors are between it and
         // a top-level parameter, so we add 1 when we case split.
         new_goal.add_scrutinee(fresh_var, arg_type, scrutinee.depth + 1);
         let id = new_goal.egraph.add(SymbolLang::leaf(fresh_var));
         // The class corresponding to this var is its class in the e-graph.
         new_goal.var_classes.insert(fresh_var, id);
-        // Generate a cvec for the fresh_var.
-        new_goal.add_cvec_for_class(id, arg_type);
 
         if CONFIG.add_grounding && ty == arg_type {
           // This is a recursive constructor parameter:
@@ -1293,7 +1239,6 @@ impl<'a> Goal<'a> {
           new_goal.add_grounding(scrutinee.name, fresh_var);
         }
       }
-      new_goal.egraph.analysis.local_ctx = new_goal.local_context.clone();
 
       // Create an application of the constructor to the fresh vars
       let fresh_var_strings_iter = fresh_vars.iter().map(|x| x.to_string());
@@ -1621,7 +1566,6 @@ impl<'a> Goal<'a> {
   /// analysis deems equal on some set of random terms.
   fn search_for_cc_lemmas(&mut self, timer: &Timer, lemmas_state: &mut LemmasState) -> Vec<Prop> {
     let mut lemmas = vec!();
-    self.egraph.analysis.cvec_analysis.saturate();
     let resolved_lhs_id = self.egraph.find(self.eq.lhs.id);
     let resolved_rhs_id = self.egraph.find(self.eq.rhs.id);
     if CONFIG.verbose {
@@ -1658,7 +1602,7 @@ impl<'a> Goal<'a> {
         //     continue
         // }
 
-        if let Some(true) = cvecs_equal(&self.egraph.analysis.cvec_analysis, &self.egraph[class_1_id].data.cvec_data, &self.egraph[class_2_id].data.cvec_data) {
+        if let true = self.egraph[class_1_id].data.cvec_data == self.egraph[class_2_id].data.cvec_data {
           let class_1_canonical = &self.egraph[class_1_id].data.canonical_form_data;
           let class_2_canonical = &self.egraph[class_2_id].data.canonical_form_data;
           match (class_1_canonical, class_2_canonical) {
@@ -1759,77 +1703,72 @@ impl<'a> Goal<'a> {
           continue;
         }
 
-        // FIXME: what do we do if we can't make cvecs for this node? Probably
-        // just let it through and conjecture lemmas from it, but now it can't
-        // be counterexample. Or maybe we should just ignore it like we do now.
-        if let Some(cvecs_equal) = cvecs_equal(&self.egraph.analysis.cvec_analysis, &self.egraph[class_1.id].data.cvec_data, &self.egraph[class_2.id].data.cvec_data) {
-          if !cvecs_equal {
-            continue;
-          }
-          let class_1_canonical = &self.egraph[class_1.id].data.canonical_form_data;
-          let class_2_canonical = &self.egraph[class_2.id].data.canonical_form_data;
-          match (class_1_canonical, class_2_canonical) {
-            (CanonicalForm::Const(c1_node), CanonicalForm::Const(c2_node)) => {
-              let num_differing_children: usize = zip(c1_node.children(), c2_node.children()).map(|(child_1, child_2)|{
-                if child_1 != child_2 {
-                  0
-                } else {
-                  1
-                }
-              }).sum();
-              // There is a simpler CC lemma to prove.
-              //
-              // Consider for example the case when the canonical forms are
-              //   c1: (S (plus x x))
-              //   c2: (S (double x))
-              // In this case, the number of differing children is only 1.
-              // The differing children are
-              //   (plus x x) and (double x)
-              // However, we can be sure that if the cvec analysis deemed c1 and
-              // c2 equal, then it will deem these two differing children equal.
-              //
-              // Thus we won't waste our time trying to prove c1 == c2 when
-              // we could instead prove (plus x x) == (double x), which implies
-              // by congruence that c1 == c2.
-              if num_differing_children <= 1 {
-                continue;
-              }
-            }
-            _ => {}
-          }
-          lemma_trees.entry(class_1_type)
-                    .and_modify(|lemma_tree| {
-                      let m = ClassMatch::top_match(origin.clone(), class_1.id, class_2.id, cvecs_equal);
-                      let _ = lemma_tree.add_match(timer, m, lemmas_state, goal_graph, lemma_proofs);
-                    })
-                    .or_insert_with(|| {
-                      let m = ClassMatch::top_match(origin.clone(), class_1.id, class_2.id, cvecs_equal);
-                      let pattern = LemmaPattern::empty_pattern(class_2_type);
-                      // NOTE: We use this function to guarantee we add a lemma
-                      // because even though we expect the root lemma to be
-                      // invalid, we want to add its children.
-                      //
-                      // We should probably make a function for making a new
-                      // lemma tree from the lemmas state.
-                      let lemma = pattern.to_lemma();
-                      let pattern_size = pattern.size;
-                      // pass INVALID_LEMMA initially, if it's not invalid we'll generate a lemma for it.
-                      let mut root = LemmaTreeNode::from_pattern(pattern, INVALID_LEMMA, pattern_size, m.clone());
-                      if root.lemma_status.is_none() {
-                        if has_counterexample_check(&lemma, self.global_search_state.env, self.global_search_state.context, self.global_search_state.cvec_reductions) {
-                          root.lemma_status = Some(LemmaStatus::Invalid);
-                        } else {
-                          let lemma_idx = lemmas_state.find_or_make_fresh_lemma(lemma, 0);
-                          root.lemma_idx = lemma_idx;
-                          root.goal_index.lemma_id = lemma_idx;
-                          root.goal_index.name = Symbol::new(&format!("lemma_{}", lemma_idx));
-                        }
-                      }
-                      let _ = root.add_match(timer, m, lemmas_state, goal_graph, lemma_proofs);
-                      root
-                    });
+        let cvecs_equal = self.egraph[class_1.id].data.cvec_data == self.egraph[class_2.id].data.cvec_data;
+        if !cvecs_equal {
+          continue;
         }
-
+        let class_1_canonical = &self.egraph[class_1.id].data.canonical_form_data;
+        let class_2_canonical = &self.egraph[class_2.id].data.canonical_form_data;
+        match (class_1_canonical, class_2_canonical) {
+          (CanonicalForm::Const(c1_node), CanonicalForm::Const(c2_node)) => {
+            let num_differing_children: usize = zip(c1_node.children(), c2_node.children()).map(|(child_1, child_2)|{
+              if child_1 != child_2 {
+                0
+              } else {
+                1
+              }
+            }).sum();
+            // There is a simpler CC lemma to prove.
+            //
+            // Consider for example the case when the canonical forms are
+            //   c1: (S (plus x x))
+            //   c2: (S (double x))
+            // In this case, the number of differing children is only 1.
+            // The differing children are
+            //   (plus x x) and (double x)
+            // However, we can be sure that if the cvec analysis deemed c1 and
+            // c2 equal, then it will deem these two differing children equal.
+            //
+            // Thus we won't waste our time trying to prove c1 == c2 when
+            // we could instead prove (plus x x) == (double x), which implies
+            // by congruence that c1 == c2.
+            if num_differing_children <= 1 {
+              continue;
+            }
+          }
+          _ => {}
+        }
+        lemma_trees.entry(class_1_type)
+                  .and_modify(|lemma_tree| {
+                    let m = ClassMatch::top_match(origin.clone(), class_1.id, class_2.id, cvecs_equal);
+                    let _ = lemma_tree.add_match(timer, m, lemmas_state, goal_graph, lemma_proofs);
+                  })
+                  .or_insert_with(|| {
+                    let m = ClassMatch::top_match(origin.clone(), class_1.id, class_2.id, cvecs_equal);
+                    let pattern = LemmaPattern::empty_pattern(class_2_type);
+                    // NOTE: We use this function to guarantee we add a lemma
+                    // because even though we expect the root lemma to be
+                    // invalid, we want to add its children.
+                    //
+                    // We should probably make a function for making a new
+                    // lemma tree from the lemmas state.
+                    let lemma = pattern.to_lemma();
+                    let pattern_size = pattern.size;
+                    // pass INVALID_LEMMA initially, if it's not invalid we'll generate a lemma for it.
+                    let mut root = LemmaTreeNode::from_pattern(pattern, INVALID_LEMMA, pattern_size, m.clone());
+                    if root.lemma_status.is_none() {
+                      if has_counterexample_check(&lemma, self.global_search_state.env, self.global_search_state.context, self.global_search_state.cvec_reductions) {
+                        root.lemma_status = Some(LemmaStatus::Invalid);
+                      } else {
+                        let lemma_idx = lemmas_state.find_or_make_fresh_lemma(lemma, 0);
+                        root.lemma_idx = lemma_idx;
+                        root.goal_index.lemma_id = lemma_idx;
+                        root.goal_index.name = Symbol::new(&format!("lemma_{}", lemma_idx));
+                      }
+                    }
+                    let _ = root.add_match(timer, m, lemmas_state, goal_graph, lemma_proofs);
+                    root
+                  });
       }
     }
     // println!("extracting lemmas from tree");
@@ -2038,7 +1977,7 @@ impl<'a> Goal<'a> {
                                  &None,
                                  self.global_search_state,
     );
-    if new_goal.cvecs_valid() == Some(true) {
+    if new_goal.cvecs_valid() {
       // println!("generalizing {} === {}", lhs_expr, rhs_expr);
       Some((Prop::new(eq, params), new_goal))
     } else {
@@ -2078,7 +2017,7 @@ impl<'a> Goal<'a> {
             if eclass.id == result.eclass {
               continue;
             }
-            if let Some(true) = cvecs_equal(&self.egraph.analysis.cvec_analysis, result_cvec, &self.egraph[eclass.id].data.cvec_data) {
+            if result_cvec == &self.egraph[eclass.id].data.cvec_data {
               let exp = extractor.find_best(eclass.id).1;
               println!("Matching eclass via cvec analysis: {} (id {})", exp, eclass.id);
             }
@@ -2346,16 +2285,16 @@ impl<'a> LemmaProofState<'a> {
     let mut goal = Goal::top(lemma_name, &prop, premise, global_search_state);
     let lemma_rw_opt = goal.make_lemma_rewrite_type_only(&goal.eq.lhs.expr, &goal.eq.rhs.expr, lemma_number, false);
     let lemma_rw_opt_no_analysis = goal.make_lemma_rewrite_unchecked(&goal.eq.lhs.expr, &goal.eq.rhs.expr, lemma_number, false);
-    let mut outcome = goal.cvecs_valid().and_then(|is_valid| {
+    let mut outcome =
       //println!("{} cvec is valid = {}", lemma_name, is_valid);
       // FIXME: Handle premises in cvecs so that we can reject invalid props
       // with preconditions
-      if premise.is_none() && !is_valid {
+      if premise.is_none() && !goal.cvecs_valid() {
         Some(Outcome::Invalid)
       } else {
         None
       }
-    });
+    ;
     // HACK: This means we don't have an IH. This lemma probably should not have
     // been considered.
 
@@ -2364,8 +2303,10 @@ impl<'a> LemmaProofState<'a> {
         println!("Property accepted by cvec analysis");
       } else {
         println!("Property rejected by cvec analysis");
-        print_cvec(&goal.egraph.analysis.cvec_analysis, &goal.egraph[goal.eq.lhs.id].data.cvec_data);
-        print_cvec(&goal.egraph.analysis.cvec_analysis, &goal.egraph[goal.eq.rhs.id].data.cvec_data);
+        print!("LHS: ");
+        goal.egraph[goal.eq.lhs.id].data.cvec_data.print();
+        print!("RHS: ");
+        goal.egraph[goal.eq.rhs.id].data.cvec_data.print();
       }
     }
 
@@ -2478,7 +2419,6 @@ impl<'a> LemmaProofState<'a> {
 
     // HACK: we saturate the cvec analysis here so we can later immutably use
     // the goal.
-    goal.egraph.analysis.cvec_analysis.saturate();
 
     goal.debug_search_for_patterns_in_egraph();
 

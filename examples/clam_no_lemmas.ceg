@@ -242,7 +242,7 @@
 (let revflat ((Node ?l ?x ?r)) (append (revflat ?l) (Cons ?x (revflat ?r))))
 
 (:: qrevaflat (-> ((Tree a) (List a)) (List a)))
-(let qrevaflat (Leaf ?acc) (?acc))
+(let qrevaflat (Leaf ?acc) ?acc)
 (let qrevaflat ((Node ?l ?x ?r) ?acc) (qrevaflat ?l (Cons ?x (qrevaflat ?r ?acc))))
 
 (:: rotate (-> (Nat (List a)) (List a)))
@@ -273,7 +273,7 @@
 (let exp (?m (S ?n)) (mult (exp ?m ?n) ?m))
 
 (:: qexp (-> (Nat Nat Nat) Nat))
-(let qexp (?m Z ?acc) (?acc))
+(let qexp (?m Z ?acc) ?acc)
 (let qexp (?m (S ?n) ?acc) (qexp ?m ?n (mult ?acc ?m)))
 
 (:: lst-union (-> ((List Nat) (List Nat)) (List Nat)))

@@ -5,7 +5,7 @@ use egg::*;
 use itertools::Itertools;
 use log::warn;
 use serde::Serializer;
-use crate::{analysis::{CvecAnalysis, CycleggAnalysis, print_cvec}, ast::Prop};
+use crate::{analysis::{CvecAnalysis, CycleggAnalysis}, ast::Prop};
 
 fn cartesian_product_helper<T: Clone>(
   vector: &[Vec<T>],
