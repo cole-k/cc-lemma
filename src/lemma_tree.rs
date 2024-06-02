@@ -1227,7 +1227,7 @@ impl LemmaTreeNode {
     self.update_lemma_status(lemma_proofs);
     // Once a lemma is proven (and therefore no longer active), don't propagate
     // its matches.
-    if goal_graph.goal_map[&m.origin.name].as_ref().borrow().status != GoalNodeStatus::Unknown || lemmas_state.proven_goal_names.contains(&m.origin.name){
+    if goal_graph.goal_map[&m.origin.name].as_ref().borrow().status != GoalNodeStatus::Unknown || lemmas_state.proven_goal_names.contains(&m.origin.name) || lemmas_state.proven_lemma_ids.contains(&m.origin.lemma_id) {
       return propagate_result;
     }
     // If we've followed a cycle too much, don't consider this match.
