@@ -61,6 +61,25 @@ from ` --exclude-tools` to generate plots for them too.
 
 Both scripts have a `--help` command explaining their usage.
 
+## Sample data
+
+You can also run `generate-plots.py` on sample data we have included under
+[precomputed-results](./precomputed-results).
+
+If you run
+
+```
+$ python3 generate-plots.py results/summary --exclude-tools hipspec cvc4 thesy
+```
+
+you should get plots that exactly match those in our paper.
+
+Note that there is one datapoint which does appear for any tool but C.C. Lemma
+among this data: `mtp-base`, which corresponds to the motivating example in
+section 1 of our paper. We ran it individually for each tool and none could
+solve it but C.C. Lemma, so we copied just its result into C.C. Lemma's results
+for the optimization benchmarks.
+
 ## Configuring the runner
 
 The runner takes some commandline arguments and additionally has some
