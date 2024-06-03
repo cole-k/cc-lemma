@@ -5,53 +5,111 @@ selling point is its ability to discover and effortlessly wield lemmas in
 service of making a proof.
 
 > [!WARNING]
-> Rewrite in progress: check back later for a new version
+> Research code ahead
 
-## The progress so far
+# I want to see it in action
 
-This repository has been initialized from `6fe83e3` from the main branch of
-https://github.com/cole-k/cyclegg.
+```
+$ cargo run --release -- examples/add.ceg
+```
 
-I pruned all the files that are not directly necessary to the rewrite, although
-I kept the examples directory because it will be necessary for tests.
+This will run and prove several sample properties about different add functions
+on Peano numbers.
 
-## The plan
+There will be several lemmas proved for some which are also output.
 
-In addition to doing changes to generally improve code quality, we have some
-major changes we want to make the main proof search algorithm, specifically how
-lemma discovery is done. Although we don't expect that this will change our
-theoretical capability, we expect there may be (significant) efficiency gains.
-Or losses...
+# Building
 
-After we do this, we'll merge the history of the remaining files back in.
+Use
 
-## Current TODOs
+```
+$ cargo build --release
+```
 
-* Everything
-  - Clean up.
-  - Remove cruft.
-  - Rework to support major changes.
-* ast.rs
-  - Use the `sexp` library instead of `symbolic_expression`.
-  - Make a new `Language` that isn't `SymbolLang`.
-* analysis.rs
-  - Use type information in the language to create c-vecs on demand instead of
-    having a two-phase c-vec creation process.
-  - Consider not having c-vecs be stored in an e-graph and evalutaed using one,
-    but instead evaluated on-demand.
-  - Can we do the blocking variable analysis as an e-graph analysis instead of
-    on the contents of the e-graph itself?
-* config.rs
-  - Remove useless flags.
-  - Read from a config file (use `confy`?) and have user-supplied flags override
-    values in the config.
-* explain.rs
-  - Rework to support new data structures.
-  - Consider outputting to an intermediate data structure and adding translators
-    to different backends.
-* goal.rs
-  - Completely rewrite.
-* goal\_graph.rs
-  - Completely rewrite.
-* Cargo.toml
-  - Remove unnecessary deps.
+to build
+
+and
+
+```
+$ cargo run --release -- FILENAME
+```
+
+to run.
+
+Make sure to include `--release` otherwise it will be much slower.
+
+# Running the benchmarks
+
+The benchmarks we ran for our evaluation live in [benchmarks](./benchmarks).
+
+We include both a runner ([runner.py](./runner.py)) to run the benchmarks as
+well as a tool to generate our plots and tables from their results
+([generate-plots.py](./generate-plots.py)).
+
+Here is how you can use them to generate plots for C.C. Lemma.
+
+```
+$ python3 runner.py 
+$ python3 generate-plots.py results/summary --exclude-tools hipspec cvc4 thesy
+```
+
+This should only take a few minutes at most because we set the timeout to 2s.
+
+If you wish to run other tools, pass them to `runner.py` under the `--tools`
+argument. Depending on which tools you have run, you can also then remove them
+from ` --exclude-tools` to generate plots for them too.
+
+Both scripts have a `--help` command explaining their usage.
+
+## Configuring the runner
+
+The runner takes some commandline arguments and additionally has some
+configurations under [scripts/config.py](./scripts/config.py).
+
+You shouldn't really need to touch the flags passed to each of the tools (and in
+fact if you tinker with them you might break something), but if you configure
+the tools for running you can put their path in the config and then you can also
+run them.
+
+The settings most important to reproducing our total evaluation are putting
+
+```
+timeout = 60
+memory_limit = 16
+```
+
+but be warned that this can take a long time. If a full timeout is reached on
+most props, it will take close to 2.5 hours -- per tool! In practice it doesn't
+typically take this long for C.C. Lemma, but do expect a runtime above one hour.
+For other tools, the runtime is generally longer.
+
+# Running on your own
+
+There are several example files in [examples](./examples) for you to peruse and
+try C.C. Lemma on if you so desire.
+
+If you want to try it on your own examples, please see refer to existing
+examples and the [docs](./docs/file-format.md).
+
+There are also many feature flags supported, most of which are for
+debugging/ablations. [scripts/config.py][./scripts/config.py], which contains
+the flags we use for our evaluation, should contain
+
+```
+--no-generalization --exclude-bid-reachable --saturate-only-parent -r
+```
+
+The first three are tweaks to the algorithm that turn off and on features we
+ended up using; the last is just for outputting a results file.
+
+In addition, there are several flags you may wish to know about.
+
+```
+-t, --timeout:      sets a timeout in seconds (default 0 for unlimited time)
+-r, --save-results: saves the results in a file called results.csv in target.
+-p, --emit-proofs:  emits a proof in Liquid Haskell under target/proofs.
+                    Experimental. We recommend running with --unmangled-names and
+                    --verbose-proofs, which will give the most readable proofs.
+```
+
+and of course `--help` will give the full list of options.

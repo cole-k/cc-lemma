@@ -2867,7 +2867,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
       if self.goal_graph.is_lemma_proven(info.lemma_id) {
         let state = proof_state.lemma_proofs.get_mut(&info.lemma_id).unwrap();
         state.outcome = Some(Outcome::Valid);
-        println!("new lemma {}", state.prop);
+        println!("proved lemma {}", state.prop);
       }
       if let Some(outcome) = proof_state.lemma_proofs.get(&info.lemma_id).unwrap().outcome.clone() {
         self.is_found_new_lemma = true;
@@ -2902,7 +2902,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
           if lemma_state.outcome.is_some() {continue;}
           lemma_state.outcome = Some(Outcome::Valid);
 
-          println!("prove lemma {}", lemma_state.prop);
+          println!("proved lemma {}", lemma_state.prop);
           new_lemma.insert(goal.lemma_id);
 
           ProofState::handle_lemma_outcome(&mut proof_state.lemmas_state, lemma_state);

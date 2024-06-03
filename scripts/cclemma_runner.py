@@ -61,5 +61,15 @@ def _collect_result(output_dir, summary_path, dataset):
     with open(output_file, "w") as oup:
         oup.write("".join(res))
 
+def build_cc_lemma():
+    command = ["cd", config.cclemma_path, ";",
+               'cargo build --release']
+    try:
+        result = subprocess.run(' '.join(command), shell=True, check=True)
+    except KeyboardInterrupt:
+        print("\nExecution halted by user")
+        sys.exit(0)
+
 def get_runner():
+    build_cc_lemma()
     return {"dataset": _get_dataset, "runner": _run_cclemma, "name": "cclemma", "post": _collect_result}
