@@ -1,6 +1,6 @@
 import os
-import config
-import util
+import scripts.config as config
+import scripts.util as util
 import time
 import glob
 import subprocess
@@ -46,7 +46,7 @@ def _collect_result(output_dir, summary_path, dataset):
         with open(file, "r") as inp:
             lines = inp.readlines()
             if len(res) == 0: res.append(lines[0])
-            if dataset == "sufu":
+            if dataset == "optimization":
                 assert len(lines) <= 2
                 if len(lines) == 1: continue 
                 
