@@ -302,14 +302,13 @@ def make_plot(dir, dataset, dataset_name, cclemma_prefix, output_dir,
         if tool in exclude:
             continue
         res = None
-        match tool:
-            case 'cclemma':
+        if tool == 'cclemma':
                 res = read_cclemma_results(dir + '/cclemma/' + dataset.lower() + '.csv', cclemma_prefix)
-            case 'hipspec':
+        if tool == 'hipspec':
                 res = read_hipspec_results(dir + '/hipspec/' + dataset.lower() + '.csv')
-            case 'cvc4':
+        if tool == 'cvc4':
                 res = read_cvc4_results(dir + '/cvc4/' + dataset.lower() + '.csv')
-            case 'thesy':
+        if tool == 'thesy':
                 # Yes, there is a lot of special-casing...
                 if dataset == 'clam':
                     res = read_thesy_results(dir + '/thesy-no-expl-proofs.csv', test_suite='clam_trimmed')
