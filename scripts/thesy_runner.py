@@ -20,6 +20,11 @@ def _run_thesy(task_name, inp_file, output_path, extra_flag):
 
     try:
         result = subprocess.run(command, shell=True, check=True)
+    except subprocess.CalledProcessError as e:
+        # output is noisy and unhelpful since it's just the error code -
+        # should check the .err files instead
+        # print(f"Command '{command}' failed with return code {e.returncode}")
+        pass
     except KeyboardInterrupt:
         print("\nExecution halted by user")
         sys.exit(0)
