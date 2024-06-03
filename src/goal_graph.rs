@@ -5,8 +5,6 @@ use crate::goal::Goal;
 
 use crate::goal_graph::GoalNodeStatus::Unknown;
 
-use egg::{Language};
-
 use std::cell::RefCell;
 
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -107,12 +105,12 @@ impl GoalNode {
 
 pub struct LemmaInfo {
   root: StrongGoalRef,
-  lemma_id: usize,
+  _lemma_id: usize,
 }
 
 impl LemmaInfo {
-  fn new(root: StrongGoalRef, lemma_id: usize) -> LemmaInfo {
-    LemmaInfo { root, lemma_id }
+  fn new(root: StrongGoalRef, _lemma_id: usize) -> LemmaInfo {
+    LemmaInfo { root, _lemma_id }
   }
 
   fn get_status(&self) -> GoalNodeStatus {

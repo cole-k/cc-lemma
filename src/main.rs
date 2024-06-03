@@ -230,7 +230,7 @@ fn prove_goal<'a>(
         &filename,
         &goal.name,
         &mut proof_state,
-        // FIXME: remove magic number
+        // TODO: remove magic number
         // (the first lemma - i.e. the main theorem - should be lemma 0)
         0,
         &goal.eq,
@@ -242,20 +242,6 @@ fn prove_goal<'a>(
       file.write_all(explanation.as_bytes())?;
     }
   }
-  // if result == Outcome::Timeout || result == Outcome::Unknown {
-  //   for (i, chain) in proof_state.lemmas_state.possible_lemmas.chains.iter().enumerate() {
-  //     println!("Chain {}", i);
-  //     for elem in chain.chain.iter() {
-  //       println!("Possible lemma: {} === {}", elem.eq.lhs, elem.eq.rhs);
-  //     }
-  //   }
-  // }
-  // for (i, chain) in proof_state.lemmas_state.proven_lemmas.chains.iter().enumerate() {
-  //   println!("Chain {}", i);
-  //   for elem in chain.chain.iter() {
-  //     println!("Proven lemma: {} === {}", elem.eq.lhs, elem.eq.rhs);
-  //   }
-  // }
 
   Ok((
     result,

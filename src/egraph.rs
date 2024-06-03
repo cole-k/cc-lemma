@@ -75,7 +75,7 @@ fn collect_expressions<L: Language, A: Analysis<L>>(
 }
 
 #[derive(Copy, Clone)]
-struct ExtractInfo {
+pub struct ExtractInfo {
   size: usize,
   loop_num: usize,
 }
@@ -178,13 +178,6 @@ pub fn collect_expressions_with_loops_aux<L: Language, A: Analysis<L>>(
     *w -= 1usize;
   });
 
-  /*println!("  {}: {}", "extract from node", id);
-  for node in class.nodes.iter() {
-    println!("     {:?}", node);
-  }
-  for expr in res.iter() {
-    println!("     {:?}", expr);
-  }*/
   res
 }
 
@@ -534,39 +527,4 @@ where
   // Update the memo since we only set it to 'true' temporarily to handle cycles.
   memo.insert((*rec_expr_id, *eclass), res);
   res
-}
-
-/// Antiunifies the two enodes, returning two Ids that need to be unified.
-///
-/// Intuitively, this takes enodes that looks like
-///
-/// (f (g a) x y)
-/// (f (g b) x y)
-///
-/// and finds the smallest part that needs to be unified to make them equal, in
-/// this case
-///
-/// (a, b)
-///
-/// If the enodes differ in multiple places, this returns None
-// NOTE: We might want to consider multiple anti-unifications, such as
-//
-// (f x y)
-// (f a b)
-//
-// returning
-//
-// (a,x), (b, y)
-fn anti_unify<N>(
-  _egraph: &EGraph<SymbolLang, N>,
-  enode_1: &SymbolLang,
-  enode_2: &SymbolLang,
-) -> Option<(Id, Id)>
-where
-  N: Analysis<SymbolLang>,
-{
-  if enode_1.op != enode_2.op {
-    return None;
-  }
-  todo!()
 }

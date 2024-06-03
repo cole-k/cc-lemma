@@ -762,16 +762,3 @@ pub fn sexp_size(sexp: &Sexp) -> usize {
     Sexp::List(xs) => xs.iter().map(sexp_size).sum::<usize>() + 1,
   }
 }
-
-// CK: Function is unused and I didn't feel like extending it to account for the change from
-//     Env = HashMap<Symbol, Vec<Symbol>>
-// to
-//     Env = HashMap<Symbol, (Vec<String>, Vec<Symbol>)>
-//
-// pub fn mk_env(descr: &[(&str, &str)]) -> Env {
-//   let mut env = Env::new();
-//   for (name, cons) in descr {
-//     env.insert(Symbol::from(*name), cons.split_whitespace().map(|s| Symbol::from(s)).collect());
-//   }
-//   env
-// }
