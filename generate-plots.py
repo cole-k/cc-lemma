@@ -369,7 +369,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='Process and plots results.')
 
     # Positional argument
-    parser.add_argument('results_dir', type=str, help='the directory where the results are located')
+    parser.add_argument('results_dir', type=str, help='the directory where the result summaries are located (using defaults, this should be results/summary)')
 
     # Optional flags
     parser.add_argument('--no-save-plots', action='store_true', default=False, help='Do not save the output plots as PNGs in OUTPUT_DIR')

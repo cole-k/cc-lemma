@@ -2947,7 +2947,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
       if self.goal_graph.is_lemma_proved(info.lemma_id) && (!CONFIG.reduce_proven_lemma || !self.goal_graph.is_root(&info) || info.lemma_id == 0) {
         let state = proof_state.lemma_proofs.get_mut(&info.lemma_id).unwrap();
         state.outcome = Some(Outcome::Valid);
-        println!("new lemma {} {}", state.prop, info.full_exp);
+        println!("proved lemma {} {}", state.prop, info.full_exp);
 
         if CONFIG.exclude_bid_reachable {
           state.rw_no_analysis.clone().map(
@@ -3006,7 +3006,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
           lemma_state.outcome = Some(Outcome::Valid);
           self.goal_graph.set_lemma_res(goal.lemma_id, GraphProveStatus::Valid);
 
-          println!("prove lemma {}", lemma_state.prop);
+          println!("proved lemma {}", lemma_state.prop);
           new_lemma.insert(goal.lemma_id);
 
           if CONFIG.exclude_bid_reachable {
