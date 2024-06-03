@@ -31,7 +31,6 @@
   ((=> (addAccum ?a ?b (S ?c)) (S (addAccum ?a ?b ?c))))
 )
 
-(// CycleQ can prove)
 (=== add_accum (a b c) (Nat Nat Nat)
   (addAccum a b c)
   (add (add a b) c)
@@ -42,7 +41,6 @@
   (addAccum b a c)
 )
 
-(// CycleQ cannot prove)
 (=== add_accum2_commutative (a b) (Nat Nat)
   (addAccum2 a b)
   (addAccum2 b a)

@@ -38,7 +38,6 @@
 (:: ite (-> (Bool a a) a))
 (let ite (True ?x ?y ) ?x)
 (let ite (False ?x ?y) ?y)
-(let ite (?b    ?x ?x) ?x)
 
 (:: not (-> (Bool) Bool))
 (let not True False)
@@ -48,6 +47,11 @@
 (let and (False ?y) False)
 (let and (?x False) False)
 (let and (True True) True)
+
+(:: or (-> (Bool Bool) Bool))
+(let or (True ?y) True)
+(let or (?x True) True)
+(let or (False False) False)
 
 (:: plus (-> (Nat Nat) Nat))
 (let plus (Z      ?y) ?y             )
@@ -155,7 +159,7 @@
 (let ins (?n Nil          ) (Cons ?n Nil)                                                  )
 (let ins (?n (Cons ?x ?xs)) (ite (lt ?n ?x) (Cons ?n (Cons ?x ?xs)) (Cons ?x (ins ?n ?xs))))
 
-(// N.B. Different definition than what we use elsewhere, this is lt instead of leq)
+(// N.B. Different definition than what we use in isaplanner, this is lt instead of leq)
 (:: insort (-> (Nat (List Nat)) (List Nat)))
 (let insort (?n Nil          ) (Cons ?n Nil)                                                      )
 (let insort (?n (Cons ?x ?xs)) (ite (lt ?n ?x) (Cons ?n (Cons ?x ?xs)) (Cons ?x (insort ?n ?xs))))
@@ -194,27 +198,6 @@
 (let mirror (Leaf           ) Leaf                             )
 (let mirror ((Node ?l ?x ?r)) (Node (mirror ?r) ?x (mirror ?l)))
 
-(:: mapE (-> ((-> a b) (Expr a)) (Expr b)))
-(let mapE (?f (MkExpr ?t ?n)) (MkExpr (mapT ?f ?t) ?n))
-
-(:: mapT (-> ((-> a b) (Tm a)) (Tm b)))
-(let mapT (?f (Var ?x)     ) (Var ($ ?f ?x))                  )
-(let mapT (?f (Cst ?n)     ) (Cst ?n)                         )
-(let mapT (?f (App ?e1 ?e2)) (App (mapE ?f ?e1) (mapE ?f ?e2)))
-
-(:: argsE (-> ((Expr a)) (List (Expr a))))
-(let argsE ((MkExpr ?t ?n)) (argsT ?t))
-
-(:: argsT (-> ((Tm a)) (List (Expr a))))
-(let argsT ((Var ?x)     ) Nil)
-(let argsT ((Cst ?n)     ) Nil)
-(let argsT ((App ?e1 ?e2)) (Cons ?e2 (argsE ?e1)))
-
-(:: headE (-> ((Expr a)) (Expr a)))
-(let headE ((MkExpr (Var ?x) ?n)     ) (MkExpr (Var ?x) ?n))
-(let headE ((MkExpr (Cst ?x) ?n)     ) (MkExpr (Cst ?x) ?n))
-(let headE ((MkExpr (App ?e1 ?e2) ?n)) (headE ?e1)         )
-
 (:: double (-> (Nat) Nat))
 (let double (Z) Z)
 (let double ((S ?x)) (S (S (double ?x))))
@@ -232,7 +215,7 @@
 (let qreva (Nil ?acc) ?acc)
 (let qreva ((Cons ?x ?xs) ?acc) (qreva ?xs (Cons ?x ?acc)))
 
-(:: revflat (-> (Tree a) (List a)))
+(:: revflat (-> ((Tree a)) (List a)))
 (let revflat (Leaf) Nil)
 (let revflat ((Node ?l ?x ?r)) (append (revflat ?l) (Cons ?x (revflat ?r))))
 
@@ -255,13 +238,15 @@
 
 (:: fac (-> (Nat) Nat))
 (let fac (Z) (S Z))
-(let fac ((S ?n)) (mult (fac ?n) ?n))
+(let fac ((S ?n)) (mult (fac ?n) (S ?n)))
 
 (:: qfac (-> (Nat Nat) Nat))
 (let qfac (Z ?n) ?n)
-(let qfac ((S ?m) ?n) (qfac ?m (mult ?n ?m)))
+(let qfac ((S ?m) ?n) (qfac ?m (mult ?n (S ?m))))
 
 (:: exp (-> (Nat Nat) Nat))
+(// This is maybe necessary, unsure if they had it in the definition)
+(// (let exp (Z Z) Z) )
 (let exp (?m Z) (S Z))
 (let exp (?m (S ?n)) (mult (exp ?m ?n) ?m))
 
@@ -269,97 +254,94 @@
 (let qexp (?m Z ?acc) (?acc))
 (let qexp (?m (S ?n) ?acc) (qexp ?m ?n (mult ?acc ?m)))
 
+(:: lst-union (-> ((List Nat) (List Nat)) (List Nat)))
+(let lst-union (Nil           ?ys          ) ?ys )
+(let lst-union ((Cons ?x ?xs) ?ys) (ite (mem ?x ?ys) (lst-union ?xs ?ys) (Cons ?x (lst-union ?xs ?ys))))
+
+(:: lst-intersection (-> ((List Nat) (List Nat)) (List Nat)))
+(let lst-intersection (Nil           ?ys          ) Nil )
+(let lst-intersection ((Cons ?x ?xs) ?ys) (ite (mem ?x ?ys) (Cons ?x (lst-union ?xs ?ys)) (lst-union ?xs ?ys)))
+
+(:: lst-subset (-> ((List Nat) (List Nat)) Bool))
+(let lst-subset (Nil           ?ys          ) True)
+(let lst-subset ((Cons ?x ?xs) ?ys) (and (lst-subset ?xs ?ys) (mem ?x ?ys)))
+
+(:: lst-eq  (-> ((List Nat) (List Nat)) Bool))
+(let lst-eq (?xs ?ys) (and (lst-subset ?xs ?ys) (lst-subset ?ys ?xs)))
+
 (=== clam_1 (x) (Nat)
   (double x)
   (plus x x)
-  ((=> (plus ?x (S ?y)) (S (plus ?x ?y))))
 )
 
 (=== clam_2 (x y) ((List a) (List a))
   (len (append x y))
   (len (append y x))
-  ((=> (len (append ?x (Cons ?y ?z))) (S (len (append ?x ?z)))))
 )
 
 (=== clam_3 (x y) ((List a) (List a))
   (len (append x y))
   (plus (len x) (len y))
-  ((=> (plus ?x (S ?y)) (S (plus ?x ?y))))
 )
 
 (=== clam_4 (x) ((List a))
   (len (append x x))
   (double (len x))
-  ((=> (len (append ?x (Cons ?y ?z))) (S (len (append ?x ?z)))))
 )
 
 (=== clam_5 (x) ((List a))
   (len (rev x))
   (len x)
-  ((=> (len (append ?x (Cons ?y Nil))) (S (len ?x))))
 )
 
 (=== clam_6 (x y) ((List a) (List a))
   (len (rev (append x y)))
   (plus (len x) (len y))
-  ((=> (len (append ?x (Cons ?y ?z))) (S (len (append ?x ?z)))))
 )
 
 (=== clam_7 (x y) ((List a) (List a))
   (len (qreva x y))
   (plus (len x) (len y))
-  ((=> (plus ?x (S ?y)) (S (plus ?x ?y))))
 )
 
 
 (=== clam_8 (x y z) (Nat Nat (List a))
   (drop x (drop y z))
   (drop y (drop x z))
-  ((=> (drop (S ?w) (drop ?x (Cons ?y ?z))) (drop ?w (drop ?x ?z))))
 )
 
 
 (=== clam_9 (w x y z) (Nat Nat Nat (List a))
   (drop w (drop x (drop y z)))
   (drop y (drop x (drop w z)))
-  ((=> (drop (S ?v) (drop ?w (drop ?x (Cons ?y ?z)))) (drop ?v (drop ?w (drop ?x ?z))))
-   (=> (drop (S ?u) (drop ?v (drop (S w) (Cons x (Cons y z))))) (drop (S u) (drop v (drop w (Cons x z)))))
-  )
 )
 
 
 (=== clam_10 (x) ((List a))
   (rev (rev x))
   x
-  ((=> (rev (append ?x (Cons ?y Nil))) (Cons ?y (rev ?x))))
 )
-
 
 
 (=== clam_11  (x y) ((List a) (List a))
   (rev (append (rev x) (rev y)))
   (append y x)
-  ((=> (rev (append ?x (append ?y (Cons ?z Nil)))) (Cons ?z (rev (append ?x ?y))))
-  (=> (rev (append (append ?x (Cons ?y Nil)) Nil)) (Cons ?y (rev (append ?x Nil))))
-  )
 )
 
 
 (=== clam_12 (x y) ((List a) (List a))
   (qreva x y)
   (append (rev x) y)
-  ((=> (append (append ?x (Cons ?y Nil)) ?z) (append ?x (Cons ?y ?z))))
 )
 
 
 (=== clam_13 (x) (Nat)
   (half (plus x x))
   x
-  ((=> (plus ?x (S ?y)) (S (plus ?x ?y))))
 )
 
 
-(// TODO: Needs conditional rewrite
+(// Needs conditional rewrite
     sorted x => sorted (insort y x)
 )
 (=== clam_14 (x) ((List Nat))
@@ -371,67 +353,45 @@
 (=== clam_15 (x) (Nat)
   (plus x (S x))
   (S (plus x x))
-  ((=> (plus ?x (S ?y)) (S (plus ?x ?y))))
 )
 
 
-(=== clam_16 (x) (Nat)
+((=== clam_16 (x) (Nat)
   (even (plus x x))
   True
-  ((=> (plus ?x (S ?y)) (S (plus ?x ?y))))
 )
 
 
 (=== clam_17 (x y) ((List a) (List a))
   (rev (rev (append x y)))
   (append (rev (rev x)) (rev (rev y)))
-  ((=> (rev (append ?x (Cons ?y Nil))) (Cons ?y (rev ?x))))
 )
 
 
 (=== clam_18 (x y) ((List a) (List a))
   (rev (append (rev x) y))
   (append (rev y) x)
-  ((=> (append (append ?x (Cons ?y Nil)) ?z) (append ?x (Cons ?y ?z)))
-   (=> (append (append ?x ?y) (Cons ?z Nil)) (append ?x (append ?y (Cons ?z Nil))))
-  )
 )
 
 
 (=== clam_19 (x y) ((List a) (List a))
   (append (rev (rev x)) y)
   (rev (rev (append x y)))
-  ((=> (rev (append ?x (Cons ?y Nil))) (Cons ?y (rev ?x))))
 )
 
 
 (=== clam_20 (x) ((List a))
   (even (len (append x x)))
   True
-  ((=> (len (append ?x (Cons ?y ?z))) (S (len (append ?x ?z)))))
 )
 
-(//
-This also suffices
-  (
-   (=> (append (append ?x ?y) (Cons ?z Nil)) (append ?x (append ?y (Cons ?z Nil))))
-   (=> (append (append ?x ?y) ?z) (append (append ?x ?y) ?z))
-  )
-)
+
 (=== clam_21 (x y) ((List a) (List a))
   (rotate (len x) (append x y))
   (append y x)
-  (
-    (=> (append (append ?x (Cons ?y Nil)) ?z) (append ?x (Cons ?y ?z)))
-    (=> (append (append ?x ?y) (Cons ?z Nil)) (append ?x (append ?y (Cons ?z Nil))))
-  )
 )
 
 
-(// N.B. This requires the lemma
-  ((=> (even (len (append ?w ?z))) (even (len (append ?w (Cons ?x (Cons ?y ?z)))))))
-  which we cannot add because it has a free variables appearing on the RHS
-)
 (=== clam_22 (x y) ((List a) (List a))
   (even (len (append x y)))
   (even (len (append y x)))
@@ -441,106 +401,85 @@ This also suffices
 (=== clam_23 (x y) ((List a) (List a))
   (half (len (append x y)))
   (half (len (append y x)))
-  ((=> (len (append ?w (Cons ?x (Cons ?y ?z)))) (S (S (len (append ?w ?z))))))
 )
 
 
 (=== clam_24 (x y) (Nat Nat)
   (even (plus x y))
   (even (plus y x))
-  ((=> (even (plus ?x ?y)) (even (plus ?x (S (S ?y))))))
 )
 
 (=== clam_25 (x y) ((List a) (List a))
   (even (len (append x y)))
   (even (plus (len x) (len y)))
-  ((=> (even (plus ?x ?y)) (even (plus ?x (S (S ?y))))))
 )
 
 
 (=== clam_26 (x y) (Nat Nat)
   (half (plus x y))
   (half (plus y x))
-  ((=> (plus ?x (S (S ?y))) (S (S (plus ?x ?y)))))
 )
 
 
 (=== clam_27 (x) ((List a))
   (rev x)
   (qreva x Nil)
-  ((=> (append (rev ?x) ?y) (qreva ?x ?y)))
 )
 
 
 (=== clam_28 (x) ((Tree a))
   (revflat x)
   (qrevaflat x Nil)
-  ((=> (append (revflat ?x) ?y) (qrevaflat ?x ?y)))
 )
 
 
 (=== clam_29 (x) ((List a))
   (rev (qreva x Nil))
   x
-  ((=> (rev (qreva ?x ?y)) (append (rev ?y) ?x))
-   (=> (rev (qreva ?x (rev ?y))) (append ?y ?x))
-  )
 )
 
 
 (=== clam_30 (x) ((List a))
   (rev (append (rev x) Nil))
   x
-  ((=> (rev (append (rev ?x) ?y)) (append (rev ?y) ?x))
-   (=> (rev (append (rev ?x) (rev ?y))) (append ?y ?x))
-  )
 )
 
 
 (=== clam_31 (x) ((List a))
   (qreva (qreva x Nil) Nil)
   x
-  ((=> (qreva (qreva ?x ?y) Nil) (append (rev ?y) ?x))
-   (=> (qreva (qreva ?x (rev ?y)) Nil) (append ?y ?x))
-  )
 )
 
 
 (=== clam_32 (x) ((List a))
   (rotate (len x) x)
   x
-  ((=> (rotate (len ?x) (append ?x ?y)) (append ?y ?x)))
 )
 
 
 (=== clam_33 (x) (Nat)
   (fac x)
   (qfac x (S Z))
-  ((=> (mult (fac ?x) ?y) (qfac ?x ?y)))
 )
 
 
 (=== clam_34 (x y) (Nat Nat)
   (mult x y)
   (qmult x y Z)
-  ((=> (plus (mult ?x ?y) ?z) (qmult ?x ?y ?z)))
 )
 
 
 (=== clam_35 (x y) (Nat Nat)
   (exp x y)
   (qexp x y (S Z))
-  ((=> (mult (exp ?x ?y) ?z) (qexp ?x ?y ?z)))
 )
-
 
 (=== clam_48 (x) ((List Nat))
   (len (sort x))
   (len x)
-  ((=> (len (insort ?x ?y)) (S (len ?y))))
 )
 
-(// TODO: needs conditional rewrite
+(// needs conditional rewrite
     not (= x y) => (=> (mem x (insort y z)) (mem x z))
 )
 (==> clam_49 (x y) (Nat (List Nat))
@@ -551,105 +490,84 @@ This also suffices
 )
 
 
-(// TODO: needs conditional rewrite
+(// needs conditional rewrite
     not (= x y) => (= (count x (insort y z)) (count x z))
 )
 (=== clam_50 (x y) (Nat (List Nat))
   (count x (sort y))
   (count x y)
-  ((=> (count ?x (insort ?x ?y)) (S (count ?x ?y))))
 )
 
 
 (=== clam_75 (x y) ((List a) (List a))
   (append (rev x) y)
   (qreva x y)
-  ((=> (append (append ?x ?y) ?z) (append ?x (append ?y ?z))))
 )
 
 
 (=== clam_76 (x y) ((Tree a) (List a))
   (append (revflat x) y)
   (qrevaflat x y)
-  ((=> (append (append ?x ?y) ?z) (append ?x (append ?y ?z))))
 )
 
 
 (=== clam_77 (x y) ((List a) (List a))
   (rev (qreva x y))
   (append (rev y) x)
-  ((=> (append (append ?x (Cons ?y Nil)) ?z) (append ?x (Cons ?y ?z))))
 )
 
 
 (=== clam_78 (x y) ((List a) (List a))
   (rev (qreva x (rev y)))
   (append y x)
-  ((=> (rev (append ?x (Cons ?y Nil))) (Cons ?y (rev ?x)))
-   (=> (append (append ?x (Cons ?y Nil)) ?z) (append ?x (Cons ?y ?z)))
-  )
 )
 
 
 (=== clam_79 (x y) ((List a) (List a))
   (rev (append (rev x) y))
   (append (rev y) x)
-  ((=> (append (append ?x (Cons ?y Nil)) ?z) (append ?x (Cons ?y ?z))))
 )
 
 
 (=== clam_80 (x y) ((List a) (List a))
   (rev (append (rev x) (rev y)))
   (append y x)
-  ((=> (rev (append ?x (Cons ?y Nil))) (Cons ?y (rev ?x)))
-   (=> (append (append ?x (Cons ?y Nil)) ?z) (append ?x (Cons ?y ?z)))
-  )
 )
 
 
 (=== clam_81 (x y) ((List a) (List a))
   (qreva (qreva x y) Nil)
   (append (rev y) x)
-  ((=> (append (append ?x (Cons ?y Nil)) ?z) (append ?x (Cons ?y ?z))))
 )
 
 
 (=== clam_82 (x y) ((List a) (List a))
   (qreva (qreva x (rev y)) Nil)
   (append y x)
-  ((=> (rev (append ?x (Cons ?y Nil))) (Cons ?y (rev ?x)))
-   (=> (append (append ?x (Cons ?y Nil)) ?z) (append ?x (Cons ?y ?z)))
-  )
 )
 
 
 (=== clam_83 (x y) ((List a) (List a))
   (rotate (len x) (append x y))
   (append y x)
-  ((=> (append (append ?x (Cons ?y Nil)) ?z) (append ?x (Cons ?y ?z)))
-   (=> (append (append ?x ?y) ?z) (append ?x (append ?y ?z)))
-  )
 )
 
 
 (=== clam_84 (x y) (Nat Nat)
   (mult (fac x) y)
   (qfac x y)
-  ((=> (mult (mult ?x ?y) ?z) (mult ?x (mult ?y ?z))))
 )
 
 
 (=== clam_85 (x y z) (Nat Nat Nat)
   (plus (mult x y) z)
   (qmult x y z)
-  ((=> (plus (plus ?x ?y) ?z) (plus ?x (plus ?y ?z))))
 )
 
 
 (=== clam_86 (x y z) (Nat Nat Nat)
   (mult (exp x y) z)
   (qexp x y z)
-  ((=> (plus (plus ?x ?y) ?z) (plus ?x (plus ?y ?z))))
 )
 
 )
