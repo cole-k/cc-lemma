@@ -6,7 +6,7 @@ cclemma_path = "/home/cole/research/cc-lemma"
 hipspec_path = "PATH/TO/HIPSPEC"
 thesy_path = "PATH/TO/THESY"
 cvc4_bin_name = "cvc4-vmcai2015"
-output_path = "/home/cole/research/cc-lemma/dataset_script/results"
+output_path = "/home/cole/research/cc-lemma/results"
 
 hipspec_expensive_props = {
     "clam": [81],
