@@ -1,0 +1,242 @@
+test_suite,file_name,success,time,stop_reasons,lemma_count,failed_proof_count,proofs_later_filtered
+isaplanner,goal1.smt2.stats.json,True,0.000867329,[],0,0,0
+isaplanner,goal10.smt2.stats.json,True,0.002040239,[],0,0,0
+isaplanner,goal11.smt2.stats.json,True,0.000261989,[],0,0,0
+isaplanner,goal12.smt2.stats.json,True,0.0011764730000000001,[],0,0,0
+isaplanner,goal13.smt2.stats.json,True,0.000788918,[],0,0,0
+isaplanner,goal14.smt2.stats.json,True,0.001673481,[],0,0,0
+isaplanner,goal15.smt2.stats.json,True,0.003987813000000001,[],0,0,0
+isaplanner,goal16.smt2.stats.json,True,0.000484913,[],0,0,0
+isaplanner,goal17.smt2.stats.json,True,0.005137546000000001,[],0,0,0
+isaplanner,goal18.smt2.stats.json,True,0.029786233000000002,[],0,0,0
+isaplanner,goal19.smt2.stats.json,True,0.015482531,[],0,0,0
+isaplanner,goal2.smt2.stats.json,True,0.001792029,[],0,0,0
+isaplanner,goal20.smt2.stats.json,True,23.491586439,['IterationLimit'],6,1,0
+isaplanner,goal22.smt2.stats.json,False,65.93956456,['IterationLimit'],8,16,6
+isaplanner,goal23.smt2.stats.json,False,103.813000827,['IterationLimit'],9,16,7
+isaplanner,goal24.smt2.stats.json,False,67.219885859,['IterationLimit'],8,15,4
+isaplanner,goal25.smt2.stats.json,True,0.028391419,[],0,0,0
+isaplanner,goal26.smt2.stats.json,False,192.489979541,['IterationLimit'],4,2,0
+isaplanner,goal27.smt2.stats.json,True,0.007448413,[],0,0,0
+isaplanner,goal28.smt2.stats.json,True,0.005617961,[],0,0,0
+isaplanner,goal29.smt2.stats.json,True,0.004546097000000001,[],0,0,0
+isaplanner,goal30.smt2.stats.json,True,0.012129836000000001,[],0,0,0
+isaplanner,goal31.smt2.stats.json,False,68.965643436,['IterationLimit'],8,39,2
+isaplanner,goal32.smt2.stats.json,False,64.631006549,['IterationLimit'],8,41,1
+isaplanner,goal33.smt2.stats.json,False,63.661856702,['IterationLimit'],8,40,2
+isaplanner,goal34.smt2.stats.json,False,65.143101064,['IterationLimit'],8,39,1
+isaplanner,goal37.smt2.stats.json,True,0.0011605180000000001,[],0,0,0
+isaplanner,goal38.smt2.stats.json,True,0.0016448530000000002,[],0,0,0
+isaplanner,goal39.smt2.stats.json,True,0.0020854240000000002,[],0,0,0
+isaplanner,goal4.smt2.stats.json,True,0.0007180740000000001,[],0,0,0
+isaplanner,goal40.smt2.stats.json,True,0.00027446100000000004,[],0,0,0
+isaplanner,goal41.smt2.stats.json,True,0.0013572500000000002,[],0,0,0
+isaplanner,goal42.smt2.stats.json,True,0.00043204100000000003,[],0,0,0
+isaplanner,goal43.smt2.stats.json,True,0.001221001,[],0,0,0
+isaplanner,goal44.smt2.stats.json,False,1.157507719,['Saturated'],2,1,0
+isaplanner,goal45.smt2.stats.json,True,0.00047894500000000004,[],0,0,0
+isaplanner,goal46.smt2.stats.json,True,0.000280242,[],0,0,0
+isaplanner,goal48.smt2.stats.json,True,0.002261242,[],0,0,0
+isaplanner,goal49.smt2.stats.json,False,15.003759821,"['IterationLimit', 'Saturated']",4,2,2
+isaplanner,goal5.smt2.stats.json,True,0.0017570600000000002,[],0,0,0
+isaplanner,goal51.smt2.stats.json,False,15.003779474,"['IterationLimit', 'Saturated']",4,4,0
+isaplanner,goal52.smt2.stats.json,False,265.280016036,"['IterationLimit', 'Saturated']",7,12,0
+isaplanner,goal54.smt2.stats.json,True,60.38689806,['IterationLimit'],4,0,0
+isaplanner,goal56.smt2.stats.json,True,0.0048125830000000005,[],0,0,0
+isaplanner,goal57.smt2.stats.json,True,13.872594465,"['IterationLimit', 'Saturated']",8,0,11
+isaplanner,goal6.smt2.stats.json,True,0.004564722,[],0,0,0
+isaplanner,goal60.smt2.stats.json,True,0.025511918,['Saturated'],1,0,0
+isaplanner,goal61.smt2.stats.json,False,8.029318896,"['IterationLimit', 'Saturated']",4,1,1
+isaplanner,goal62.smt2.stats.json,False,8.073259299,"['IterationLimit', 'Saturated']",4,1,1
+isaplanner,goal63.smt2.stats.json,True,32.746026503,[],0,0,0
+isaplanner,goal64.smt2.stats.json,True,0.6054888890000001,[],0,0,0
+isaplanner,goal65.smt2.stats.json,False,14.616133724,"['IterationLimit', 'Saturated']",6,2,0
+isaplanner,goal67.smt2.stats.json,False,3.885872095,['IterationLimit'],6,0,3
+isaplanner,goal68.smt2.stats.json,False,42.679352136,['IterationLimit'],7,12,0
+isaplanner,goal69.smt2.stats.json,False,37.373909835,['IterationLimit'],8,9,4
+isaplanner,goal7.smt2.stats.json,True,0.004531961,[],0,0,0
+isaplanner,goal71.smt2.stats.json,False,4.598368429,['IterationLimit'],5,0,1
+isaplanner,goal75.smt2.stats.json,False,2.5577260280000003,"['IterationLimit', 'Saturated']",6,5,0
+isaplanner,goal77.smt2.stats.json,True,0.001982565,[],0,0,0
+isaplanner,goal79.smt2.stats.json,False,96.10143993,['IterationLimit'],7,0,1
+isaplanner,goal8.smt2.stats.json,True,0.150767703,[],0,0,0
+isaplanner,goal80.smt2.stats.json,False,91.518460384,['IterationLimit'],7,0,2
+isaplanner,goal81.smt2.stats.json,True,0.098150547,[],0,0,0
+isaplanner,goal82.smt2.stats.json,True,0.0049031840000000005,[],0,0,0
+isaplanner,goal85.smt2.stats.json,True,0.0031267,[],0,0,0
+isaplanner,goal86.smt2.stats.json,True,0.003219364,[],0,0,0
+isaplanner,goal87.smt2.stats.json,False,138.251005828,"['IterationLimit', 'NodeLimit', 'Saturated']",16,22,17
+isaplanner,goal9.smt2.stats.json,True,0.02582732,[],0,0,0
+optimization,autolifter-single-pass-mps.stats.json,True,0.002148739,[],0,0,0
+optimization,autolifter-single-pass-sum.stats.json,True,0.00964799,['Saturated'],3,0,0
+optimization,fusion-deforestation-page7-2.stats.json,True,0.011720564000000001,['Saturated'],2,0,0
+optimization,synduce-constraints-memo-constant.stats.json,True,0.0033578780000000003,[],0,0,0
+optimization,synduce-list-issorted.stats.json,False,62.824061542,"['IterationLimit', 'Saturated']",11,1180,2
+optimization,synduce-list-last.stats.json,True,0.418033076,"['IterationLimit', 'Saturated']",4,1,14
+optimization,synduce-misc-simple_nnf.stats.json,True,0.071407989,['Saturated'],6,0,1
+optimization,synduce-tree-sorted.stats.json,False,55.194327005,"['IterationLimit', 'Saturated']",12,206,2
+hipspec_sg,nichomachus-goal2.smt2.stats.json,True,0.00156569,[],0,0,0
+hipspec_sg,nichomachus-goal3.smt2.stats.json,True,22.162665576,"['IterationLimit', 'NodeLimit']",7,28,1
+hipspec_sg,nichomachus-goal4.smt2.stats.json,True,0.433414134,['IterationLimit'],1,0,0
+hipspec_sg,nichomachus-goal5.smt2.stats.json,True,0.014123223,[],0,0,0
+hipspec_sg,nichomachus-goal6.smt2.stats.json,True,0.001968357,[],0,0,0
+hipspec_sg,nichomachus-goal7.smt2.stats.json,True,0.038196913,[],0,0,0
+hipspec_sg,nichomachus-goal8.smt2.stats.json,True,0.0062195570000000006,[],0,0,0
+hipspec_sg,nichomachus-goal9.smt2.stats.json,True,0.056185585,[],0,0,0
+hipspec_sg,rev-equiv-goal3.smt2.stats.json,True,0.0031455990000000002,[],0,0,0
+hipspec_sg,rev-equiv-goal6.smt2.stats.json,True,0.001231106,[],0,0,0
+hipspec_sg,rev-equiv-goal8.smt2.stats.json,True,0.0012120520000000001,[],0,0,0
+hipspec_sg,rotate-goal7.smt2.stats.json,True,0.960779416,[],0,0,0
+hipspec_sg,rotate-goal8.smt2.stats.json,True,0.002053879,[],0,0,0
+hipspec_sg,rotate-goal9.smt2.stats.json,True,0.002038106,[],0,0,0
+leon,amortize-queue-goal1.smt2.stats.json,True,0.001158163,[],0,0,0
+leon,amortize-queue-goal10.smt2.stats.json,True,0.0009645080000000001,[],0,0,0
+leon,amortize-queue-goal11.smt2.stats.json,True,0.001236652,[],0,0,0
+leon,amortize-queue-goal3.smt2.stats.json,True,0.12221011000000001,[],0,0,0
+leon,amortize-queue-goal4.smt2.stats.json,True,0.152365311,[],0,0,0
+leon,amortize-queue-goal5.smt2.stats.json,True,5.85052798,[],0,0,0
+leon,amortize-queue-goal8.smt2.stats.json,True,0.000935376,[],0,0,0
+leon,bsearch-tree-goal13.smt2.stats.json,True,0.0019291030000000002,[],0,0,0
+leon,bsearch-tree-goal9.smt2.stats.json,True,0.020681537,[],0,0,0
+sg_clam,goal-sg1.smt2.stats.json,True,0.001067769,[],0,0,0
+sg_clam,goal-sg10.smt2.stats.json,True,0.000515069,[],0,0,0
+sg_clam,goal-sg11.smt2.stats.json,True,3.5409518120000003,"['IterationLimit', 'Saturated']",6,3,2
+sg_clam,goal-sg12.smt2.stats.json,True,0.000687891,[],0,0,0
+sg_clam,goal-sg13.smt2.stats.json,True,0.003269731,[],0,0,0
+sg_clam,goal-sg14.smt2.stats.json,False,93.79461053200001,['IterationLimit'],7,0,4
+sg_clam,goal-sg15.smt2.stats.json,True,0.001326406,[],0,0,0
+sg_clam,goal-sg16.smt2.stats.json,True,0.0038898310000000003,[],0,0,0
+sg_clam,goal-sg17.smt2.stats.json,True,0.001757876,[],0,0,0
+sg_clam,goal-sg18.smt2.stats.json,True,0.043798050000000005,['IterationLimit'],1,0,0
+sg_clam,goal-sg19.smt2.stats.json,True,2.236406971,"['IterationLimit', 'Saturated']",3,0,0
+sg_clam,goal-sg2.smt2.stats.json,True,0.014888739000000002,['Saturated'],1,0,0
+sg_clam,goal-sg20.smt2.stats.json,True,0.0030100950000000004,[],0,0,0
+sg_clam,goal-sg21.smt2.stats.json,True,0.792306712,['IterationLimit'],3,0,0
+sg_clam,goal-sg22.smt2.stats.json,False,2.70890262,['IterationLimit'],4,1,2
+sg_clam,goal-sg23.smt2.stats.json,False,3.652457801,['IterationLimit'],4,16,2
+sg_clam,goal-sg24.smt2.stats.json,True,7.856273159,['IterationLimit'],4,0,0
+sg_clam,goal-sg25.smt2.stats.json,True,0.005498347000000001,[],0,0,0
+sg_clam,goal-sg26.smt2.stats.json,True,4.30764394,['IterationLimit'],3,0,0
+sg_clam,goal-sg27.smt2.stats.json,True,0.00047538200000000005,[],0,0,0
+sg_clam,goal-sg28.smt2.stats.json,True,0.001247697,[],0,0,0
+sg_clam,goal-sg29.smt2.stats.json,True,0.001011854,[],0,0,0
+sg_clam,goal-sg3.smt2.stats.json,True,0.0006100680000000001,[],0,0,0
+sg_clam,goal-sg30.smt2.stats.json,True,0.00112615,[],0,0,0
+sg_clam,goal-sg31.smt2.stats.json,True,0.0010947580000000001,[],0,0,0
+sg_clam,goal-sg32.smt2.stats.json,True,0.001935548,[],0,0,0
+sg_clam,goal-sg33.smt2.stats.json,True,0.000660808,[],0,0,0
+sg_clam,goal-sg34.smt2.stats.json,True,0.000459256,[],0,0,0
+sg_clam,goal-sg35.smt2.stats.json,True,0.000700981,[],0,0,0
+sg_clam,goal-sg4.smt2.stats.json,True,0.000615654,[],0,0,0
+sg_clam,goal-sg48.smt2.stats.json,True,0.000422382,[],0,0,0
+sg_clam,goal-sg49.smt2.stats.json,True,0.006917172,[],0,0,0
+sg_clam,goal-sg5.smt2.stats.json,True,0.0008791340000000001,[],0,0,0
+sg_clam,goal-sg6.smt2.stats.json,True,16.028149899,"['IterationLimit', 'Saturated']",10,1,3
+sg_clam,goal-sg7.smt2.stats.json,True,0.0012988420000000001,[],0,0,0
+sg_clam,goal-sg75.smt2.stats.json,True,0.0010758,[],0,0,0
+sg_clam,goal-sg76.smt2.stats.json,True,0.000750763,[],0,0,0
+sg_clam,goal-sg77.smt2.stats.json,True,0.026688707000000002,['Saturated'],2,0,0
+sg_clam,goal-sg78.smt2.stats.json,True,7.045132867,"['IterationLimit', 'Saturated']",4,1,0
+sg_clam,goal-sg79.smt2.stats.json,True,0.0192609,['Saturated'],1,0,0
+sg_clam,goal-sg8.smt2.stats.json,True,0.004144907000000001,[],0,0,0
+sg_clam,goal-sg80.smt2.stats.json,True,3.375894783,"['IterationLimit', 'Saturated']",6,0,5
+sg_clam,goal-sg81.smt2.stats.json,True,6.078026444,"['IterationLimit', 'Saturated']",16,1,7
+sg_clam,goal-sg82.smt2.stats.json,True,6.509985108,"['IterationLimit', 'Saturated']",4,1,0
+sg_clam,goal-sg83.smt2.stats.json,True,0.47203554500000006,['IterationLimit'],1,0,0
+sg_clam,goal-sg9.smt2.stats.json,True,0.006221114000000001,[],0,0,0
+hipspec,nichomachus-goal1.smt2.stats.json,True,0.13348268600000002,['IterationLimit'],3,0,0
+hipspec,nichomachus-goal2.smt2.stats.json,True,0.136517409,['IterationLimit'],3,0,0
+hipspec,nichomachus-goal3.smt2.stats.json,True,0.9742906330000001,['IterationLimit'],7,5,6
+hipspec,nichomachus-goal5.smt2.stats.json,True,18.500429524,"['IterationLimit', 'NodeLimit']",12,5,2
+hipspec,nichomachus-goal6.smt2.stats.json,False,11.617240801,['IterationLimit'],9,401,4
+hipspec,nichomachus-goal8.smt2.stats.json,True,1.044962091,['IterationLimit'],8,10,0
+hipspec,rev-equiv-goal1.smt2.stats.json,True,0.00034294100000000004,[],0,0,0
+hipspec,rev-equiv-goal2.smt2.stats.json,True,0.000647551,[],0,0,0
+hipspec,rev-equiv-goal3.smt2.stats.json,True,0.5532980980000001,"['IterationLimit', 'Saturated']",2,2,0
+hipspec,rev-equiv-goal4.smt2.stats.json,True,0.00045855,[],0,0,0
+hipspec,rev-equiv-goal5.smt2.stats.json,True,0.001196362,[],0,0,0
+hipspec,rev-equiv-goal6.smt2.stats.json,True,0.001013941,[],0,0,0
+hipspec,rev-equiv-goal7.smt2.stats.json,True,0.7673752380000001,"['IterationLimit', 'Saturated']",4,59,0
+hipspec,rev-equiv-goal8.smt2.stats.json,True,0.662309574,"['IterationLimit', 'Saturated']",3,1,2
+hipspec,rotate-goal1.smt2.stats.json,True,0.000318171,[],0,0,0
+hipspec,rotate-goal2.smt2.stats.json,True,0.000996491,[],0,0,0
+hipspec,rotate-goal5.smt2.stats.json,True,0.029385183000000002,[],0,0,0
+hipspec,rotate-goal6.smt2.stats.json,True,23.163381224,['IterationLimit'],11,2,12
+hipspec,rotate-goal8.smt2.stats.json,True,9.183213292,['IterationLimit'],6,0,0
+clam_trimmed,goal1.smt2.stats.json,True,0.036984932000000005,"['IterationLimit', 'Saturated']",2,2,0
+clam_trimmed,goal10.smt2.stats.json,True,0.22347471800000002,"['IterationLimit', 'Saturated']",3,2,0
+clam_trimmed,goal11.smt2.stats.json,True,0.370211491,"['IterationLimit', 'Saturated']",4,2,0
+clam_trimmed,goal12.smt2.stats.json,True,0.644014219,"['IterationLimit', 'Saturated']",2,16,0
+clam_trimmed,goal13.smt2.stats.json,True,0.08111420000000001,['IterationLimit'],3,1,1
+clam_trimmed,goal14.smt2.stats.json,False,8.755943507,['IterationLimit'],5,0,0
+clam_trimmed,goal15.smt2.stats.json,True,0.016407368000000002,"['IterationLimit', 'Saturated']",3,0,1
+clam_trimmed,goal16.smt2.stats.json,True,0.019664451000000003,['IterationLimit'],2,0,0
+clam_trimmed,goal17.smt2.stats.json,True,0.186340428,"['IterationLimit', 'Saturated']",3,2,0
+clam_trimmed,goal18.smt2.stats.json,True,0.128263566,"['IterationLimit', 'Saturated']",2,1,0
+clam_trimmed,goal19.smt2.stats.json,True,0.18125801100000002,"['IterationLimit', 'Saturated']",3,2,0
+clam_trimmed,goal2.smt2.stats.json,False,0.268702171,"['IterationLimit', 'Saturated']",2,0,0
+clam_trimmed,goal20.smt2.stats.json,False,0.143733925,['IterationLimit'],2,0,3
+clam_trimmed,goal21.smt2.stats.json,True,6.85419035,['IterationLimit'],4,1,0
+clam_trimmed,goal22.smt2.stats.json,False,0.145951582,['IterationLimit'],2,0,1
+clam_trimmed,goal23.smt2.stats.json,False,0.343611688,['IterationLimit'],2,2,0
+clam_trimmed,goal24.smt2.stats.json,True,0.01891034,['IterationLimit'],2,0,0
+clam_trimmed,goal25.smt2.stats.json,True,0.0009443520000000001,[],0,0,0
+clam_trimmed,goal26.smt2.stats.json,True,0.16233550100000002,['IterationLimit'],3,1,1
+clam_trimmed,goal27.smt2.stats.json,True,0.31892663200000004,"['IterationLimit', 'Saturated']",4,1,2
+clam_trimmed,goal28.smt2.stats.json,True,4.102207316,"['IterationLimit', 'Saturated']",4,2,2
+clam_trimmed,goal29.smt2.stats.json,True,1.052669514,"['IterationLimit', 'Saturated']",4,21,0
+clam_trimmed,goal3.smt2.stats.json,True,0.0005806520000000001,[],0,0,0
+clam_trimmed,goal30.smt2.stats.json,True,0.169143109,"['IterationLimit', 'Saturated']",3,1,1
+clam_trimmed,goal31.smt2.stats.json,True,0.07616998500000001,['Saturated'],1,0,0
+clam_trimmed,goal32.smt2.stats.json,True,7.333983282,['IterationLimit'],7,2,3
+clam_trimmed,goal36.smt2.stats.json,False,8.970630716,"['IterationLimit', 'Saturated']",2,0,0
+clam_trimmed,goal37.smt2.stats.json,True,0.014177351000000001,[],0,0,0
+clam_trimmed,goal38.smt2.stats.json,True,0.020303549,[],0,0,0
+clam_trimmed,goal39.smt2.stats.json,True,0.019368092,[],0,0,0
+clam_trimmed,goal4.smt2.stats.json,False,0.148880124,"['IterationLimit', 'Saturated']",2,1,0
+clam_trimmed,goal40.smt2.stats.json,False,28.349276187,"['IterationLimit', 'Saturated']",3,0,0
+clam_trimmed,goal41.smt2.stats.json,False,29.655269176,"['IterationLimit', 'Saturated']",2,0,0
+clam_trimmed,goal45.smt2.stats.json,True,0.021646089,[],0,0,0
+clam_trimmed,goal46.smt2.stats.json,True,0.022708484,[],0,0,0
+clam_trimmed,goal47.smt2.stats.json,False,9.388329893,['IterationLimit'],5,0,0
+clam_trimmed,goal48.smt2.stats.json,True,3.900864156,['IterationLimit'],3,1,0
+clam_trimmed,goal49.smt2.stats.json,True,0.006924335,[],0,0,0
+clam_trimmed,goal5.smt2.stats.json,False,0.6133735680000001,"['IterationLimit', 'Saturated']",4,3,2
+clam_trimmed,goal50.smt2.stats.json,False,40.406458844,['IterationLimit'],5,2,0
+clam_trimmed,goal51.smt2.stats.json,True,0.000703811,[],0,0,0
+clam_trimmed,goal52.smt2.stats.json,True,0.0007705250000000001,[],0,0,0
+clam_trimmed,goal53.smt2.stats.json,True,0.000561685,[],0,0,0
+clam_trimmed,goal54.smt2.stats.json,True,0.007066584000000001,[],0,0,0
+clam_trimmed,goal55.smt2.stats.json,True,0.001222002,[],0,0,0
+clam_trimmed,goal56.smt2.stats.json,True,0.012041647,[],0,0,0
+clam_trimmed,goal57.smt2.stats.json,True,0.018984999000000002,[],0,0,0
+clam_trimmed,goal58.smt2.stats.json,True,0.0006494550000000001,[],0,0,0
+clam_trimmed,goal59.smt2.stats.json,True,0.46792219,"['IterationLimit', 'Saturated']",3,2,0
+clam_trimmed,goal6.smt2.stats.json,True,0.886541683,"['IterationLimit', 'Saturated']",8,5,7
+clam_trimmed,goal60.smt2.stats.json,True,0.0009316060000000001,[],0,0,0
+clam_trimmed,goal61.smt2.stats.json,True,0.000773882,[],0,0,0
+clam_trimmed,goal62.smt2.stats.json,False,6.815413375,['IterationLimit'],5,0,0
+clam_trimmed,goal63.smt2.stats.json,True,0.0006301200000000001,[],0,0,0
+clam_trimmed,goal64.smt2.stats.json,False,0.152297447,['IterationLimit'],2,0,0
+clam_trimmed,goal65.smt2.stats.json,True,0.001181392,[],0,0,0
+clam_trimmed,goal66.smt2.stats.json,False,0.048249756000000005,['IterationLimit'],5,0,2
+clam_trimmed,goal67.smt2.stats.json,True,0.0018033550000000002,[],0,0,0
+clam_trimmed,goal68.smt2.stats.json,True,0.003322746,[],0,0,0
+clam_trimmed,goal69.smt2.stats.json,False,9.559535507,['IterationLimit'],5,0,0
+clam_trimmed,goal7.smt2.stats.json,True,0.339413132,"['IterationLimit', 'Saturated']",3,0,0
+clam_trimmed,goal70.smt2.stats.json,False,37.526402048,['IterationLimit'],5,2,0
+clam_trimmed,goal71.smt2.stats.json,True,0.008553477,[],0,0,0
+clam_trimmed,goal72.smt2.stats.json,True,0.000432838,[],0,0,0
+clam_trimmed,goal73.smt2.stats.json,True,1.67168658,['IterationLimit'],12,2,3
+clam_trimmed,goal74.smt2.stats.json,True,0.0008027280000000001,[],0,0,0
+clam_trimmed,goal75.smt2.stats.json,False,0.795293052,"['IterationLimit', 'Saturated']",4,10,0
+clam_trimmed,goal76.smt2.stats.json,True,2.847920661,"['IterationLimit', 'Saturated']",2,1,0
+clam_trimmed,goal77.smt2.stats.json,True,0.409689599,"['IterationLimit', 'Saturated']",2,18,0
+clam_trimmed,goal78.smt2.stats.json,True,0.8585028020000001,"['IterationLimit', 'Saturated']",4,21,0
+clam_trimmed,goal79.smt2.stats.json,True,0.128079095,"['IterationLimit', 'Saturated']",2,1,0
+clam_trimmed,goal80.smt2.stats.json,True,0.443294497,"['IterationLimit', 'Saturated']",4,1,2
+clam_trimmed,goal81.smt2.stats.json,True,0.6126744820000001,"['IterationLimit', 'Saturated']",3,21,0
+clam_trimmed,goal82.smt2.stats.json,True,0.903763713,"['IterationLimit', 'Saturated']",4,19,2
+clam_trimmed,goal83.smt2.stats.json,True,6.790350015,['IterationLimit'],5,1,1
+clam_trimmed,goal84.smt2.stats.json,True,89.390566575,"['IterationLimit', 'NodeLimit']",15,204,9
+clam_trimmed,goal85.smt2.stats.json,True,15.057322864,['IterationLimit'],13,2,31
