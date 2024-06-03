@@ -1,0 +1,63 @@
+prop_name,prop_proven,time,num_lemmas_attempted,num_lemmas,num_raw_eqs,num_evals,num_proved_lemmas,num_unproved_lemmas,proved_lemmas,unproved_lemmas,prop
+prop_1,True,0.152524,4,3,163,23028,3,0,"['m+m == double m', 'm+(n+o) == n+(m+o)', 'm+n == n+m']",[],double x == x+x
+prop_10,True,1.597569,5,3,215,37976,3,0,"['rev xs++rev ys == rev (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],rev (rev x) == x
+prop_11,True,2.601972,5,3,215,38127,3,0,"['rev xs++rev ys == rev (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],rev (rev x++rev y) == y++x
+prop_12,True,2.691765,9,7,1071,176423,7,0,"['qrev xs [] == rev xs', 'qrev xs ys++zs == qrev xs (ys++zs)', 'qrev (qrev xs ys) zs == qrev ys (xs++zs)', 'qrev (qrev xs ys) [] == qrev ys xs', 'rev xs++rev ys == rev (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],qrev x y == rev x++y
+prop_13,True,0.145404,4,3,205,31277,3,0,"['half (m+m) == m', 'm+(n+o) == n+(m+o)', 'm+n == n+m']",[],half (x+x) == x
+prop_14,False,13.551833,10,4,85,13886,4,0,"['m<=m == True', 'm<=S m == True', 'S m<=m == False', 'insert Z (isort ms) == isort (insert Z ms)']",[],sorted (isort x) == True
+prop_15,True,1.140025,3,2,149,21021,2,0,"['m+(n+o) == n+(m+o)', 'm+n == n+m']",[],x+S x == S (x+x)
+prop_16,True,1.148728,4,3,154,21851,3,0,"['even (m+m) == True', 'm+(n+o) == n+(m+o)', 'm+n == n+m']",[],even (x+x) == True
+prop_17,True,2.650663,5,3,215,37937,3,0,"['rev xs++rev ys == rev (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],rev (rev (x++y)) == rev (rev x)++rev (rev y)
+prop_18,True,1.582989,5,3,215,38221,3,0,"['rev xs++rev ys == rev (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],rev (rev x++y) == rev y++x
+prop_19,True,1.58631,5,3,215,38409,3,0,"['rev xs++rev ys == rev (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],rev (rev x)++y == rev (rev (x++y))
+prop_2,True,0.439585,1,0,191,32963,0,0,[],[],length (x++y) == length (y++x)
+prop_20,True,1.378013,4,3,193,33303,3,0,"['length (xs++ys) == length (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],even (length (x++x)) == True
+prop_21,True,4.015204,12,7,385,63779,7,0,"['rotate (length xs) (rotate m xs) == rotate m xs', 'rotate (length xs) (xs++ys) == ys++xs', 'rotate m (x:[]) == x:[]', 'rotate (S m) (rotate n xs) == rotate (S n) (rotate m xs)', 'length (xs++ys) == length (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],rotate (length x) (x++y) == y++x
+prop_22,True,3.495478,4,3,193,33451,3,0,"['length (xs++ys) == length (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],even (length (x++y)) == even (length (y++x))
+prop_23,True,0.336764,4,3,193,33242,3,0,"['length (xs++ys) == length (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],half (length (x++y)) == half (length (y++x))
+prop_24,True,0.155757,4,3,154,21784,3,0,"['even (m+m) == True', 'm+(n+o) == n+(m+o)', 'm+n == n+m']",[],even (x+y) == even (y+x)
+prop_25,True,0.749805,8,7,402,64550,7,0,"['length xs+length ys == length (xs++ys)', 'length (xs++ys) == length (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs', 'even (m+m) == True', 'm+(n+o) == n+(m+o)', 'm+n == n+m']",[],even (length (x++y)) == even (length y+length x)
+prop_26,True,1.215129,4,3,205,31263,3,0,"['half (m+m) == m', 'm+(n+o) == n+(m+o)', 'm+n == n+m']",[],half (x+y) == half (y+x)
+prop_27,True,2.536371,9,7,1071,176468,7,0,"['qrev xs [] == rev xs', 'qrev xs ys++zs == qrev xs (ys++zs)', 'qrev (qrev xs ys) zs == qrev ys (xs++zs)', 'qrev (qrev xs ys) [] == qrev ys xs', 'rev xs++rev ys == rev (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],rev x == qrev x []
+prop_28,False,4.191321,6,5,443,82632,5,0,"['xs++[] == xs', '(xs++ys)++zs == xs++(ys++zs)', 'rev xs++rev ys == rev (ys++xs)', 'qrevflat xss xs++ys == qrevflat xss (xs++ys)', 'rev (rev xs) == xs']",[],revflat x == qrevflat x []
+prop_29,True,2.563767,9,7,1071,176606,7,0,"['qrev xs [] == rev xs', 'qrev xs ys++zs == qrev xs (ys++zs)', 'qrev (qrev xs ys) zs == qrev ys (xs++zs)', 'qrev (qrev xs ys) [] == qrev ys xs', 'rev xs++rev ys == rev (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],rev (qrev x []) == x
+prop_3,True,0.536624,1,0,397,63690,0,0,[],[],length (x++y) == length y+length x
+prop_30,True,1.515495,5,3,215,37836,3,0,"['rev xs++rev ys == rev (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],rev (rev x++[]) == x
+prop_31,True,1.291257,2,1,160,32487,1,0,['qrev (qrev xs ys) [] == qrev ys xs'],[],qrev (qrev x []) [] == x
+prop_32,True,5.14438,12,7,385,64961,7,0,"['rotate (length xs) (rotate m xs) == rotate m xs', 'rotate (length xs) (xs++ys) == ys++xs', 'rotate m (x:[]) == x:[]', 'rotate (S m) (rotate n xs) == rotate (S n) (rotate m xs)', 'length (xs++ys) == length (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],rotate (length x) x == x
+prop_33,False,,0,,,,,,,,
+prop_34,False,,7,,37668,5733654,,,,,
+prop_35,False,,0,,,,,,,,
+prop_36,True,0.466694,1,0,224,37354,0,0,[],[],elem x y == True => elem x (y++z) == True
+prop_37,True,0.483551,1,0,224,37375,0,0,[],[],elem x z == True => elem x (y++z) == True
+prop_38,True,0.506643,1,0,224,37457,0,0,[],[],elem x y == True => elem x z == True => elem x (y++z) == True
+prop_39,True,0.270273,1,0,156,23687,0,0,[],[],elem x (drop y z) == True => elem x z == True
+prop_4,True,1.310706,5,4,196,33662,4,0,"['double (length xs) == length (xs++xs)', 'length (xs++ys) == length (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],length (x++x) == double (length x)
+prop_40,True,0.254755,1,0,211,28699,0,0,[],[],subset x y == True => union x y == y
+prop_41,True,0.359088,1,0,214,28602,0,0,[],[],subset x y == True => intersect x y == x
+prop_42,False,,20,,142,20376,,,,,
+prop_43,True,0.280559,1,0,142,20398,0,0,[],[],elem x y == True => elem x (union z y) == True
+prop_44,False,,20,,145,20409,,,,,
+prop_45,True,1.422575,10,8,140,21106,8,0,"['elem (S m) (insert m ms) == elem (S m) ms', 'elem m (insert m ms) == True', 'm==S m == False', 'm==m == True', 'm==n == n==m', 'S m<=m == False', 'm<=S m == True', 'm<=m == True']",[],elem x (insert x y) == True
+prop_46,True,4.555602,10,8,140,21057,8,0,"['elem (S m) (insert m ms) == elem (S m) ms', 'elem m (insert m ms) == True', 'm==S m == False', 'm==m == True', 'm==n == n==m', 'S m<=m == False', 'm<=S m == True', 'm<=m == True']",[],x == y => elem x (insert y z) == True
+prop_47,True,0.338001,1,0,192,28922,0,0,[],[],x/=y == True => elem x (insert y z) == elem x z
+prop_48,False,8.265139,8,4,89,15600,4,0,"['m<=m == True', 'm<=S m == True', 'S m<=m == False', 'insert Z (isort ms) == isort (insert Z ms)']",[],length (isort x) == length x
+prop_49,False,15.194076,17,9,179,28233,9,0,"['m<=m == True', 'm<=S m == True', 'S m<=m == False', 'm==n == n==m', 'm==m == True', 'm==S m == False', 'elem m (insert m ms) == True', 'elem (S m) (insert m ms) == elem (S m) ms', 'insert Z (isort ms) == isort (insert Z ms)']",[],elem x (isort y) == True => elem x y == True
+prop_5,True,0.662173,7,5,234,41271,5,0,"['length (rev xs) == length xs', 'length (xs++ys) == length (ys++xs)', 'rev xs++rev ys == rev (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],length (rev x) == length x
+prop_50,False,31.929712,21,9,425,93148,9,0,"['m<=m == True', 'm<=S m == True', 'S m<=m == False', 'm==n == n==m', 'm==m == True', 'm==S m == False', 'count m (insert m ms) == S (count m ms)', 'count (S m) (insert m ms) == count (S m) ms', 'insert Z (isort ms) == isort (insert Z ms)']",[],count x (isort y) == count x y
+prop_6,True,2.637879,10,8,440,72257,8,0,"['length xs+length ys == length (xs++ys)', 'length (rev xs) == length xs', 'length (xs++ys) == length (ys++xs)', 'rev xs++rev ys == rev (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs', 'm+(n+o) == n+(m+o)', 'm+n == n+m']",[],length (rev (x++y)) == length x+length y
+prop_7,True,2.746257,7,4,385,65080,4,0,"['length xs+length ys == length (qrev xs ys)', 'qrev (qrev xs ys) [] == qrev ys xs', 'm+(n+o) == n+(m+o)', 'm+n == n+m']",[],length (qrev x y) == length x+length y
+prop_75,True,2.581898,9,7,1071,176245,7,0,"['qrev xs [] == rev xs', 'qrev xs ys++zs == qrev xs (ys++zs)', 'qrev (qrev xs ys) zs == qrev ys (xs++zs)', 'qrev (qrev xs ys) [] == qrev ys xs', 'rev xs++rev ys == rev (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],rev x++y == qrev x y
+prop_76,False,6.534654,6,5,443,83009,5,0,"['xs++[] == xs', '(xs++ys)++zs == xs++(ys++zs)', 'rev xs++rev ys == rev (ys++xs)', 'qrevflat xss xs++ys == qrevflat xss (xs++ys)', 'rev (rev xs) == xs']",[],revflat x++y == qrevflat x y
+prop_77,True,3.716328,9,7,1071,177186,7,0,"['qrev xs [] == rev xs', 'qrev xs ys++zs == qrev xs (ys++zs)', 'qrev (qrev xs ys) zs == qrev ys (xs++zs)', 'qrev (qrev xs ys) [] == qrev ys xs', 'rev xs++rev ys == rev (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],rev (qrev x y) == rev y++x
+prop_78,True,2.485603,9,7,1071,174624,7,0,"['qrev xs [] == rev xs', 'qrev xs ys++zs == qrev xs (ys++zs)', 'qrev (qrev xs ys) zs == qrev ys (xs++zs)', 'qrev (qrev xs ys) [] == qrev ys xs', 'rev xs++rev ys == rev (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],rev (qrev x (rev y)) == y++x
+prop_79,True,1.483583,5,3,215,37718,3,0,"['rev xs++rev ys == rev (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],rev (rev x++y) == rev y++x
+prop_8,True,0.14783,1,0,107,16703,0,0,[],[],drop x (drop y z) == drop y (drop x z)
+prop_80,True,1.524701,5,3,215,38061,3,0,"['rev xs++rev ys == rev (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],rev (rev x++rev y) == y++x
+prop_81,True,5.443801,9,7,1071,180574,7,0,"['qrev xs [] == rev xs', 'qrev xs ys++zs == qrev xs (ys++zs)', 'qrev (qrev xs ys) zs == qrev ys (xs++zs)', 'qrev (qrev xs ys) [] == qrev ys xs', 'rev xs++rev ys == rev (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],qrev (qrev x y) [] == rev y++x
+prop_82,True,2.497587,9,7,1071,175036,7,0,"['qrev xs [] == rev xs', 'qrev xs ys++zs == qrev xs (ys++zs)', 'qrev (qrev xs ys) zs == qrev ys (xs++zs)', 'qrev (qrev xs ys) [] == qrev ys xs', 'rev xs++rev ys == rev (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],qrev (qrev x (rev y)) [] == y++x
+prop_83,True,4.004197,12,7,385,63761,7,0,"['rotate (length xs) (rotate m xs) == rotate m xs', 'rotate (length xs) (xs++ys) == ys++xs', 'rotate m (x:[]) == x:[]', 'rotate (S m) (rotate n xs) == rotate (S n) (rotate m xs)', 'length (xs++ys) == length (ys++xs)', '(xs++ys)++zs == xs++(ys++zs)', 'xs++[] == xs']",[],rotate (length x) (x++y) == y++x
+prop_84,False,,0,,,,,,,,
+prop_85,False,,0,,37667,5734008,,,,,
+prop_86,False,,0,,,,,,,,
+prop_9,True,1.332227,2,1,107,17009,1,0,['drop m (drop n xs) == drop n (drop m xs)'],[],drop w (drop x (drop y z)) == drop y (drop x (drop w z))
