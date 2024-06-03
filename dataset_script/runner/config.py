@@ -1,12 +1,12 @@
-timeout = 60
+timeout = 2
 memory_limit = 16
 
-dataset_root = "/home/jiry/merged_dataset"
-cclemma_path = "/home/jiry/cyclegg"
-hipspec_path = "/home/jiry/hipspec"
-thesy_path = "/home/jiry/thesy"
-cvc4_bin_name = "cvc4-magic"
-output_path = "/home/jiry/eval_res"
+dataset_root = "/home/cole/research/cc-lemma/benchmarks"
+cclemma_path = "/home/cole/research/cc-lemma"
+hipspec_path = "PATH/TO/HIPSPEC"
+thesy_path = "PATH/TO/THESY"
+cvc4_bin_name = "cvc4-vmcai2015"
+output_path = "/home/cole/research/cc-lemma/dataset_script/results"
 
 hipspec_expensive_props = {
     "clam": [81],

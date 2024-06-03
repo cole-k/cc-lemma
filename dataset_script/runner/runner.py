@@ -16,7 +16,6 @@ def run(runner_info, dataset_list):
 	is_cover = False
 
 	considered_dataset = [dataset for dataset in dataset_list]
-	#if solver_name == "cclemma": considered_dataset.append("sufu-ite")
 
 	for dataset in considered_dataset:
 		benchmarks = dataset_collector(dataset)
@@ -39,7 +38,7 @@ def run(runner_info, dataset_list):
 
 if __name__ == "__main__":
 	dataset_list = ["isaplanner", "clam", "sufu"]
-	run(thesy_runner.get_runner(), dataset_list)
-	run(cvc_runner.get_runner(), dataset_list)
-	run(hipspec_runner.get_runner(), dataset_list)
+	# run(thesy_runner.get_runner(), dataset_list)
+	# run(cvc_runner.get_runner(), dataset_list)
+	# run(hipspec_runner.get_runner(), dataset_list)
 	run(cclemma_runner.get_runner(), dataset_list)
