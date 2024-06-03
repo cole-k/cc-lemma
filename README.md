@@ -46,14 +46,26 @@ We include both a runner ([runner.py](./runner.py)) to run the benchmarks as
 well as a tool to generate our plots and tables from their results
 ([generate-plots.py](./generate-plots.py)).
 
-Here is how you can use them to generate plots for C.C. Lemma.
+Here is how you can use them to generate plots for C.C. Lemma and save them
+under the `results` folder.
 
 ```
 $ python3 runner.py 
-$ python3 generate-plots.py results/summary --exclude-tools hipspec cvc4 thesy
+$ python3 generate-plots.py results/summary -o results --exclude-tools thesy cvc4 hipspec
 ```
 
 This should only take a few minutes at most because we set the timeout to 2s.
+
+Use the following command to now run for cvc4 and hipspec and generate a plot
+for all three (we don't include TheSy because the results are not competitive
+enough to put in the effort to build and parse its outputs).
+
+```
+$ python3 runner.py  --tools cvc4 hipspec
+$ python3 generate-plots.py results/summary -o results --exclude-tools thesy
+```
+
+This should only take a few minutes too.
 
 If you wish to run other tools, pass them to `runner.py` under the `--tools`
 argument. Depending on which tools you have run, you can also then remove them
