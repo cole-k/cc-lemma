@@ -2,7 +2,12 @@ use egg::*;
 use lazy_static::lazy_static;
 
 use indexmap::IndexMap;
-use std::{collections::{BTreeMap, BTreeSet}, fmt::Display, str::FromStr, hash::Hash};
+use std::{
+  collections::{BTreeMap, BTreeSet},
+  fmt::Display,
+  hash::Hash,
+  str::FromStr,
+};
 use symbolic_expressions::{Sexp, SexpError};
 
 use crate::config::CONFIG;
@@ -65,13 +70,10 @@ impl Type {
 
   pub fn is_arrow(&self) -> bool {
     match &self.repr {
-      Sexp::List(xs) => {
-        xs[0].string().unwrap().as_str() == ARROW
-      }
-      _ => false
+      Sexp::List(xs) => xs[0].string().unwrap().as_str() == ARROW,
+      _ => false,
     }
   }
-
 }
 
 impl FromStr for Type {
@@ -199,7 +201,6 @@ where
   }
 }
 
-
 /// Unlike map_sexp, this substitutes Sexp -> Sexp, so the base case is when f
 /// returns Some(new_sexp), which replaces the Sexp entirely.
 pub fn map_sexp_sexp<F>(f: F, sexp: &Sexp) -> Sexp
@@ -219,13 +220,16 @@ where
 /// Iterates over every sub-sexp in the sexp, substituting it entirely if it
 /// matches the substitution.
 pub fn substitute_sexp(sexp: &Sexp, from: &Sexp, to: &Sexp) -> Sexp {
-  map_sexp_sexp(|interior_sexp| {
-    if interior_sexp == from {
-      Some(to.clone())
-    } else {
-      None
-    }
-  }, sexp)
+  map_sexp_sexp(
+    |interior_sexp| {
+      if interior_sexp == from {
+        Some(to.clone())
+      } else {
+        None
+      }
+    },
+    sexp,
+  )
 }
 
 /// Returns every subexpression in the sexp that contains a var, ignoring base
@@ -247,14 +251,16 @@ fn add_sexp_subexpressions(sexp: &Sexp, subexprs: &mut BTreeMap<String, Sexp>) -
       let mut child_iter = children.iter();
       // The root is a function so we shouldn't add it
       child_iter.next();
-      child_iter.for_each(|child| {any_child_has_var |= add_sexp_subexpressions(child, subexprs);});
+      child_iter.for_each(|child| {
+        any_child_has_var |= add_sexp_subexpressions(child, subexprs);
+      });
     }
     Sexp::String(s) if is_var(s) => {
       // We won't add the variable, but we will add every subexpression
       // containing it.
       return true;
     }
-    _ => {},
+    _ => {}
   }
   // If there's a variable in this sexp, we can generalize it.
   if any_child_has_var {
@@ -279,8 +285,15 @@ pub fn contains_function(sexp: &Sexp) -> bool {
   }
 }
 
-fn find_instantiations_helper<F>(proto: &Sexp, actual: &Sexp, is_var: F, instantiations_map: &mut SSubst) -> bool
-where F: FnOnce(&str) -> bool + Copy {
+fn find_instantiations_helper<F>(
+  proto: &Sexp,
+  actual: &Sexp,
+  is_var: F,
+  instantiations_map: &mut SSubst,
+) -> bool
+where
+  F: FnOnce(&str) -> bool + Copy,
+{
   match (proto, actual) {
     (Sexp::Empty, _) | (_, Sexp::Empty) => unreachable!(),
     (Sexp::String(proto_str), actual_sexp) => {
@@ -328,12 +341,15 @@ where F: FnOnce(&str) -> bool + Copy {
 ///
 /// actual is assumed to be a valid instantiation of proto.
 pub fn find_instantiations<F>(proto: &Sexp, actual: &Sexp, is_var: F) -> Option<SSubst>
-where F: FnOnce(&str) -> bool + Copy {
+where
+  F: FnOnce(&str) -> bool + Copy,
+{
   let mut instantiations = BTreeMap::new();
-  let successful_instantiation = find_instantiations_helper(&proto, &actual, is_var, &mut instantiations);
+  let successful_instantiation =
+    find_instantiations_helper(&proto, &actual, is_var, &mut instantiations);
   if successful_instantiation {
     Some(instantiations)
-  } else{
+  } else {
     // The instantiations are bogus/partial if it is not successful
     None
   }
@@ -396,7 +412,8 @@ pub fn is_var(var_name: &str) -> bool {
 }
 
 pub fn get_vars<F>(e: &Expr, f: F) -> BTreeSet<Symbol>
-where F: FnOnce(&str) -> bool + Copy
+where
+  F: FnOnce(&str) -> bool + Copy,
 {
   let mut vars = BTreeSet::new();
   for n in e.as_ref() {
@@ -417,7 +434,7 @@ fn sexp_leaves_helper(sexp: &Sexp, leaves: &mut BTreeSet<String>) {
   match sexp {
     Sexp::String(s) => {
       leaves.insert(s.clone());
-    },
+    }
     Sexp::List(list) => {
       let mut list_iter = list.iter();
       // Skip the head, it's a function
@@ -500,10 +517,7 @@ impl Equation {
   /// NOTE: Equation used to handle ordering the lhs and rhs, but we now let Prop
   /// handle that.
   pub fn new(lhs: Sexp, rhs: Sexp) -> Self {
-    Self {
-      lhs,
-      rhs
-    }
+    Self { lhs, rhs }
   }
 
   pub fn from_exprs(lhs: &Expr, rhs: &Expr) -> Self {
@@ -513,7 +527,6 @@ impl Equation {
     let rhs = symbolic_expressions::parser::parse_str(&rhs_string).unwrap();
     Self::new(lhs, rhs)
   }
-
 }
 
 impl Display for Equation {
@@ -524,7 +537,9 @@ impl Display for Equation {
 
 // Can the vars of this expression be instantiated to the other expression?
 fn cmp_sexp_by_instantiation<F>(sexp1: &Sexp, sexp2: &Sexp, is_var: F) -> Option<std::cmp::Ordering>
-where F: FnOnce(&str) -> bool + Copy {
+where
+  F: FnOnce(&str) -> bool + Copy,
+{
   let sexp1_leq_sexp2 = find_instantiations(sexp1, sexp2, is_var).is_some();
   let sexp2_leq_sexp1 = find_instantiations(sexp2, sexp1, is_var).is_some();
   match (sexp1_leq_sexp2, sexp2_leq_sexp1) {
@@ -539,7 +554,7 @@ where F: FnOnce(&str) -> bool + Copy {
 #[derive(Debug, Clone)]
 pub struct Prop {
   pub eq: Equation,
-  pub params: Vec<(Symbol, Type)>
+  pub params: Vec<(Symbol, Type)>,
 }
 
 impl Prop {
@@ -558,7 +573,9 @@ impl Prop {
     let mut param_to_alpha_renamed: BTreeMap<String, String> = BTreeMap::default();
     // First we reorder the lhs and rhs based on their lexicographic order.
     let (reordered_lhs, reordered_rhs) =
-      if cmp_sexp_lexicographic(&eq.lhs, &eq.rhs, |s| param_names.contains(s)) == std::cmp::Ordering::Greater {
+      if cmp_sexp_lexicographic(&eq.lhs, &eq.rhs, |s| param_names.contains(s))
+        == std::cmp::Ordering::Greater
+      {
         (&eq.rhs, &eq.lhs)
       } else {
         (&eq.lhs, &eq.rhs)
@@ -569,14 +586,21 @@ impl Prop {
     let renamed_rhs = alpha_rename_sexp(reordered_rhs, &param_names, &mut param_to_alpha_renamed);
     // Then we rename the parameters using the names we generated renaming the
     // lhs and rhs.
-    let mut renamed_params: Vec<(Symbol, Type)> = params.into_iter().map(|(p, t)| {
-      let new_name: Symbol = param_to_alpha_renamed.get(p.as_str())
-        .unwrap_or_else(|| {
-          panic!("param {} does not occur in equation {} == {}", p, eq.lhs, eq.rhs);
-        })
-        .into();
-      (new_name, t)
-    }).collect();
+    let mut renamed_params: Vec<(Symbol, Type)> = params
+      .into_iter()
+      .map(|(p, t)| {
+        let new_name: Symbol = param_to_alpha_renamed
+          .get(p.as_str())
+          .unwrap_or_else(|| {
+            panic!(
+              "param {} does not occur in equation {} == {}",
+              p, eq.lhs, eq.rhs
+            );
+          })
+          .into();
+        (new_name, t)
+      })
+      .collect();
     // Finally, we reorder the parameters by their name.
     renamed_params.sort_by_key(|(p, _t)| p.as_str());
 
@@ -594,7 +618,6 @@ impl Prop {
   pub fn size(&self) -> usize {
     sexp_size(&self.eq.lhs) + sexp_size(&self.eq.rhs)
   }
-
 }
 
 /// We create Props a lot, so it's worth it to make this kind of weirdly
@@ -602,7 +625,11 @@ impl Prop {
 ///
 /// This way, we can avoid making multiple traversals of the sexps whenever we
 /// make a Prop.
-fn alpha_rename_sexp(sexp: &Sexp, params: &BTreeSet<String>, param_to_alpha_renamed: &mut BTreeMap<String, String>) -> Sexp {
+fn alpha_rename_sexp(
+  sexp: &Sexp,
+  params: &BTreeSet<String>,
+  param_to_alpha_renamed: &mut BTreeMap<String, String>,
+) -> Sexp {
   match sexp {
     Sexp::Empty => Sexp::Empty,
     Sexp::String(s) => {
@@ -619,10 +646,10 @@ fn alpha_rename_sexp(sexp: &Sexp, params: &BTreeSet<String>, param_to_alpha_rena
       }
     }
     Sexp::List(list) => {
-      let new_list =
-        list.iter()
-            .map(|s| alpha_rename_sexp(s, params, param_to_alpha_renamed))
-            .collect();
+      let new_list = list
+        .iter()
+        .map(|s| alpha_rename_sexp(s, params, param_to_alpha_renamed))
+        .collect();
       Sexp::List(new_list)
     }
   }
@@ -644,7 +671,9 @@ fn alpha_rename_sexp(sexp: &Sexp, params: &BTreeSet<String>, param_to_alpha_rena
 // NOTE: It might be faster and still good enough in practice to not distinguish
 // between vars. The lookups might start to add up.
 fn cmp_sexp_lexicographic<F>(sexp1: &Sexp, sexp2: &Sexp, is_var: F) -> std::cmp::Ordering
-where F: FnOnce(&str) -> bool + Copy {
+where
+  F: FnOnce(&str) -> bool + Copy,
+{
   match (sexp1, sexp2) {
     (Sexp::Empty, Sexp::Empty) => std::cmp::Ordering::Equal,
     (Sexp::Empty, _) => std::cmp::Ordering::Less,
@@ -654,7 +683,7 @@ where F: FnOnce(&str) -> bool + Copy {
       let s2_is_var = is_var(s2);
       match (s1_is_var, s2_is_var) {
         // Non-vars just compare normally
-        (false ,false) => s1.cmp(s2),
+        (false, false) => s1.cmp(s2),
         (true, false) => std::cmp::Ordering::Less,
         (false, true) => std::cmp::Ordering::Greater,
         // Vars are always considered equal
@@ -676,36 +705,42 @@ where F: FnOnce(&str) -> bool + Copy {
 }
 
 impl PartialEq for Prop {
-    fn eq(&self, other: &Self) -> bool {
-      self.partial_cmp(other) == Some(std::cmp::Ordering::Equal)
-    }
+  fn eq(&self, other: &Self) -> bool {
+    self.partial_cmp(other) == Some(std::cmp::Ordering::Equal)
+  }
 }
 
 impl PartialOrd for Prop {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-      // let vars: BTreeSet<String> = self.params.iter().chain(other.params.iter()).map(|(var, _)| var.to_string()).collect();
-      let is_var = |s: &str| {
-        // vars.contains(s)
-        self.params.iter().chain(other.params.iter()).any(|(var, _)| s == &var.to_string())
-      };
-      let lhs_cmp = cmp_sexp_by_instantiation(&self.eq.lhs, &other.eq.lhs, is_var);
-      let rhs_cmp = cmp_sexp_by_instantiation(&self.eq.rhs, &other.eq.rhs, is_var);
-      // They should be the same result, otherwise, they aren't equal
-      if lhs_cmp == rhs_cmp {
-        lhs_cmp
-      } else {
-        None
-      }
+  fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    // let vars: BTreeSet<String> = self.params.iter().chain(other.params.iter()).map(|(var, _)| var.to_string()).collect();
+    let is_var = |s: &str| {
+      // vars.contains(s)
+      self
+        .params
+        .iter()
+        .chain(other.params.iter())
+        .any(|(var, _)| s == &var.to_string())
+    };
+    let lhs_cmp = cmp_sexp_by_instantiation(&self.eq.lhs, &other.eq.lhs, is_var);
+    let rhs_cmp = cmp_sexp_by_instantiation(&self.eq.rhs, &other.eq.rhs, is_var);
+    // They should be the same result, otherwise, they aren't equal
+    if lhs_cmp == rhs_cmp {
+      lhs_cmp
+    } else {
+      None
     }
+  }
 }
 
 impl Eq for Prop {}
 
 impl Display for Prop {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let formatted_params: String = self.params.iter().map(|(p, t)| {
-      format!("{}: {}. ", p, t)
-    }).collect();
+    let formatted_params: String = self
+      .params
+      .iter()
+      .map(|(p, t)| format!("{}: {}. ", p, t))
+      .collect();
     write!(f, "forall {}{}", formatted_params, self.eq)
   }
 }

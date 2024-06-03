@@ -114,7 +114,7 @@ pub struct Args {
   pub saturate_only_parent: bool,
 
   #[clap(long = "reduce-proven-lemmas")]
-  pub reduce_proven_lemmas: bool
+  pub reduce_proven_lemmas: bool,
 }
 
 impl Args {
@@ -170,7 +170,7 @@ pub struct Config {
   pub exclude_bid_reachable: bool,
   pub symbolic_max_term: usize,
   pub saturate_only_parent: bool,
-  pub reduce_proven_lemma: bool
+  pub reduce_proven_lemma: bool,
 }
 
 impl Config {
@@ -232,7 +232,7 @@ impl Config {
       symbolic_max_term: 100,
       exclude_bid_reachable: args.exclude_bid_reachable,
       saturate_only_parent: args.saturate_only_parent,
-      reduce_proven_lemma: args.reduce_proven_lemmas
+      reduce_proven_lemma: args.reduce_proven_lemmas,
     }
   }
 

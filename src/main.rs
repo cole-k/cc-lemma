@@ -4,15 +4,15 @@ use std::fs::*;
 use std::io::{Result, Write};
 use std::time::{Duration, Instant};
 
+pub mod analysis;
 pub mod ast;
 pub mod config;
-pub mod analysis;
 pub mod egraph;
 pub mod explain;
 pub mod goal;
+mod goal_graph;
 pub mod parser;
 pub mod utils;
-mod goal_graph;
 
 use config::{ARGS, CONFIG};
 use explain::explain_top;
@@ -46,7 +46,14 @@ fn main() -> Result<()> {
         continue;
       }
     }
-    let global_search_state = GlobalSearchState::new(&parser_state.env, &parser_state.context, &reductions, &parser_state.cvec_rules, &defns, &raw_goal.local_searchers);
+    let global_search_state = GlobalSearchState::new(
+      &parser_state.env,
+      &parser_state.context,
+      &reductions,
+      &parser_state.cvec_rules,
+      &defns,
+      &raw_goal.local_searchers,
+    );
 
     let mut goal = Goal::top(
       &raw_goal.name,
@@ -62,14 +69,33 @@ fn main() -> Result<()> {
       goal
     );
 
-    let (result, duration, num_lemmas, num_attempted_lemmas, num_proven_lemmas) = if ARGS.do_uncyclic() {
-      prove_goal(goal.clone(), raw_goal.prop.clone(), raw_goal.premise.clone(), global_search_state, false)?
-    } else {
-      (Outcome::Unknown, Duration::from_secs(0), 0, 0, 0)
-    };
-    let (result_cyclic, duration_cyclic, num_lemmas_cyclic, num_attempted_lemmas_cyclic, num_proven_lemmas_cyclic) = if ARGS.do_cyclic() {
+    let (result, duration, num_lemmas, num_attempted_lemmas, num_proven_lemmas) =
+      if ARGS.do_uncyclic() {
+        prove_goal(
+          goal.clone(),
+          raw_goal.prop.clone(),
+          raw_goal.premise.clone(),
+          global_search_state,
+          false,
+        )?
+      } else {
+        (Outcome::Unknown, Duration::from_secs(0), 0, 0, 0)
+      };
+    let (
+      result_cyclic,
+      duration_cyclic,
+      num_lemmas_cyclic,
+      num_attempted_lemmas_cyclic,
+      num_proven_lemmas_cyclic,
+    ) = if ARGS.do_cyclic() {
       goal.name = format!("{}_cyclic", goal.name);
-      prove_goal(goal.clone(), raw_goal.prop.clone(), raw_goal.premise.clone(), global_search_state, true)?
+      prove_goal(
+        goal.clone(),
+        raw_goal.prop.clone(),
+        raw_goal.premise.clone(),
+        global_search_state,
+        true,
+      )?
     } else {
       (Outcome::Unknown, Duration::from_secs(0), 0, 0, 0)
     };
@@ -84,10 +110,16 @@ fn main() -> Result<()> {
     }
 
     if ARGS.do_uncyclic() {
-      println!("(uncyclic) Theorized {} lemmas, fully attempted {} lemmas, proved {} lemmas", num_lemmas, num_attempted_lemmas, num_proven_lemmas);
+      println!(
+        "(uncyclic) Theorized {} lemmas, fully attempted {} lemmas, proved {} lemmas",
+        num_lemmas, num_attempted_lemmas, num_proven_lemmas
+      );
     }
     if ARGS.do_cyclic() {
-      println!("(cyclic) Theorized {} lemmas, fully attempted {} lemmas, proved {} lemmas", num_lemmas_cyclic, num_attempted_lemmas_cyclic, num_proven_lemmas_cyclic);
+      println!(
+        "(cyclic) Theorized {} lemmas, fully attempted {} lemmas, proved {} lemmas",
+        num_lemmas_cyclic, num_attempted_lemmas_cyclic, num_proven_lemmas_cyclic
+      );
     }
 
     if ARGS.do_cyclic() && ARGS.do_uncyclic() {
@@ -159,7 +191,13 @@ fn main() -> Result<()> {
 
 /// Prove a goal using either cyclic or uncyclic mode;
 /// record the duration and emit the proof.
-fn prove_goal<'a>(goal: Goal<'a>, goal_prop: Prop, goal_premise: Option<Equation>, global_search_state: GlobalSearchState<'a>, cyclic: bool) -> Result<(Outcome, Duration, usize, usize, usize)> {
+fn prove_goal<'a>(
+  goal: Goal<'a>,
+  goal_prop: Prop,
+  goal_premise: Option<Equation>,
+  global_search_state: GlobalSearchState<'a>,
+  cyclic: bool,
+) -> Result<(Outcome, Duration, usize, usize, usize)> {
   CONFIG.set_cyclic(cyclic);
   let start_time = Instant::now();
   if CONFIG.verbose {
@@ -219,5 +257,11 @@ fn prove_goal<'a>(goal: Goal<'a>, goal_prop: Prop, goal_premise: Option<Equation
   //   }
   // }
 
-  Ok((result, duration, num_lemmas, num_lemmas - num_lemmas_not_attempted, num_proven_lemmas))
+  Ok((
+    result,
+    duration,
+    num_lemmas,
+    num_lemmas - num_lemmas_not_attempted,
+    num_proven_lemmas,
+  ))
 }
