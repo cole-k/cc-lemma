@@ -32,7 +32,7 @@ fn main() -> Result<()> {
     None
   };
   result_file.iter_mut().for_each(|file| {
-    file.write(format!("name,result,time,num_lemmas,num_lemmas_attempted,num_lemmas_proven,result_cyclic,time_cyclic,num_lemmas_cyclic,num_attempted_lemmas_cyclic,num_proven_lemmas_cyclic\n").as_bytes()).expect("failed to write header");
+    file.write("name,result,time,num_lemmas,num_lemmas_attempted,num_lemmas_proven,result_cyclic,time_cyclic,num_lemmas_cyclic,num_attempted_lemmas_cyclic,num_proven_lemmas_cyclic\n".to_string().as_bytes()).expect("failed to write header");
   });
   let mut num_goals_attempted = 0;
   let mut num_differing_goals = 0;
@@ -218,7 +218,7 @@ fn prove_goal<'a>(
     if lemma_proof_state.outcome == Some(Outcome::Valid) {
       num_proven_lemmas += 1;
     }
-    if lemma_proof_state.outcome == None {
+    if lemma_proof_state.outcome.is_none() {
       num_lemmas_not_attempted += 1;
     }
   }

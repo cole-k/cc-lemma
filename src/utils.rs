@@ -1,7 +1,7 @@
 use colored::Colorize;
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::analysis::{print_cvec, CvecAnalysis, CycleggAnalysis};
+use crate::analysis::{CycleggAnalysis};
 use egg::*;
 use itertools::Itertools;
 use log::warn;
@@ -36,7 +36,7 @@ pub fn print_expressions_in_eclass<L: egg::Language + std::fmt::Display, N: egg:
   egraph: &EGraph<L, N>,
   id: Id,
 ) {
-  let extractor = egg::Extractor::new(&egraph, AstSize);
+  let extractor = egg::Extractor::new(egraph, AstSize);
 
   for node in egraph[id].nodes.iter() {
     let child_rec_exprs: String = node
@@ -459,6 +459,6 @@ where
   }
 
   pub fn first(&self) -> &T {
-    &self.chain.front().unwrap()
+    self.chain.front().unwrap()
   }
 }

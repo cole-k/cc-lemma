@@ -1,14 +1,14 @@
-use crate::ast::{sexp_size, Equation, Prop};
+use crate::ast::{sexp_size, Equation};
 use crate::config::CONFIG;
-use crate::egraph::get_all_expressions_with_loop;
+
 use crate::goal::Goal;
-use crate::goal::Outcome::Valid;
+
 use crate::goal_graph::GoalNodeStatus::Unknown;
-use colored::Colorize;
-use egg::{Analysis, EGraph, Id, Language, Rewrite, Runner, SymbolLang};
-use itertools::Unique;
+
+use egg::{Language};
+
 use std::cell::RefCell;
-use std::cmp::{Ordering, Reverse};
+
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::{Rc, Weak};
 
@@ -137,7 +137,7 @@ impl GoalGraph {
   /* Record new results */
   pub fn record_goal_result(&mut self, goal: &GoalIndex, res: GoalNodeStatus) {
     match res {
-      GoalNodeStatus::Unknown => return,
+      GoalNodeStatus::Unknown => (),
       _ => {
         let goal_node = &self.goal_map[&goal.name];
         goal_node.borrow_mut().status = res;
@@ -150,7 +150,7 @@ impl GoalGraph {
 
   pub fn record_lemma_result(&mut self, lemma_id: usize, res: GoalNodeStatus) {
     match res {
-      GoalNodeStatus::Unknown => return,
+      GoalNodeStatus::Unknown => (),
       _ => {
         let goal_node = &self.lemma_map[&lemma_id].root;
         goal_node.borrow_mut().status = res;
@@ -197,16 +197,14 @@ impl GoalGraph {
       goal_node.borrow_mut().sub_goals.push(sub_node.clone());
       sub_goals.push((sub_goal.name.clone(), sub_node));
     }
-    self.goal_map.extend(sub_goals.into_iter());
+    self.goal_map.extend(sub_goals);
   }
 
   pub fn record_connector_lemma(&mut self, from: &GoalIndex, root: &GoalIndex) {
-    if !self.lemma_map.contains_key(&root.lemma_id) {
+    if let std::collections::hash_map::Entry::Vacant(e) = self.lemma_map.entry(root.lemma_id) {
       let goal = Rc::new(RefCell::new(GoalNode::new(root, None)));
       self.goal_map.insert(root.name.clone(), Rc::clone(&goal));
-      self
-        .lemma_map
-        .insert(root.lemma_id, LemmaInfo::new(goal, root.lemma_id));
+      e.insert(LemmaInfo::new(goal, root.lemma_id));
     }
 
     let goal_node = self.goal_map.get(&from.name).unwrap();
