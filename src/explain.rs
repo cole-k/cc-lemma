@@ -4,9 +4,12 @@ use std::collections::BTreeMap;
 use std::str::FromStr;
 use symbolic_expressions::Sexp;
 
-use crate::ast::{map_sexp, Context, Defns, Env, Type, find_instantiations};
+use crate::ast::{find_instantiations, map_sexp, Context, Defns, Env, Type};
 use crate::config::CONFIG;
-use crate::goal::{ETermEquation, ProofState, ProofTerm, IH_EQUALITY_PREFIX, ProofInfo, ProofLeaf, GlobalSearchState, Outcome};
+use crate::goal::{
+  ETermEquation, GlobalSearchState, Outcome, ProofInfo, ProofLeaf, ProofState, ProofTerm,
+  IH_EQUALITY_PREFIX,
+};
 
 /// Constants from (Liquid)Haskell
 const EQUALS: &str = "=";
@@ -45,7 +48,7 @@ const APPLY: &str = "$";
 const ARROW: &str = "->";
 const FORWARD_ARROW: &str = "=>";
 const BACKWARD_ARROW: &str = "<=";
-const LEMMA_SEPARATOR: &str ="-";
+const LEMMA_SEPARATOR: &str = "-";
 
 /// A rewrite can be forward or backward, this specifies which direction it
 /// goes.
@@ -121,7 +124,10 @@ fn add_header_and_defns(
   str_explanation.push('\n');
 
   // Haskell data declarations
-  str_explanation.push_str(&add_data_definitions(global_search_state.env, global_search_state.context));
+  str_explanation.push_str(&add_data_definitions(
+    global_search_state.env,
+    global_search_state.context,
+  ));
 
   // Add custom unreachable definition.
   str_explanation.push_str(UNREACHABLE_DEF);
@@ -129,10 +135,12 @@ fn add_header_and_defns(
   str_explanation.push('\n');
 
   // Haskell definitions
-  str_explanation.push_str(&add_definitions(global_search_state.defns, global_search_state.context));
+  str_explanation.push_str(&add_definitions(
+    global_search_state.defns,
+    global_search_state.context,
+  ));
 
   str_explanation
-
 }
 
 fn explain_body(
@@ -152,12 +160,7 @@ fn explain_body(
   // println!("{:?}", args);
 
   // Add the types and function definition stub
-  str_explanation.push_str(&add_proof_types_and_stub(
-    goal,
-    &lhs,
-    &rhs,
-    &args,
-  ));
+  str_explanation.push_str(&add_proof_types_and_stub(goal, &lhs, &rhs, &args));
   str_explanation.push('\n');
 
   // Finally, we can do the proof explanation
@@ -182,7 +185,12 @@ pub fn explain_top(
   let mut str_explanation = String::new();
 
   // Add the boilerplate and definitions
-  str_explanation.push_str(&add_header_and_defns(filename, goal, eq, global_search_state));
+  str_explanation.push_str(&add_header_and_defns(
+    filename,
+    goal,
+    eq,
+    global_search_state,
+  ));
 
   // (arg name, arg type), to be used in creating the type.
   let args: Vec<(Symbol, Type)> = params
@@ -221,9 +229,12 @@ pub fn explain_top(
     }
     let lemma_info = LemmaInfo {
       name: format!("lemma_{}", lemma_number),
-      params: lemma_proof.prop.params.iter().map(|(param, ty)| {
-        (param.to_string(), convert_ty(&ty.repr))
-      }).collect(),
+      params: lemma_proof
+        .prop
+        .params
+        .iter()
+        .map(|(param, ty)| (param.to_string(), convert_ty(&ty.repr)))
+        .collect(),
     };
     lemma_map.insert(lemma_info.name.clone(), lemma_info);
   }
@@ -241,7 +252,14 @@ pub fn explain_top(
     //
     // Right now this dumps all valid proofs.
     let lemma_name = format!("lemma_{}", lemma_number);
-    let lemma_exp = explain_body(&lemma_name, &mut lemma_proof.lemma_proof, &lemma_proof.prop.eq.lhs, &lemma_proof.prop.eq.rhs, &lemma_proof.prop.params, &mut lemma_map);
+    let lemma_exp = explain_body(
+      &lemma_name,
+      &mut lemma_proof.lemma_proof,
+      &lemma_proof.prop.eq.lhs,
+      &lemma_proof.prop.eq.rhs,
+      &lemma_proof.prop.params,
+      &mut lemma_map,
+    );
     str_explanation.push_str(&lemma_exp);
     str_explanation.push('\n');
   }
@@ -433,29 +451,29 @@ fn explain_proof(
       // We have a proper explanation
       return match proof_leaf {
         ProofLeaf::Contradiction(expl) => {
-            let mut str_explanation = String::new();
-            add_indentation(&mut str_explanation, depth);
-            str_explanation.push_str(UNREACHABLE);
-            // Open paren (we will pass the proof to unreachable to prove by contradiction)
-            str_explanation.push(' ');
-            str_explanation.push('(');
-            str_explanation.push('\n');
-            let proof = explain_goal(
-              // Increase depth of the proof because we want `unreachable` to
-              // be at a lower depth.
-              depth + 1,
-              expl,
-              top_goal_name,
-              lemma_map,
-            );
-            // Add the proof itself
-            str_explanation.push_str(&proof);
-            // Close the paren
-            add_indentation(&mut str_explanation, depth);
-            str_explanation.push(')');
-            str_explanation.push('\n');
-            str_explanation.push('\n');
-            str_explanation
+          let mut str_explanation = String::new();
+          add_indentation(&mut str_explanation, depth);
+          str_explanation.push_str(UNREACHABLE);
+          // Open paren (we will pass the proof to unreachable to prove by contradiction)
+          str_explanation.push(' ');
+          str_explanation.push('(');
+          str_explanation.push('\n');
+          let proof = explain_goal(
+            // Increase depth of the proof because we want `unreachable` to
+            // be at a lower depth.
+            depth + 1,
+            expl,
+            top_goal_name,
+            lemma_map,
+          );
+          // Add the proof itself
+          str_explanation.push_str(&proof);
+          // Close the paren
+          add_indentation(&mut str_explanation, depth);
+          str_explanation.push(')');
+          str_explanation.push('\n');
+          str_explanation.push('\n');
+          str_explanation
         }
         ProofLeaf::Refl(expl) => {
           // Just use this proof on its own.
@@ -465,14 +483,17 @@ fn explain_proof(
         ProofLeaf::Todo => todo!("Proof not implemented for proof of {}", goal),
       };
     }
-    None => {}// unreachable!("Missing proof explanation for {}", goal),
+    None => {} // unreachable!("Missing proof explanation for {}", goal),
   }
   // If it's not in the proof tree, it must be a leaf.
-  if !proof_info.proof.contains_key(goal) {
-  }
+  if !proof_info.proof.contains_key(goal) {}
   // Need to clone to avoid borrowing... unfortunately this is all because we need
   // a mutable reference to the explanations for some annoying reason
-  let proof_term = proof_info.proof.get(goal).expect(&format!("Missing proof term: {}", goal)).clone();
+  let proof_term = proof_info
+    .proof
+    .get(goal)
+    .expect(&format!("Missing proof term: {}", goal))
+    .clone();
   let mut str_explanation = String::new();
   let mut proof_depth = depth;
   let mut case_depth = depth + 1;
@@ -560,20 +581,17 @@ fn explain_goal(
             Some(add_lemma_invocation(top_goal_name, args.iter().cloned()))
           } else if rule_name.contains(LEMMA_SEPARATOR) {
             // println!("extracting lemma from {} {} {}", rule_name, flat_term, next_term);
-            rule_name.split_once(LEMMA_SEPARATOR).and_then(|(lemma_name, lemma_rest)|{
-              if lemma_map.contains_key(lemma_name) {
-                Some(extract_lemma_invocation(
-                  lemma_name,
-                  lemma_rest,
-                  &rw_dir,
-                  flat_term,
-                  next_term,
-                  lemma_map,
-                ))
-              } else {
-                None
-              }
-            })
+            rule_name
+              .split_once(LEMMA_SEPARATOR)
+              .and_then(|(lemma_name, lemma_rest)| {
+                if lemma_map.contains_key(lemma_name) {
+                  Some(extract_lemma_invocation(
+                    lemma_name, lemma_rest, &rw_dir, flat_term, next_term, lemma_map,
+                  ))
+                } else {
+                  None
+                }
+              })
           } else {
             None
           }
@@ -705,9 +723,7 @@ fn extract_lemma_invocation(
   };
   // println!("lemma {} and rest: {}", lemma_name, lemma_rest);
   let lemma_info = lemma_map.get(lemma_name).unwrap();
-  let lemma: Vec<&str> = lemma_rest
-    .split(EQUALS)
-    .collect();
+  let lemma: Vec<&str> = lemma_rest.split(EQUALS).collect();
 
   let lhs_sexp = symbolic_expressions::parser::parse_str(lemma[0]).unwrap();
   let rhs_sexp = symbolic_expressions::parser::parse_str(lemma[1]).unwrap();
@@ -718,8 +734,14 @@ fn extract_lemma_invocation(
   // We actually know the LHS and RHS of the lemma, but we don't know what order
   // they were applied in. We should record which direction the rewrite was in
   // so we don't have to do some hacky unification on the rewrite string itself.
-  let is_var = |s: &str| lemma_info.params.iter().any(|(param, _param_ty)| param == s.trim_start_matches("?"));
-  let mut lhsmap = find_instantiations(&lhs_sexp, &flat_term_to_sexp(&rewritten_from), is_var).unwrap();
+  let is_var = |s: &str| {
+    lemma_info
+      .params
+      .iter()
+      .any(|(param, _param_ty)| param == s.trim_start_matches("?"))
+  };
+  let mut lhsmap =
+    find_instantiations(&lhs_sexp, &flat_term_to_sexp(&rewritten_from), is_var).unwrap();
   let rhsmap = find_instantiations(&rhs_sexp, &flat_term_to_sexp(&rewritten_to), is_var).unwrap();
   // let mut lhsmap = map_variables(lemma[0], &flat_term_to_sexp(&rewritten_from).to_string());
   // let rhsmap = map_variables(lemma[1], &flat_term_to_sexp(&rewritten_to).to_string());
@@ -746,13 +768,10 @@ fn extract_lemma_invocation(
   // whose parameters are not in the same order as they are stored in lhsmap.
   add_lemma_invocation(
     &lemma_info.name,
-    lemma_info
-      .params
-      .iter()
-      .map(|(param, _)|{
-        // HACK: putting ? in front to extract the right pattern
-        lhsmap.get(&format!("?{}", param)).unwrap().to_string()
-      }),
+    lemma_info.params.iter().map(|(param, _)| {
+      // HACK: putting ? in front to extract the right pattern
+      lhsmap.get(&format!("?{}", param)).unwrap().to_string()
+    }),
   )
 }
 

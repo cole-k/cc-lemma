@@ -8,9 +8,14 @@ use crate::config::CONFIG;
 use crate::egraph::{ConditionalSearcher, DestructiveApplier};
 use crate::goal::*;
 
-fn make_rewrite_for_defn<A>(name: &str, args: &Sexp, value: &Sexp, is_axiom: bool) -> Rewrite<SymbolLang, A>
-  where
-      A: Analysis<SymbolLang>
+fn make_rewrite_for_defn<A>(
+  name: &str,
+  args: &Sexp,
+  value: &Sexp,
+  is_axiom: bool,
+) -> Rewrite<SymbolLang, A>
+where
+  A: Analysis<SymbolLang>,
 {
   let name_sexp = Sexp::String(name.to_string());
   let pattern_with_name = match args {
@@ -28,11 +33,15 @@ fn make_rewrite_for_defn<A>(name: &str, args: &Sexp, value: &Sexp, is_axiom: boo
   let searcher: Pattern<SymbolLang> = lhs.parse().unwrap();
   let applier: Pattern<SymbolLang> = rhs.parse().unwrap();
   if CONFIG.destructive_rewrites && !is_axiom {
-    Rewrite::new(lhs, searcher.clone(), DestructiveApplier::new(searcher, applier)).unwrap()
+    Rewrite::new(
+      lhs,
+      searcher.clone(),
+      DestructiveApplier::new(searcher, applier),
+    )
+    .unwrap()
   } else {
     Rewrite::new(lhs, searcher, applier).unwrap()
   }
-
 }
 
 pub struct RawGoal {
@@ -40,7 +49,7 @@ pub struct RawGoal {
   pub prop: Prop,
   pub premise: Option<Equation>,
   pub local_rules: Vec<Rw>,
-  pub local_searchers: Vec<ConditionalSearcher<Pattern<SymbolLang>, Pattern<SymbolLang>>>
+  pub local_searchers: Vec<ConditionalSearcher<Pattern<SymbolLang>, Pattern<SymbolLang>>>,
 }
 
 #[derive(Default)]
@@ -62,10 +71,10 @@ impl ParserState {
     let mut worklist = vec![];
     for expr in exprs {
       let expr_as_nodes_or_var: Vec<ENodeOrVar<SymbolLang>> = expr
-          .as_ref()
-          .iter()
-          .map(|n| ENodeOrVar::ENode(n.clone()))
-          .collect();
+        .as_ref()
+        .iter()
+        .map(|n| ENodeOrVar::ENode(n.clone()))
+        .collect();
       let expr_as_pattern: PatternAst<SymbolLang> = PatternAst::from(expr_as_nodes_or_var);
       self.add_functions(&expr_as_pattern, &mut used_names, &mut worklist);
     }
@@ -91,8 +100,8 @@ impl ParserState {
       if let ENodeOrVar::ENode(node) = node_or_var {
         let s = node.op;
         if self.context.contains_key(&s)
-            && !is_constructor(&s.to_string())
-            && !used_names.contains(&s)
+          && !is_constructor(&s.to_string())
+          && !used_names.contains(&s)
         {
           used_names.insert(s);
           worklist.push(s);
@@ -111,14 +120,13 @@ impl ParserState {
     format!("apply-{}-{}", name, id)
   }
 
-
   /// Return all rules that define the function name,
   /// including the rule that defines conversion from partial to first-order application.
   fn definition(&self, name: &Symbol) -> Vec<&Rw> {
     let mut res = Vec::new();
     for r in &self.rules {
       if Self::is_part_app_rule(&r.name, name) {
-      //if r.name.to_string() == ParserState::part_app_rule(name) {
+        //if r.name.to_string() == ParserState::part_app_rule(name) {
         res.push(r);
       } else {
         let lhs_pat = r.searcher.get_pattern_ast().unwrap();
@@ -136,8 +144,8 @@ impl ParserState {
   /// If type_ is an arrow type, return a rewrite that allows converting partial applications into regular first-order applications,
   /// that is: ($ ... ($ name ?x0) ... ?xn) => (name ?x0 ... ?xn).
   fn partial_application<A>(name: &Symbol, type_: &Type) -> Option<Vec<Rewrite<SymbolLang, A>>>
-    where
-        A: Analysis<SymbolLang>
+  where
+    A: Analysis<SymbolLang>,
   {
     let (args, _) = type_.args_ret();
     if args.is_empty() {
@@ -152,16 +160,20 @@ impl ParserState {
         let rhs = format!(
           "({} {})",
           name,
-          (0..=num)
-              .map(wildcard)
-              .collect::<Vec<String>>()
-              .join(" ")
+          (0..=num).map(wildcard).collect::<Vec<String>>().join(" ")
         );
         let mut lhs = format!("({} {} ?x{})", APPLY, pre_rhs, num);
         pre_rhs = rhs.clone();
         let rhs: Pat = rhs.parse().unwrap();
         let lhs: Pat = lhs.parse().unwrap();
-        res.push(Rewrite::new(ParserState::get_part_app_rule(name, num), lhs.clone(), DestructiveApplier::new(lhs, rhs)).unwrap());
+        res.push(
+          Rewrite::new(
+            ParserState::get_part_app_rule(name, num),
+            lhs.clone(),
+            DestructiveApplier::new(lhs, rhs),
+          )
+          .unwrap(),
+        );
       }
       Some(res)
     }
@@ -185,16 +197,16 @@ impl ParserState {
     }
     let (names, mut rules) = self.used_names_and_definitions(&roots);
     let filtered_defns = self
-        .defns
-        .iter()
-        .filter_map(|(defn_name, defn_cases)| {
-          if names.contains(&Symbol::from(defn_name)) {
-            Some((defn_name.clone(), defn_cases.clone()))
-          } else {
-            None
-          }
-        })
-        .collect();
+      .defns
+      .iter()
+      .filter_map(|(defn_name, defn_cases)| {
+        if names.contains(&Symbol::from(defn_name)) {
+          Some((defn_name.clone(), defn_cases.clone()))
+        } else {
+          None
+        }
+      })
+      .collect();
     rules.extend(local_rules);
     (rules, filtered_defns)
   }
@@ -250,27 +262,27 @@ pub fn parse_file(filename: &str) -> Result<ParserState, SexpError> {
           cons_index += 1;
           let type_vars = decl.list()?[2].list()?;
           type_vars
-              .iter()
-              .map(|x| {
-                let var_name = x.string()?;
-                validate_variable(var_name);
-                // FIXME: We should really only mangle names in the emitted
-                // explanations. If this is fixed, please change the config so
-                // that it does not implicitly adjust the maximum split depth to
-                // account for the additional underscore.
-                Ok(mangle_name(var_name))
-              })
-              .collect::<Result<Vec<String>, SexpError>>()?
+            .iter()
+            .map(|x| {
+              let var_name = x.string()?;
+              validate_variable(var_name);
+              // FIXME: We should really only mangle names in the emitted
+              // explanations. If this is fixed, please change the config so
+              // that it does not implicitly adjust the maximum split depth to
+              // account for the additional underscore.
+              Ok(mangle_name(var_name))
+            })
+            .collect::<Result<Vec<String>, SexpError>>()?
         };
         let cons = decl.list()?[cons_index].list()?;
         let mangled_cons_symbs = cons
-            .iter()
-            .map(|x| {
-              let cons_name = x.string()?;
-              validate_datatype(cons_name);
-              Ok(Symbol::from(&mangle_name(cons_name)))
-            })
-            .collect::<Result<Vec<Symbol>, SexpError>>()?;
+          .iter()
+          .map(|x| {
+            let cons_name = x.string()?;
+            validate_datatype(cons_name);
+            Ok(Symbol::from(&mangle_name(cons_name)))
+          })
+          .collect::<Result<Vec<Symbol>, SexpError>>()?;
         validate_datatype(name);
         state.env.insert(
           Symbol::from(&mangle_name(name)),
@@ -308,13 +320,18 @@ pub fn parse_file(filename: &str) -> Result<ParserState, SexpError> {
           &mangled_name,
           &mangled_args,
           &mangled_value,
-          decl_kind == "axiom"
+          decl_kind == "axiom",
         ));
         // HACK: add the same rules to a list of rewrites for cvecs. This is
         // only done because we don't have a good way of storing rules that can
         // work as both Rw and CvecRw.
         if decl_kind != "axiom" {
-          state.cvec_rules.push(make_rewrite_for_defn(&mangled_name, &mangled_args, &mangled_value, false));
+          state.cvec_rules.push(make_rewrite_for_defn(
+            &mangled_name,
+            &mangled_args,
+            &mangled_value,
+            false,
+          ));
         }
 
         // Add to the hashmap
@@ -322,8 +339,8 @@ pub fn parse_file(filename: &str) -> Result<ParserState, SexpError> {
           cases.push((mangled_args, mangled_value));
         } else {
           state
-              .defns
-              .insert(mangled_name, vec![(mangled_args, mangled_value)]);
+            .defns
+            .insert(mangled_name, vec![(mangled_args, mangled_value)]);
         }
       }
       "===" | "==>" => {
@@ -338,19 +355,19 @@ pub fn parse_file(filename: &str) -> Result<ParserState, SexpError> {
         let name = decl.list()?[1].string()?.to_string();
         let param_name_list = decl.list()?[2].list()?;
         let mangled_param_names = param_name_list
-            .iter()
-            .map(|x| {
-              let var_name = x.string()?;
-              validate_variable(var_name);
-              Ok(Symbol::from(&mangle_name(var_name)))
-            })
-            .collect::<Result<Vec<Symbol>, SexpError>>()?;
+          .iter()
+          .map(|x| {
+            let var_name = x.string()?;
+            validate_variable(var_name);
+            Ok(Symbol::from(&mangle_name(var_name)))
+          })
+          .collect::<Result<Vec<Symbol>, SexpError>>()?;
         let param_type_list = decl.list()?[3].list()?;
         let mangled_param_types = param_type_list.iter().map(|x| Type::new(mangle_sexp(x)));
         let params = mangled_param_names
-            .into_iter()
-            .zip(mangled_param_types)
-            .collect();
+          .into_iter()
+          .zip(mangled_param_types)
+          .collect();
 
         let mut index = 4;
         let premise = if decl_kind == "==>" {
@@ -385,7 +402,7 @@ pub fn parse_file(filename: &str) -> Result<ParserState, SexpError> {
                   searcher.clone(),
                   applier.clone(),
                 )
-                    .unwrap();
+                .unwrap();
                 local_rules.push(rw);
                 // println!("adding rewrite rule: {} => {}", lhs, rhs);
               }
@@ -395,14 +412,14 @@ pub fn parse_file(filename: &str) -> Result<ParserState, SexpError> {
                   searcher.clone(),
                   applier.clone(),
                 )
-                    .unwrap();
+                .unwrap();
                 local_rules.push(rw);
                 let rw = Rewrite::new(
                   format!("hyp-lemma-{}", rhs),
                   applier.clone(),
                   searcher.clone(),
                 )
-                    .unwrap();
+                .unwrap();
                 local_rules.push(rw);
               }
               "=?>" => {
