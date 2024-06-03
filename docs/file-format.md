@@ -265,6 +265,19 @@ The following is a property from IsaPlanner conditioned upon `n = x`.
   (count n (Cons x xs)))
 ```
 
+## Builtins
+We include a special reserved function `$` to allow for partial application in
+higher-order functions.
+
+`map`, for example, needs to be defined using `$` otherwise it cannot evaluate
+properly.
+
+```
+(:: map (-> ((-> (a) b) (List a)) (List b)))
+(let map (?f Nil          ) Nil                          )
+(let map (?f (Cons ?x ?xs)) (Cons ($ ?f ?x) (map ?f ?xs)))
+```
+
 ## Assumptions
 We require that the following definitions are always provided (i.e. they aren't
 baked into the prover but it expects them to be defined as such)
