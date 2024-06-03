@@ -56,7 +56,7 @@ $ python3 generate-plots.py results/summary -o results --exclude-tools thesy cvc
 
 This should only take a few minutes at most because we set the timeout to 2s.
 
-Use the following command to now run for cvc4 and hipspec and generate a plot
+Use the following command to now run for CVC4 and HipSpec and generate a plot
 for all three (we don't include TheSy because the results are not competitive
 enough to put in the effort to build and parse its outputs).
 
@@ -65,7 +65,9 @@ $ python3 runner.py  --tools cvc4 hipspec
 $ python3 generate-plots.py results/summary -o results --exclude-tools thesy
 ```
 
-This should only take a few minutes too.
+This should only take a few minutes too. Note that you might need to increase
+the timeout for HipSpec if you're getting 0 proved properties -- especially so
+on a VM: it is slower to start than either CVC4 or C.C. Lemma.
 
 If you wish to run other tools, pass them to `runner.py` under the `--tools`
 argument. Depending on which tools you have run, you can also then remove them
@@ -81,10 +83,10 @@ You can also run `generate-plots.py` on sample data we have included under
 If you run
 
 ```
-$ python3 generate-plots.py results/summary --exclude-tools hipspec cvc4 thesy
+$ python3 generate-plots.py precomputed-results --exclude-tools hipspec cvc4 thesy
 ```
 
-you should get plots that exactly match those in our paper.
+you should get plots that match those in our paper.
 
 Note that there is one datapoint which does appear for any tool but C.C. Lemma
 among this data: `mtp-base`, which corresponds to the motivating example in
