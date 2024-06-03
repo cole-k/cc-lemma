@@ -1,8 +1,9 @@
 import os
-import config
-import util
+import scripts.config as config
+import scripts.util as util
 import time
 import json
+import subprocess
 
 def _get_dataset(dataset_name):
     dataset_path = os.path.join(config.dataset_root, "thesy", dataset_name)
@@ -17,8 +18,12 @@ def _run_thesy(task_name, inp_file, output_path, extra_flag):
     command = ["cd", config.thesy_path, ";", "timeout " + str(config.timeout),  os.path.join(config.thesy_path, "target/release/TheSy"), "--prove ", extra_flag, config.thesy_args, inp_file, ">", oup_file, "2>", err_file]
     command = " ".join(command)
 
-    os.system(command)
-        
+    try:
+        result = subprocess.run(command, shell=True, check=True)
+    except KeyboardInterrupt:
+        print("\nExecution halted by user")
+        sys.exit(0)
+
     inp_dir = os.path.dirname(inp_file)
     task_base = os.path.basename(os.path.splitext(inp_file)[0])
     for new_file in os.listdir(inp_dir):
