@@ -72,7 +72,6 @@ struct LemmaInfo {
 pub fn goal_name_to_filename(goal_name: &str) -> String {
   goal_name
     .split('_')
-    .into_iter()
     .map(|chunk| {
       let mut chars_iter = chunk.chars();
       let mut new_string = String::new();
@@ -160,7 +159,7 @@ fn explain_body(
   // println!("{:?}", args);
 
   // Add the types and function definition stub
-  str_explanation.push_str(&add_proof_types_and_stub(goal, &lhs, &rhs, &args));
+  str_explanation.push_str(&add_proof_types_and_stub(goal, lhs, rhs, &args));
   str_explanation.push('\n');
 
   // Finally, we can do the proof explanation
@@ -176,7 +175,7 @@ pub fn explain_top(
   filename: &str,
   goal: &str,
   state: &mut ProofState,
-  ih_lemma_number: usize,
+  _ih_lemma_number: usize,
   eq: &ETermEquation,
   params: &[Symbol],
   top_level_vars: &BTreeMap<Symbol, Type>,
@@ -193,9 +192,9 @@ pub fn explain_top(
   ));
 
   // (arg name, arg type), to be used in creating the type.
-  let args: Vec<(Symbol, Type)> = params
+  let _args: Vec<(Symbol, Type)> = params
     .iter()
-    .map(|param| (param.clone(), top_level_vars[param].clone()))
+    .map(|param| (*param, top_level_vars[param].clone()))
     .collect();
 
   // Finally, we can do the proof explanation
@@ -486,13 +485,13 @@ fn explain_proof(
     None => {} // unreachable!("Missing proof explanation for {}", goal),
   }
   // If it's not in the proof tree, it must be a leaf.
-  if !proof_info.proof.contains_key(goal) {}
+  proof_info.proof.contains_key(goal);
   // Need to clone to avoid borrowing... unfortunately this is all because we need
   // a mutable reference to the explanations for some annoying reason
   let proof_term = proof_info
     .proof
     .get(goal)
-    .expect(&format!("Missing proof term: {}", goal))
+    .unwrap_or_else(|| panic!("Missing proof term: {}", goal))
     .clone();
   let mut str_explanation = String::new();
   let mut proof_depth = depth;
@@ -738,7 +737,7 @@ fn extract_lemma_invocation(
     lemma_info
       .params
       .iter()
-      .any(|(param, _param_ty)| param == s.trim_start_matches("?"))
+      .any(|(param, _param_ty)| param == s.trim_start_matches('?'))
   };
   let mut lhsmap =
     find_instantiations(&lhs_sexp, &flat_term_to_sexp(&rewritten_from), is_var).unwrap();
@@ -894,10 +893,9 @@ fn extract_ih_arguments(rule_name: &str) -> Vec<String> {
     .strip_prefix(IH_EQUALITY_PREFIX)
     .unwrap()
     .split(',')
-    .into_iter()
     .map(|pair| {
       // println!("{}", pair);
-      let args: Vec<&str> = pair.split('=').into_iter().collect();
+      let args: Vec<&str> = pair.split('=').collect();
       // This should just be x=(Constructor c1 c2 c3)
       assert_eq!(args.len(), 2);
       args[1].to_string()

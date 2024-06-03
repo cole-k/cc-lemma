@@ -346,7 +346,7 @@ where
 {
   let mut instantiations = BTreeMap::new();
   let successful_instantiation =
-    find_instantiations_helper(&proto, &actual, is_var, &mut instantiations);
+    find_instantiations_helper(proto, actual, is_var, &mut instantiations);
   if successful_instantiation {
     Some(instantiations)
   } else {
@@ -398,7 +398,7 @@ pub fn is_constructor(var_name: &str) -> bool {
 pub fn sexp_is_constructor(sexp: &Sexp) -> bool {
   match sexp {
     Sexp::String(s) => is_constructor(s),
-    Sexp::List(v) => is_constructor(&v[0].string().unwrap()),
+    Sexp::List(v) => is_constructor(v[0].string().unwrap()),
     _ => false,
   }
 }
@@ -411,7 +411,7 @@ pub fn is_var(var_name: &str) -> bool {
   var_name.chars().next().unwrap().is_lowercase()
 }
 
-pub fn get_vars<F>(e: &Expr, f: F) -> BTreeSet<Symbol>
+pub fn get_vars<F>(e: &Expr, _f: F) -> BTreeSet<Symbol>
 where
   F: FnOnce(&str) -> bool + Copy,
 {

@@ -87,7 +87,7 @@ fn merge_infos(infos: &Vec<ExtractInfo>) -> ExtractInfo {
     size += info.size;
     loop_num += info.loop_num;
   }
-  return ExtractInfo { size, loop_num };
+  ExtractInfo { size, loop_num }
 }
 
 fn is_valid_info(info: &ExtractInfo) -> bool {
@@ -124,7 +124,7 @@ pub fn collect_expressions_with_loops_aux<L: Language, A: Analysis<L>>(
     return res;
   }
   trace.entry(id).and_modify(|w| {
-    *w = *w + 1usize;
+    *w += 1usize;
   });
   for node in class.nodes.iter() {
     let mut sub_exprs: Vec<Vec<(ExtractInfo, RecExpr<L>)>> = Vec::new();
@@ -175,7 +175,7 @@ pub fn collect_expressions_with_loops_aux<L: Language, A: Analysis<L>>(
     }
   }
   trace.entry(id).and_modify(|w| {
-    *w = *w - 1usize;
+    *w -= 1usize;
   });
 
   /*println!("  {}: {}", "extract from node", id);
@@ -369,7 +369,7 @@ where
   N: Analysis<L>,
 {
   fn check(&self, egraph: &EGraph<L, N>, _eclass: Id, subst: &Subst) -> bool {
-    lookup_pattern(&self, egraph, subst)
+    lookup_pattern(self, egraph, subst)
   }
 }
 
@@ -449,7 +449,7 @@ where
     .to_owned()
     .into_iter()
     .filter(|node| {
-      !match_enode(egraph, &rec_expr, &rec_expr_id, subst, node, &mut memo)
+      !match_enode(egraph, rec_expr, &rec_expr_id, subst, node, &mut memo)
       // if res {
       //     // println!("{} filtering node {:?}", rule_name, node)
       // }
@@ -529,7 +529,7 @@ where
     memo.insert((*rec_expr_id, *eclass), true);
     egraph[*eclass]
       .iter()
-      .any(|node| match_enode(egraph, rec_expr, &rec_expr_id, subst, node, memo))
+      .any(|node| match_enode(egraph, rec_expr, rec_expr_id, subst, node, memo))
   };
   // Update the memo since we only set it to 'true' temporarily to handle cycles.
   memo.insert((*rec_expr_id, *eclass), res);
@@ -558,7 +558,7 @@ where
 //
 // (a,x), (b, y)
 fn anti_unify<N>(
-  egraph: &EGraph<SymbolLang, N>,
+  _egraph: &EGraph<SymbolLang, N>,
   enode_1: &SymbolLang,
   enode_2: &SymbolLang,
 ) -> Option<(Id, Id)>

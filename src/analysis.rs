@@ -263,8 +263,7 @@ impl CvecAnalysis {
       .unwrap_or_else(|| self.initialize_ty(ty, env, ctx));
     let mut rng = thread_rng();
     let cvec = random_terms
-      .choose_multiple(&mut rng, self.cvec_size)
-      .map(|id| *id)
+      .choose_multiple(&mut rng, self.cvec_size).copied()
       .collect();
     Cvec::Cvec(cvec)
   }
@@ -416,7 +415,7 @@ impl Cvec {
         .iter()
         .map(|child| {
           max_child_timestamp = std::cmp::max(max_child_timestamp, egraph[*child].data.timestamp);
-          egraph[*child].data.cvec_data.get_at_index(i).map(|id| *id)
+          egraph[*child].data.cvec_data.get_at_index(i).copied()
         })
         .collect();
       match opt_children {

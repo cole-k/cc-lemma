@@ -162,7 +162,7 @@ impl ParserState {
           name,
           (0..=num).map(wildcard).collect::<Vec<String>>().join(" ")
         );
-        let mut lhs = format!("({} {} ?x{})", APPLY, pre_rhs, num);
+        let lhs = format!("({} {} ?x{})", APPLY, pre_rhs, num);
         pre_rhs = rhs.clone();
         let rhs: Pat = rhs.parse().unwrap();
         let lhs: Pat = lhs.parse().unwrap();

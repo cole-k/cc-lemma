@@ -3,7 +3,7 @@ use crate::config::CONFIG;
 use crate::goal::Goal;
 use crate::goal_graph::GraphProveStatus::{Subsumed, Unknown, Valid};
 use egg::{EGraph, Id, Rewrite, Runner, SymbolLang};
-use itertools::Unique;
+
 use std::cmp::{Ordering, Reverse};
 use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -157,7 +157,7 @@ impl GoalGraph {
         }
       }
     }
-    visited.into_iter().map(|(a, b)| b).collect()
+    visited.into_values().collect()
   }
 
   pub fn record_case_split(&mut self, from: &GoalInfo, to: &Vec<GoalInfo>) {
@@ -187,7 +187,7 @@ impl GoalGraph {
       }
       let nodes = lemma.nodes.unwrap();
       let classes = self.get_new_id(nodes);
-      let start_size = lemma.goals.first().unwrap().size;
+      let _start_size = lemma.goals.first().unwrap().size;
 
       match repr_map.get_mut(&classes) {
         None => {
