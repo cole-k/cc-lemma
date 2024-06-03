@@ -5,6 +5,7 @@ import time
 import subprocess
 import csv
 import glob
+import sys
 
 def _get_dataset(dataset_name):
     dataset_path = os.path.join(config.dataset_root, "cvc4", dataset_name)

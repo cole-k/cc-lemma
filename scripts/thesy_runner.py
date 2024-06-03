@@ -4,6 +4,7 @@ import scripts.util as util
 import time
 import json
 import subprocess
+import sys
 
 def _get_dataset(dataset_name):
     dataset_path = os.path.join(config.dataset_root, "thesy", dataset_name)

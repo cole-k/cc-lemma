@@ -7,6 +7,7 @@ import re
 import json
 import csv
 import subprocess
+import sys
 
 def _get_dataset(dataset_name):
     # special case for optimization: each property and its definitions are in a separate
