@@ -21,11 +21,11 @@ def _run_cclemma(task_name, inp_file, output_path, extra_flag):
                os.path.join(config.cclemma_path, "target/release/cc-lemma"), inp_file, config.cclemma_args, "-t", str(config.timeout), ">", oup_file, "2>" + err_file]
     try:
         result = subprocess.run(' '.join(command), shell=True, check=True)
-    # output is noisy and unhelpful since it's just the error code -
-    # should check the .err files instead
-    #
-    # except subprocess.CalledProcessError as e:
-    #     print(f"Command '{command}' failed with return code {e.returncode}")
+    except subprocess.CalledProcessError as e:
+        # output is noisy and unhelpful since it's just the error code -
+        # should check the .err files instead
+        # print(f"Command '{command}' failed with return code {e.returncode}")
+        pass
     except KeyboardInterrupt:
         print("\nExecution halted by user")
         sys.exit(0)
