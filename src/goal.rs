@@ -2295,17 +2295,24 @@ pub struct ProofInfo {
 
 pub struct Timer {
   pub start_time: Instant,
+  pub timeout: Option<(u64, u32)>
 }
 
 impl Timer {
-  fn new(start_time: Instant) -> Self { Self { start_time } }
+  fn new(start_time: Instant) -> Self {
+    Self {start_time, timeout: CONFIG.timeout.map(|w| (w, 0))}
+  }
+
+  pub fn new_with_timeout(start_time: Instant, sec: u64, nano: u32) -> Self {
+    Self {start_time, timeout: Some((sec, nano))}
+  }
 
   /// Has timeout been reached?
   pub fn timeout(&self) -> bool {
-    CONFIG
+    self
         .timeout
         .map_or(false,
-                |timeout| self.start_time.elapsed() > Duration::new(timeout, 0))
+                |(sec, nano)| self.start_time.elapsed() > Duration::new(sec, nano))
   }
 }
 
@@ -3015,7 +3022,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
     }
     assert!(self.next_goal.is_some());
     let info = self.next_goal.clone().unwrap();
-    //println!("{} {:?}", "Current".red(), info);
+    // println!("{} {}", "Current".red(), info.full_exp);
     assert_eq!(info.lemma_id, lemma_index);
 
     if !proof_state.lemma_proofs.contains_key(&lemma_index) {
@@ -3056,13 +3063,14 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
       return;
     }
 
-    // println!("\ntry goal {} from {} {}", info.full_exp, self.prop_map[&info.lemma_id], lemma_proof_state.case_split_depth);
+    //println!("\ntry goal {} from {} {}", info.full_exp, self.prop_map[&info.lemma_id], lemma_proof_state.case_split_depth);
 
     // HACK: we do two lookups, the first to briefly use the proof state as
     // mutable to try the goal, the second to obtain the goal immutably so we
     // can extract lemmas using the full proof state.
     let step_res = proof_state.lemma_proofs.get_mut(&lemma_index).unwrap()
       .try_goal(&info, &proof_state.timer, &mut proof_state.lemmas_state);
+
 
     let lemma_proof_state = proof_state.lemma_proofs.get(&lemma_index).unwrap();
 

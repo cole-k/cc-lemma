@@ -44,6 +44,10 @@ pub enum PatternWithHoles {
   Node(Symbol, Vec<Box<PatternWithHoles>>),
 }
 
+fn return_propagate_result_with_timer(timer: &Timer, res: PropagateMatchResult) -> PropagateMatchResult {
+  if timer.timeout() {PropagateMatchResult::default()} else {res}
+}
+
 /// The side of the lemma
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Side {
@@ -194,13 +198,14 @@ impl PatternWithHoles {
 
   /// Receives function definitions and evaluates the pattern according to them,
   /// mutating the current pattern in the process.
-  pub fn eval(&mut self, fn_defs: &FnDefs) {
+  pub fn eval(&mut self, fn_defs: &FnDefs, timer: &Timer) {
+    if timer.timeout() {return;}
     match self {
       // Cannot eval a hole
       Self::Hole(_) => {},
       Self::Node(name, actual_args) => {
         // First recursively evaluate all arguments.
-        actual_args.iter_mut().for_each(|actual_arg| actual_arg.eval(fn_defs));
+        actual_args.iter_mut().for_each(|actual_arg| actual_arg.eval(fn_defs, timer));
         // Then recursively evaluate the current if it is a function.
         //
         // NOTE: We assume that if it's not defined then it must be a
@@ -216,7 +221,7 @@ impl PatternWithHoles {
               // If they all match, then perfrom the subst
               *self = def_rhs.subst_holes(&instantiations_map).0;
               // Continue evaluating
-              self.eval(fn_defs);
+              self.eval(fn_defs, timer);
               return;
             }
           }
@@ -893,7 +898,6 @@ impl LemmaTreeNode {
   }
 
   fn has_counterexample(&self, global_search_state: &GlobalSearchState) -> bool {
-    // println!("{}", self.pattern);
     // let start_time = Instant::now();
     for _ in 0..CONFIG.cvec_size {
       let rand_subst = self.pattern.holes.iter().chain(self.pattern.locked_holes.iter())
@@ -901,11 +905,12 @@ impl LemmaTreeNode {
           let rand_sexp = random_term_from_type_max_depth(ty, global_search_state.env, global_search_state.context, CONFIG.cvec_term_max_depth);
           (*hole, sexp_to_pattern(&rand_sexp))
       }).collect();
+      let timer = Timer::new_with_timeout(Instant::now(), 0, CONFIG.eval_time_out);
       let mut rand_subst_lhs = self.pattern.lhs.subst_holes(&rand_subst).0;
-      rand_subst_lhs.eval(global_search_state.defs_for_eval);
+      rand_subst_lhs.eval(global_search_state.defs_for_eval, &timer);
       let mut rand_subst_rhs = self.pattern.rhs.subst_holes(&rand_subst).0;
-      rand_subst_rhs.eval(global_search_state.defs_for_eval);
-      if rand_subst_lhs != rand_subst_rhs {
+      rand_subst_rhs.eval(global_search_state.defs_for_eval, &timer);
+      if !timer.timeout() && rand_subst_lhs != rand_subst_rhs {
         // let end_time = Instant::now();
         // println!("{}us to find counterexample", (end_time - start_time).as_micros());
         return true;
@@ -961,12 +966,11 @@ impl LemmaTreeNode {
         None
       }
     }).unwrap();
-
     propagate_result.merge(self.propagate_match_lock_hole(timer, current_hole, &m, goal, lemmas_state, goal_graph, lemma_proofs));
     if !self.match_enode_propagation_allowed {
       // If we aren't allowed to propagate via enodes, just return what we have
       // so far.
-      return propagate_result;
+      return return_propagate_result_with_timer(timer, propagate_result);
     }
     propagate_result.merge(self.propagate_match_fill_with_enode(timer, current_hole, &m, goal, lemmas_state, goal_graph, lemma_proofs));
     // if self.children.keys().any(|key| key.hole != current_hole) {
@@ -976,11 +980,14 @@ impl LemmaTreeNode {
     //   });
     //   panic!("somehow there's a key that isn't equal to the current hole!");
     // }
-    propagate_result
+    return_propagate_result_with_timer(timer, propagate_result)
   }
 
   fn propagate_match_lock_hole<'a>(&mut self, timer: &Timer, current_hole: HoleIdx, m: &ClassMatch, goal: &Goal<'a>, lemmas_state: &mut LemmasState, goal_graph: &mut GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
     let mut propagate_result = PropagateMatchResult::default();
+    if timer.timeout() {
+      return propagate_result;
+    }
     // We will try to unify this hole with any existing locked holes.
     let unifiable_holes = m.holes_unifiable_with(current_hole, self.pattern.locked_holes.iter().map(|(hole, _, _)| *hole));
     for other_hole in unifiable_holes {
@@ -1057,7 +1064,6 @@ impl LemmaTreeNode {
         self.children.insert(edge, lemma_node);
       }
     }
-
     // Next, we will create an edge corresponding to "locking" or preventing the
     // current hole from being filled.
     let lock_edge = LemmaTreeEdge {
@@ -1077,7 +1083,7 @@ impl LemmaTreeNode {
     // that we do the same generalization in both places), so we check here that
     // we aren't doing too many first.
     if new_match.num_generalizations > CONFIG.max_num_generalizations {
-      return propagate_result;
+      return return_propagate_result_with_timer(timer, propagate_result);
     }
     if let Some(child_node) = self.children.get_mut(&lock_edge) {
       propagate_result.merge(child_node.add_match(timer, new_match, lemmas_state, goal_graph, lemma_proofs));
@@ -1111,11 +1117,14 @@ impl LemmaTreeNode {
       // }
       self.children.insert(lock_edge, new_node);
     }
-    propagate_result
+    return_propagate_result_with_timer(timer, propagate_result)
   }
 
   fn propagate_match_fill_with_enode<'a>(&mut self, timer: &Timer, current_hole: HoleIdx, m: &ClassMatch, goal: &Goal<'a>, lemmas_state: &mut LemmasState, goal_graph: &mut GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
     let mut propagate_result = PropagateMatchResult::default();
+    if timer.timeout() {
+      return propagate_result;
+    }
     // Create/lookup each new LemmaTreeNode that comes from a refinement
     // of the current hole's matched class in the e-graph. For each e-node in
     // the e-class create or lookup a new LemmaTreeNode whose edge is the hole
@@ -1185,7 +1194,7 @@ impl LemmaTreeNode {
         }
       }
     }
-    propagate_result
+    return_propagate_result_with_timer(timer, propagate_result)
 
   }
 
@@ -1228,13 +1237,13 @@ impl LemmaTreeNode {
     // Once a lemma is proven (and therefore no longer active), don't propagate
     // its matches.
     if goal_graph.goal_map[&m.origin.name].as_ref().borrow().status != GoalNodeStatus::Unknown || lemmas_state.proven_goal_names.contains(&m.origin.name) || lemmas_state.proven_lemma_ids.contains(&m.origin.lemma_id) {
-      return propagate_result;
+      return return_propagate_result_with_timer(timer, propagate_result);
     }
     // If we've followed a cycle too much, don't consider this match.
     if m.subst.values().any(|(_, prev_classes)| {
       prev_classes.values().any(|count| *count > CONFIG.max_num_cycles_followed)
     }) {
-      return propagate_result;
+      return return_propagate_result_with_timer(timer, propagate_result);
     }
     if !m.cvecs_equal {
       // We shouldn't have proven the lemma valid.
@@ -1256,7 +1265,7 @@ impl LemmaTreeNode {
     if self.pattern.size > lemmas_state.max_lemma_size {
       propagate_result.num_propagated_matches += 1;
       self.current_matches.push_front(m);
-      return propagate_result;
+      return return_propagate_result_with_timer(timer, propagate_result);
     }
     // println!("{}, {}, {}", self.goal_index.get_cost(), self.pattern.to_lemma().size(), lemmas_state.max_lemma_size);
     match self.lemma_status {
@@ -1278,7 +1287,7 @@ impl LemmaTreeNode {
         propagate_result.num_propagated_matches += 1;
       }
     }
-    propagate_result
+    return_propagate_result_with_timer(timer, propagate_result)
   }
 
   /// FIXME: this is needlessly inefficient

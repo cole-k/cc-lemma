@@ -187,6 +187,7 @@ pub struct Config {
   pub num_free_vars_allowed: usize,
   pub max_num_cycles_followed: usize,
   pub max_num_generalizations: usize,
+  pub eval_time_out: u32
 }
 
 impl Config {
@@ -253,6 +254,7 @@ impl Config {
       num_free_vars_allowed: args.num_free_vars_allowed,
       max_num_cycles_followed: args.max_num_cycles_followed,
       max_num_generalizations: args.max_num_generalizations,
+      eval_time_out: 10000000
     }
   }
 

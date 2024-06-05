@@ -270,9 +270,9 @@
 (let qexp (?m (S ?n) ?acc) (qexp ?m ?n (mult ?acc ?m)))
 
 
-(=== clam_86 (x y z) (Nat Nat Nat)
-  (mult (exp x y) z)
-  (qexp x y z)
+(=== clam_18 (x y) ((List a) (List a))
+  (rev (append (rev x) y))
+  (append (rev y) x)
 )
 
 )

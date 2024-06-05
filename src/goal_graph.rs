@@ -347,13 +347,9 @@ impl GoalGraph {
                 continue;
             }
             let classes = self.get_new_id(lemma.enodes.unwrap());
-            if classes.0 == classes.1 {
+            repr_id_map.insert(lemma.lemma_id, repr_map[&classes]);
+            if lemma.lemma_id != repr_map[&classes] {
                 removed.insert(*index);
-            } else {
-                repr_id_map.insert(lemma.lemma_id, repr_map[&classes]);
-                if lemma.lemma_id != repr_map[&classes] {
-                    removed.insert(*index);
-                }
             }
         }
 
