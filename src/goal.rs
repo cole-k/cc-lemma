@@ -2562,7 +2562,6 @@ impl<'a> ProofState<'a> {
     //println!("handle outcomes for {:?}", lemma_proof_state.outcome);
     //println!("  {:?}", lemmas_state.lemma_rewrites_no_analysis);
     if lemma_proof_state.outcome == Some(Outcome::Valid) {
-      //println!("new lemma: {}", lemma_proof_state.prop);
       lemmas_state.proven_lemmas.insert(lemma_proof_state.prop.clone());
 
       // HACK: track the larger (in terms of sexp size) of the lhs and rhs;
@@ -2627,7 +2626,9 @@ impl<'a> ProofState<'a> {
           return lemma_proof_state.outcome.as_ref().unwrap().clone();
         }
         if lemma_proof_state.outcome == Some(Outcome::Valid) {
-          scheduler.on_proven_lemma(lemma_number, self);
+          scheduler.on_proven_lemma(Some(lemma_number), self);
+        } else if CONFIG.saturate_only_parent {
+          scheduler.on_proven_lemma(None, self);
         }
       }
       // Ruyi: move this part inside scheduler
@@ -2928,7 +2929,7 @@ trait BreadthFirstScheduler {
 
   /// A hook that is called whenever a lemma is proven. Theoretically you could
   /// have this logic be in handle_lemma instead.
-  fn on_proven_lemma<'a>(&mut self, lemma: usize, proof_state: &mut ProofState<'a>);
+  fn on_proven_lemma<'a>(&mut self, lemma: Option<usize>, proof_state: &mut ProofState<'a>);
 
 }
 
@@ -2997,7 +2998,6 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
     if let Some(optimal) = frontier.into_iter().min_by_key(|index| {
       index.get_cost()
     }) {
-      // println!("Try lemma {}", optimal.full_exp);
       if optimal.get_cost() > proof_state.lemmas_state.max_lemma_size {
         println!("cost {} greater than {}", optimal.get_cost(), proof_state.lemmas_state.max_lemma_size);
         proof_state.lemmas_state.max_lemma_size += 1;
@@ -3057,6 +3057,10 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
 
     // TODO: do this for invalid lemmas?
     if proof_state.lemmas_state.proven_lemmas.contains_leq(&lemma_state.prop) {
+        println!("{} {}", "covered lemma", lemma_state.prop);
+        /*for existing in proof_state.lemmas_state.proven_lemmas.elems.iter() {
+          println!("  Available lemma {}", existing);
+        }*/
         lemma_state.outcome = Some(Outcome::Valid);
         self.goal_graph.record_lemma_result(info.lemma_id, GoalNodeStatus::Valid);
         proof_state.lemmas_state.proven_lemma_ids.insert(info.lemma_id);
@@ -3108,17 +3112,21 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
     }
   }
 
-  fn on_proven_lemma<'a>(&mut self, _lemma: usize, proof_state: &mut ProofState<'a>) {
-    proof_state.lemmas_state.proven_lemma_ids.insert(_lemma);
-    let mut new_lemma = HashSet::new();
-    new_lemma.insert(_lemma);
+  fn on_proven_lemma<'a>(&mut self, _lemma: Option<usize>, proof_state: &mut ProofState<'a>) {
+    if let Some(lemma) = _lemma {
+      proof_state.lemmas_state.proven_lemma_ids.insert(lemma);
+    }
 
-    while !new_lemma.is_empty() {
+    let mut is_made_progress = true;
+
+    // println!("{}", "Start Iterate".green());
+    while is_made_progress {
       if proof_state.timer.timeout() {
         return;
       }
+      is_made_progress = false;
       // println!("trying to prove additional lemmas...");
-      let proved_goals: Vec<_> = self.goal_graph.get_waiting_goals(Some(&new_lemma)).into_iter().filter(
+      let proved_goals: Vec<_> = self.goal_graph.get_waiting_goals().into_iter().filter(
         |info| {
           let state = proof_state.lemma_proofs.get_mut(&info.lemma_id).unwrap();
           state.try_finish(info.name, &mut proof_state.lemmas_state)
@@ -3133,8 +3141,6 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
         return;
       }
 
-      new_lemma.clear();
-
       for goal in proved_goals.into_iter() {
         // println!("  retry and prove ({}) {}", goal.lemma_id, goal.full_exp);
         self.goal_graph.record_goal_result(&goal, GoalNodeStatus::Valid);
@@ -3145,7 +3151,7 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
           lemma_state.outcome = Some(Outcome::Valid);
 
           println!("prove lemma {}", lemma_state.prop);
-          new_lemma.insert(goal.lemma_id);
+          is_made_progress = true;
 
           ProofState::handle_lemma_outcome(&mut proof_state.lemmas_state, lemma_state);
           proof_state.lemmas_state.proven_lemma_ids.insert(goal.lemma_id);

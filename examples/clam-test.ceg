@@ -38,7 +38,7 @@
 (:: ite (-> (Bool a a) a))
 (let ite (True ?x ?y ) ?x)
 (let ite (False ?x ?y) ?y)
-(let ite (?b    ?x ?x) ?x)
+(// (let ite (?b    ?x ?x) ?x))
 
 (:: not (-> (Bool) Bool))
 (let not True False)
@@ -48,6 +48,11 @@
 (let and (False ?y) False)
 (let and (?x False) False)
 (let and (True True) True)
+
+(:: or (-> (Bool Bool) Bool))
+(let or (True ?y) True)
+(let or (?x True) True)
+(let or (False False) False)
 
 (:: plus (-> (Nat Nat) Nat))
 (let plus (Z      ?y) ?y             )
@@ -232,12 +237,12 @@
 (let qreva (Nil ?acc) ?acc)
 (let qreva ((Cons ?x ?xs) ?acc) (qreva ?xs (Cons ?x ?acc)))
 
-(:: revflat (-> (Tree a) (List a)))
+(:: revflat (-> ((Tree a)) (List a)))
 (let revflat (Leaf) Nil)
 (let revflat ((Node ?l ?x ?r)) (append (revflat ?l) (Cons ?x (revflat ?r))))
 
 (:: qrevaflat (-> ((Tree a) (List a)) (List a)))
-(let qrevaflat (Leaf ?acc) (?acc))
+(let qrevaflat (Leaf ?acc) ?acc)
 (let qrevaflat ((Node ?l ?x ?r) ?acc) (qrevaflat ?l (Cons ?x (qrevaflat ?r ?acc))))
 
 (:: rotate (-> (Nat (List a)) (List a)))
@@ -255,24 +260,41 @@
 
 (:: fac (-> (Nat) Nat))
 (let fac (Z) (S Z))
-(let fac ((S ?n)) (mult (fac ?n) ?n))
+(let fac ((S ?n)) (mult (fac ?n) (S ?n)))
 
 (:: qfac (-> (Nat Nat) Nat))
 (let qfac (Z ?n) ?n)
-(let qfac ((S ?m) ?n) (qfac ?m (mult ?n ?m)))
+(let qfac ((S ?m) ?n) (qfac ?m (mult ?n (S ?m))))
 
 (:: exp (-> (Nat Nat) Nat))
+(// This is maybe necessary, unsure if they had it in the definition)
+(// (let exp (Z Z) Z) )
 (let exp (?m Z) (S Z))
 (let exp (?m (S ?n)) (mult (exp ?m ?n) ?m))
 
 (:: qexp (-> (Nat Nat Nat) Nat))
-(let qexp (?m Z ?acc) (?acc))
+(let qexp (?m Z ?acc) ?acc)
 (let qexp (?m (S ?n) ?acc) (qexp ?m ?n (mult ?acc ?m)))
 
+(:: lst-union (-> ((List Nat) (List Nat)) (List Nat)))
+(let lst-union (Nil           ?ys          ) ?ys )
+(let lst-union ((Cons ?x ?xs) ?ys) (ite (mem ?x ?ys) (lst-union ?xs ?ys) (Cons ?x (lst-union ?xs ?ys))))
 
-(=== clam_18 (x y) ((List a) (List a))
-  (rev (append (rev x) y))
-  (append (rev y) x)
+(:: lst-intersection (-> ((List Nat) (List Nat)) (List Nat)))
+(let lst-intersection (Nil           ?ys          ) Nil )
+(let lst-intersection ((Cons ?x ?xs) ?ys) (ite (mem ?x ?ys) (Cons ?x (lst-union ?xs ?ys)) (lst-union ?xs ?ys)))
+
+(:: lst-subset (-> ((List Nat) (List Nat)) Bool))
+(let lst-subset (Nil           ?ys          ) True)
+(let lst-subset ((Cons ?x ?xs) ?ys) (and (lst-subset ?xs ?ys) (mem ?x ?ys)))
+
+(:: lst-eq  (-> ((List Nat) (List Nat)) Bool))
+(let lst-eq (?xs ?ys) (and (lst-subset ?xs ?ys) (lst-subset ?ys ?xs)))
+
+
+(=== clam_14 (x) ((List Nat))
+  (sorted (sort x))
+  True
 )
 
 )

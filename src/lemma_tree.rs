@@ -1255,7 +1255,9 @@ impl LemmaTreeNode {
     match self.lemma_status {
       Some(LemmaStatus::InQueue) | Some(LemmaStatus::Inconclusive) => {
         if m.cvecs_equal {
-          goal_graph.record_connector_lemma(&m.origin, &self.goal_index);
+          if goal_graph.record_connector_lemma(&m.origin, &self.goal_index) {
+            goal_graph.relink_related_lemmas();
+          }
         }
       }
       _ => {}

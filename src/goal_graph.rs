@@ -116,13 +116,14 @@ impl GoalNode {
 pub struct LemmaInfo {
     root: StrongGoalRef,
     lemma_id: usize,
-    enodes: Option<(Id, Id)>
+    enodes: Option<(Id, Id)>,
+    repr_id: usize
 }
 
 impl LemmaInfo {
     fn new(root: StrongGoalRef, lemma_id: usize, enodes: Option<(Id, Id)>) -> LemmaInfo {
         LemmaInfo {
-            root, lemma_id, enodes
+            root, lemma_id, enodes, repr_id: lemma_id
         }
     }
 
@@ -166,6 +167,7 @@ impl GoalGraph {
     }
 
     pub fn record_lemma_result(&mut self, lemma_id: usize, res: GoalNodeStatus) {
+        assert_eq!(self.lemma_map[&lemma_id].repr_id, lemma_id);
         match res {
             GoalNodeStatus::Unknown => return,
             _ => {
@@ -218,20 +220,29 @@ impl GoalGraph {
         (self.egraph.add_expr(&lhs), self.egraph.add_expr(&rhs))
     }
 
-    pub fn record_connector_lemma(&mut self, from: &GoalIndex, root: &GoalIndex) {
+    fn get_repr_id(&self, id: usize) -> usize {
+        let repr_id = self.lemma_map[&id].repr_id;
+        if repr_id == id {return id} else {self.get_repr_id(repr_id)}
+    }
+
+    pub fn record_connector_lemma(&mut self, from: &GoalIndex, root: &GoalIndex) -> bool {
+        let mut is_new = false;
         if !self.lemma_map.contains_key(&root.lemma_id) {
-            // println!("New cc lemma {}", root.full_exp);
             let goal = Rc::new(RefCell::new(GoalNode::new(root, None)));
             self.goal_map.insert(root.name, Rc::clone(&goal));
             let enodes = self.get_lemma_enodes(root);
             self.lemma_map.insert(root.lemma_id, LemmaInfo::new(goal, root.lemma_id, Some(enodes)));
+            is_new = true;
         }
 
+        let repr_id = self.get_repr_id(root.lemma_id);
         let goal_node = self.goal_map.get(&from.name).unwrap();
-        goal_node.borrow_mut().connect_lemmas.push(root.lemma_id);
+        goal_node.borrow_mut().connect_lemmas.push(repr_id);
+        is_new
     }
 
     pub fn is_lemma_proven(&self, lemma_id: usize) -> bool {
+        let lemma_id = self.get_repr_id(lemma_id);
         let root = self.lemma_map.get(&lemma_id).unwrap();
         root.get_status() == GoalNodeStatus::Valid
     }
@@ -281,14 +292,23 @@ impl GoalGraph {
         ).collect()
     }
 
-    pub fn get_waiting_goals(&mut self, raw_active_lemmas: Option<&HashSet<usize>>) -> Vec<GoalIndex> {
+    pub fn get_waiting_goals(&mut self) -> Vec<GoalIndex> {
         let mut res = self.get_working_goals().0;
         if CONFIG.saturate_only_parent {
-            if let Some(active_lemmas) = raw_active_lemmas {
-                res = res.clone().into_iter().filter(|info| {
-                    info.borrow().connect_lemmas.iter().any(|w| {active_lemmas.contains(w)})
-                }).collect();
+            let mut final_res = Vec::default();
+            for node in res.into_iter() {
+                let mut connector_lemmas = node.borrow().connect_lemmas.clone();
+                let pre_size = connector_lemmas.len();
+                connector_lemmas = connector_lemmas
+                    .into_iter()
+                    .filter(|id| {!self.is_lemma_proven(*id)})
+                    .collect();
+                if pre_size != connector_lemmas.len() {
+                    node.borrow_mut().connect_lemmas = connector_lemmas;
+                    final_res.push(node);
+                }
             }
+            res = final_res;
         }
         res.iter().map(|raw_node| {
             let node = raw_node.borrow();
@@ -322,48 +342,47 @@ impl GoalGraph {
 
     pub fn relink_related_lemmas(&mut self) {
         self.saturate();
+        // println!("{}", "Relink".red());
         let mut repr_map = HashMap::new();
+        let mut class_map = HashMap::new();
         for lemma in self.lemma_map.values() {
-            if lemma.enodes.is_none() { continue; }
+            if lemma.enodes.is_none() || lemma.repr_id != lemma.lemma_id || self.is_lemma_proven(lemma.lemma_id) { continue; }
             let nodes = lemma.enodes.unwrap();
             let classes = self.get_new_id(nodes);
-            // println!("{} {}.{}", lemma.root.borrow().full_exp, classes.0, classes.1);
+            //println!("  {} {:?}", lemma.root.borrow().full_exp, classes);
+            class_map.insert(lemma.lemma_id, classes);
 
             match repr_map.get_mut(&classes) {
                 None => {
                     repr_map.insert(classes, lemma.lemma_id);
                 },
-                Some(id) => if *id > lemma.lemma_id {
-                    *id = lemma.lemma_id;
+                Some(id) => {
+                    let index_x = GoalIndex::from_node(&self.lemma_map.get(id).unwrap().root.borrow());
+                    let index_y = GoalIndex::from_node(&self.lemma_map.get(&lemma.lemma_id).unwrap().root.borrow());
+                    if index_x.get_cost() > index_y.get_cost() {
+                    //if *id > lemma.lemma_id {
+                        *id = lemma.lemma_id;
+                    }
                 }
             }
         }
 
-        let mut repr_id_map = HashMap::new();
-        let mut removed = HashSet::new();
-        for (index, lemma) in self.lemma_map.iter() {
-            if lemma.enodes.is_none () {
-                repr_id_map.insert(lemma.lemma_id, lemma.lemma_id);
-                continue;
-            }
-            let classes = self.get_new_id(lemma.enodes.unwrap());
-            repr_id_map.insert(lemma.lemma_id, repr_map[&classes]);
-            if lemma.lemma_id != repr_map[&classes] {
-                removed.insert(*index);
+        for (index, classes) in class_map.into_iter() {
+            let mut lemma = self.lemma_map.get_mut(&index).unwrap();
+            lemma.repr_id = repr_map[&classes];
+
+            if lemma.repr_id == lemma.lemma_id && classes.0 == classes.1 {
+                lemma.root.borrow_mut().status = GoalNodeStatus::Valid;
+                self.proven_lemmas.insert(lemma.lemma_id);
             }
         }
 
         for goal in self.goal_map.values() {
-            let mut existing = HashSet::new();
-            for lemma in goal.borrow().connect_lemmas.iter() {
-                if let Some(new_id) = repr_id_map.get(lemma) {
-                    existing.insert(*new_id);
-                }
-            }
-            goal.borrow_mut().connect_lemmas = existing.into_iter().collect();
-        }
-        for removed_id in removed.iter() {
-            self.lemma_map.remove(removed_id);
+            let connect_lemmas = goal.borrow().connect_lemmas.clone();
+            goal.borrow_mut().connect_lemmas = connect_lemmas
+                .into_iter()
+                .map(|id| {self.get_repr_id(id)})
+                .collect();
         }
     }
 
@@ -383,7 +402,7 @@ impl GoalGraph {
         let mut new_rewrites = Vec::new();
         // println!("#lemmas {}, size(e-graph) {}", self.lemma_map.values().len(), self.egraph.total_number_of_nodes());
         for lemma in self.lemma_map.values() {
-            if self.is_lemma_proven(lemma.lemma_id) && !self.proven_lemmas.contains(&lemma.lemma_id) {
+            if self.is_lemma_proven(lemma.lemma_id) && !self.proven_lemmas.contains(&lemma.lemma_id) && lemma.repr_id == lemma.lemma_id {
                 self.proven_lemmas.insert(lemma.lemma_id);
                 // println!("try proven lemmas {} <=> {}", lemma.root.borrow().full_exp.lhs, lemma.root.borrow().full_exp.rhs);
                 let (left_vars, left_pattern) = build_pattern(&lemma.root.borrow().full_exp.lhs);

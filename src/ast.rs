@@ -752,14 +752,17 @@ impl PartialOrd for Prop {
         // vars.contains(s)
         self.params.iter().chain(other.params.iter()).any(|(var, _)| s == &var.to_string())
       };
-      let lhs_cmp = cmp_sexp_by_instantiation(&self.eq.lhs, &other.eq.lhs, is_var);
+      let self_merged = Sexp::List(vec![Sexp::String("=".to_string()), self.eq.lhs.clone(), self.eq.rhs.clone()]);
+      let other_merged = Sexp::List(vec![Sexp::String("=".to_string()), other.eq.lhs.clone(), other.eq.rhs.clone()]);
+      /*let lhs_cmp = cmp_sexp_by_instantiation(&self.eq.lhs, &other.eq.lhs, is_var);
       let rhs_cmp = cmp_sexp_by_instantiation(&self.eq.rhs, &other.eq.rhs, is_var);
       // They should be the same result, otherwise, they aren't equal
       if lhs_cmp == rhs_cmp {
         lhs_cmp
       } else {
         None
-      }
+      }*/
+      cmp_sexp_by_instantiation(&self_merged, &other_merged, is_var)
     }
 }
 
