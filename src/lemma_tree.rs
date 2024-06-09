@@ -1271,10 +1271,9 @@ impl LemmaTreeNode {
     }
     // println!("{}, {}, {}", self.goal_index.get_cost(), self.pattern.to_lemma().size(), lemmas_state.max_lemma_size);
     match self.lemma_status {
-      Some(LemmaStatus::Valid) | Some(LemmaStatus::Dead) => {
-        // Nothing to do here: the node is valid so we don't need any more
-        // matches.
-        self.current_matches.clear();
+      Some(LemmaStatus::Valid | LemmaStatus::Dead) => {
+        // this branch is dead and we need to make sure we handle all of its remaining matches.
+        self.clear_current_matches(goal_graph);
       }
       Some(_) => {
         // Recursively propagate this match downwards
@@ -1364,12 +1363,12 @@ impl LemmaTreeNode {
   }
 
   /// FIXME: this is needlessly inefficient
-  pub fn record_lemma_result(&mut self, lemma_idx: usize, result: LemmaStatus) {
+  pub fn record_lemma_result(&mut self, goal_graph: &mut GoalGraph, lemma_idx: usize, result: LemmaStatus) {
     // Base case: set the status
     if self.lemma_idx == lemma_idx {
       self.lemma_status = Some(result);
       if result == LemmaStatus::Valid {
-        self.mark_branch_valid();
+        self.mark_branch_valid(goal_graph);
       }
       return;
     }
@@ -1384,16 +1383,19 @@ impl LemmaTreeNode {
     }
 
     // Look for the result in the children.
-    self.children.values_mut().for_each(|child| child.record_lemma_result(lemma_idx, result));
+    self.children.values_mut().for_each(|child| child.record_lemma_result(goal_graph, lemma_idx, result));
   }
 
-  fn mark_branch_valid(&mut self) {
+  fn mark_branch_valid(&mut self, goal_graph: &mut GoalGraph) {
     // This branch is valid (and therefore so are its children), so we can clear
     // any work we've done.
     self.lemma_status = Some(LemmaStatus::Valid);
     // Remove the current matches.
-    self.current_matches.clear();
+    self.clear_current_matches(goal_graph);
     // Do the same for all children.
+    //
+    // NOTE: We shouldn't need to relink the matches in them because they should
+    // be subsumed by higher matches.
     self.children.clear();
   }
 
@@ -1415,6 +1417,25 @@ impl LemmaTreeNode {
           }
         }
       });
+    }
+  }
+
+  /// Call this function when we determine that the current node is no longer
+  /// worth considering (this should means it is either valid or dead).
+  ///
+  /// If the node is valid, we will make sure that we record all of the matches
+  /// as connector lemmas so that the relations in our goal graph are correct.
+  fn clear_current_matches(&mut self, goal_graph: &mut GoalGraph) {
+    if self.lemma_status == Some(LemmaStatus::Valid) {
+      self.current_matches.drain(..).for_each(|m| {
+        if m.cvecs_equal {
+          if goal_graph.record_connector_lemma(&m.origin, &self.goal_index) {
+            goal_graph.relink_related_lemmas();
+          }
+        }
+      });
+    } else {
+      self.current_matches.clear();
     }
   }
 }
