@@ -717,7 +717,7 @@ where S: Serializer {
   s.end()
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Debug)]
 pub enum LemmaStatus {
   Valid,
   Invalid,
@@ -1225,9 +1225,15 @@ impl LemmaTreeNode {
   ///
   /// If the node has not been attempted already, we add it to its matches.
   pub fn add_match<'a>(&mut self, timer: &Timer, m: ClassMatch, lemmas_state: &mut LemmasState, goal_graph: &mut GoalGraph, lemma_proofs: &BTreeMap<usize, LemmaProofState<'a>>) -> PropagateMatchResult {
-    // if self.pattern.size != self.goal_index.get_cost() {
-    //   panic!("{}, {}", self.pattern, self.goal_index.full_exp);
-    // }
+    /*let cared_lemmas = HashSet::from(["(append v0 (append v1 v2)) === (append (append v0 v1) v2)".to_string(),
+      "(append (qreva v0 v1) v2) === (append (rev v0) (append v1 v2))".to_string()]);
+    let lemma_1 = m.origin.full_exp.to_string();
+    let lemma_2 = self.goal_index.full_exp.to_string();
+
+    if self.lemma_status != Some(LemmaStatus::Invalid) && self.lemma_status != Some(LemmaStatus::Dead) &&
+        (cared_lemmas.contains(&lemma_1) || cared_lemmas.contains(&lemma_2)) {
+      println!("Adding match {} => {}", m.origin.full_exp, self.goal_index.full_exp);
+    }*/
     let mut propagate_result = PropagateMatchResult::default();
     if timer.timeout() {
       return propagate_result;

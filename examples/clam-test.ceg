@@ -292,9 +292,9 @@
 (let lst-eq (?xs ?ys) (and (lst-subset ?xs ?ys) (lst-subset ?ys ?xs)))
 
 
-(=== clam_14 (x) ((List Nat))
-  (sorted (sort x))
-  True
+(=== clam_27 (x) ((List a))
+  (rev x)
+  (qreva x Nil)
 )
 
 )

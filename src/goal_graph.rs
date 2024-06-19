@@ -71,32 +71,43 @@ pub struct GoalIndex {
     /// in our goal priority queue. Or we should switch to using something like
     /// https://github.com/mlb2251/lambdas.
     pub lemma_size: usize,
+    pub parent_size: usize
 }
 
 impl GoalIndex {
     pub fn get_cost(&self) -> usize {
-        sexp_size(&self.full_exp.lhs) + sexp_size(&self.full_exp.rhs)
+        //sexp_size(&self.full_exp.lhs) + sexp_size(&self.full_exp.rhs)
         // self.lemma_depth
+        self.parent_size
     }
     pub fn from_node(node: &GoalNode) -> GoalIndex {
+        let mut parent_size = 0usize;
+        if let Some(parent) = &node.father {
+            let parent = parent.upgrade().unwrap();
+            let expr = &parent.borrow().full_exp;
+            parent_size = sexp_size(&expr.lhs) + sexp_size(&expr.rhs);
+        }
         GoalIndex {
             name: node.name,
             lemma_id: node.lemma_id,
             full_exp: node.full_exp.clone(),
             lemma_size: node.lemma_size,
+            parent_size: parent_size
         }
     }
     pub fn from_goal(goal: &Goal, lemma_id: usize, lemma_size: usize) -> GoalIndex {
         GoalIndex {
             name: goal.name,
             lemma_id, full_exp: goal.full_expr.clone(),
-            lemma_size,
+            lemma_size, parent_size: sexp_size(&goal.full_expr.lhs) + sexp_size(&goal.full_expr.rhs)
         }
     }
 
     pub fn from_lemma(lemma_name: Symbol, expr: Equation, lemma_id: usize, lemma_size: usize) -> GoalIndex {
+        let parent_size = sexp_size(&expr.lhs) + sexp_size(&expr.rhs);
         GoalIndex {
-            name: lemma_name, full_exp: expr, lemma_id, lemma_size
+            name: lemma_name, full_exp: expr, lemma_id, lemma_size,
+            parent_size
         }
     }
 }
@@ -114,7 +125,7 @@ impl GoalNode {
 }
 
 pub struct LemmaInfo {
-    root: StrongGoalRef,
+    pub root: StrongGoalRef,
     lemma_id: usize,
     enodes: Option<(Id, Id)>,
     repr_id: usize
@@ -133,7 +144,7 @@ impl LemmaInfo {
 }
 
 pub struct GoalGraph {
-    lemma_map: HashMap<usize, LemmaInfo>,
+    pub lemma_map: HashMap<usize, LemmaInfo>,
     pub goal_map: HashMap<Symbol, StrongGoalRef>,
     egraph: EGraph<SymbolLang, ()>,
     lemma_rewrites: Vec<Rewrite<SymbolLang, ()>>,
@@ -295,6 +306,7 @@ impl GoalGraph {
     pub fn get_waiting_goals(&mut self) -> Vec<GoalIndex> {
         let mut res = self.get_working_goals().0;
         if CONFIG.saturate_only_parent {
+            let pre_size = res.len();
             let mut final_res = Vec::default();
             for node in res.into_iter() {
                 let mut connector_lemmas = node.borrow().connect_lemmas.clone();
@@ -309,6 +321,7 @@ impl GoalGraph {
                 }
             }
             res = final_res;
+            // println!("{} {} => {}", "saturate only parent".blue(), pre_size, res.len());
         }
         res.iter().map(|raw_node| {
             let node = raw_node.borrow();

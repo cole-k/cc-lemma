@@ -3004,7 +3004,11 @@ impl BreadthFirstScheduler for GoalLevelPriorityQueue {
       }
       // proof_state.lemmas_state.max_lemma_size = std::cmp::max(proof_state.lemmas_state.max_lemma_size, optimal.get_cost());
       self.next_goal = Some(optimal.clone());
-      // println!("Trying {} ({})", optimal.name, optimal.full_exp);
+      let root_goal = &self.goal_graph.lemma_map[&optimal.lemma_id];
+      let root_goal_info = GoalIndex::from_node(&root_goal.root.borrow());
+      if root_goal_info.full_exp.to_string() == "(append (qreva v0 v1) v2) === (append (rev v0) (append v1 v2))" {
+        println!("Trying {} ({})", optimal.name, optimal.full_exp);
+      }
       Ok(vec!(optimal.lemma_id))
     } else {
       println!("report unknown because of an empty queue");
