@@ -18,6 +18,17 @@ on Peano numbers.
 
 There will be several lemmas proved for some which are also output.
 
+# Pre-requisites
+
+Install `cargo` and Rust using [rustup](https://rustup.rs/).
+
+For running the experiments, we expect an enviroment and shell that supports
+typical commands (`cd`, `rm`, `ulimit`, and `timeout`). This is true of most
+Unix distributions.
+
+If building another tool, you will also need to follow its respective
+installation guide.
+
 # Building
 
 Use
