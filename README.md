@@ -4,6 +4,10 @@ C.C. Lemma is a tool for automating inductive equational proofs. Its main
 selling point is its ability to discover and effortlessly wield lemmas in
 service of making a proof.
 
+This is an artifact generated from the
+[`icfp-24`](https://github.com/cole-k/cc-lemma/tree/icfp-24) branch of the
+`cc-lemma` repository.
+
 > [!WARNING]
 > Research code ahead
 
@@ -49,6 +53,12 @@ to run.
 
 Make sure to include `--release` otherwise it will be much slower.
 
+The artifact comes with the code already built. To build it yourself, run
+
+```
+$ cargo clean
+```
+
 # Running the benchmarks
 
 The benchmarks we ran for our evaluation live in [benchmarks](./benchmarks).
@@ -68,11 +78,13 @@ $ python3 generate-plots.py results/summary -o results --exclude-tools thesy cvc
 This should only take a few minutes at most because we set the timeout to 2s.
 
 Use the following command to now run for CVC4 and HipSpec and generate a plot
-for all three (we don't include TheSy because the results are not competitive
-enough to put in the effort to build and parse its outputs).
+for all three. We don't include TheSy because the results are not competitive
+enough to put in the effort to parse its outputs; however, TheSy is included in
+the artifact and you can run it. We describe how you can evaluate its results in
+a later section.
 
 ```
-$ python3 runner.py  --tools cvc4 hipspec
+$ python3 runner.py --tools cvc4 hipspec
 $ python3 generate-plots.py results/summary -o results --exclude-tools thesy
 ```
 
@@ -157,3 +169,56 @@ In addition, there are several flags you may wish to know about.
 ```
 
 and of course `--help` will give the full list of options.
+
+# Addendum: evaluating TheSy's results
+
+We did not include in this artifact the necessary pieces to construct a graph of
+TheSy's results. We had to write a lot of ad-hoc code to parse and build up the
+results CSVs we use to create our graphs and we didn't deem it worth the effort
+to modularize this code for TheSy given its performance.
+
+To quickly get a sense of how many properties TheSy proves, you can use this
+one-liner (assuming you're in the root of `cc-lemma`). Change `isaplanner` to
+whichever test suite you want to compare with. This checks for the string "done
+in" which to my knowledge TheSy prints if it succeeds.
+
+```
+cat results/thesy/isaplanner/*.out | grep 'Found all lemmas' | wc
+```
+
+There is one caveat: we run TheSy on more properties than we compare to. This is
+handled in other tools by the results parser,  using the below code that
+generates the range of properties for CLAM we keep: to ensure that you make the
+same comparison you will want to filter TheSy's results that you only have these
+(e.g. don't check `goal36.out`).
+
+``` python
+    '''
+    All of our CLAM datasets have more properties than the original 50
+    (labeled with prefix T in the paper, these are properties 1-50 in our dataset).
+
+    These additional properties correspond to lemmas thought to be necessary
+    to prove the originals (labeled with L and G).
+
+    We do not use T1-T50, but instead a combination of the T and G properties
+    which are thought to require lemmas. If you are familiar with CVC4's
+    benchmarks, these are the goals which have "sg" versions, i.e. lemmas thought
+    to be necessary to prove them.
+    '''
+    # Range from 1 to 35 inclusive
+    range1 = map(str, range(1, 36))
+    # Handle the case where there's a prefix 0 (hacky, I know)
+    range_single_digit = map(lambda x: '0' + str(x), range(1,10))
+    # Range from 48 to 50 inclusive
+    range2 = map(str, range(48, 51))
+    # Range from 75 to 86 inclusive
+    range3 = map(str, range(75, 87))
+```
+
+To visually scan the results, you could use this one-liner instead of the above
+
+```
+find results/thesy/clam -name '*.out' -exec grep -H 'Found all lemmas' {} \;
+```
+
+and then filter based upon the filename.

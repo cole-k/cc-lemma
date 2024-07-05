@@ -356,7 +356,7 @@
 )
 
 
-((=== clam_16 (x) (Nat)
+(=== clam_16 (x) (Nat)
   (even (plus x x))
   True
 )
