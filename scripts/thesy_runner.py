@@ -51,6 +51,7 @@ def _run_thesy(task_name, inp_file, output_path, extra_flag):
 
 def _collect_result(output_dir, summary_path, dataset):
     outfile = os.path.join(summary_path, dataset + '.csv')
+    util.create_path(outfile)
     stats_processor.write_stats(output_dir, outfile)
 
 def get_runner():
