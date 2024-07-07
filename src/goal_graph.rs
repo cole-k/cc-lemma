@@ -1,265 +1,360 @@
-use std::cell::RefCell;
 use std::cmp::{Ordering, Reverse};
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::rc::{Rc, Weak};
-use colored::Colorize;
-use egg::{Analysis, EGraph, Id, Language, Rewrite, Runner, SymbolLang};
+use egg::{EGraph, Id, Rewrite, Runner, SymbolLang};
 use itertools::Unique;
-use crate::ast::{Equation, Prop, sexp_size};
+use crate::ast::{Prop, sexp_size};
 use crate::config::CONFIG;
 use crate::goal::Goal;
-use crate::egraph::get_all_expressions_with_loop;
-use crate::goal::Outcome::Valid;
-use crate::goal_graph::GoalNodeStatus::Unknown;
+use crate::goal_graph::GraphProveStatus::{Subsumed, Unknown, Valid};
 
-/**
- Interface of the current goal graph:
- 0. fn new(root: &GoalIndex) -> GoalGraph
-    Create the goalgraph with the root node of the target lemma.
- 1. fn record_goal_result(&mut self, goal: &GoalIndex, res: GoalNodeStatus)
-    Record the result every time when we prove/disprove a goal
- 2. fn record_lemma_result(&mut self, lemma_id: usize, res: GoalNodeStatus)
-    Record the result every time when we directly know the result of a lemma.
-    Currently, the only such case is when the cvecs of a lemma do not match.
- 3. fn record_case_split(&mut self, from: &GoalIndex, to: &Vec<GoalIndex>)
-    Record the result of case-split
- 4. fn record_connector_lemma(&mut self, from: &GoalIndex, root: &GoalIndex)
-    Invoke this function every time we find a cc-lemma, "from" denotes the source goal,
-    while "root" denotes the root goal of the found lemma.
- 5. fn is_lemma_proven(&self, lemma_id: usize) -> bool
-    Check whether a lemma is proven by id
- 6. fn get_frontier_goals(&self) -> Vec<GoalIndex>
-    Get the list of frontier (or active) goals
- 7. fn get_waiting_goals(&self, raw_active_lemmas: Option<&HashSet<usize>>) -> Vec<GoalIndex>
-    Get the list of waiting (or inactive) goals that have "direct" dependencies with a list
-    of newly proven lemmas (raw_active_lemmas).
-**/
-
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
-pub enum GoalNodeStatus {
-    Unknown, Valid, Invalid
+#[derive(PartialEq, Eq, Debug)]
+pub enum GraphProveStatus {
+    Unknown, Valid, Invalid, Subsumed
 }
 
-type StrongGoalRef = Rc<RefCell<GoalNode>>;
-type WeakGoalRef = Weak<RefCell<GoalNode>>;
-
-pub struct GoalNode {
-    name: String, // The same as the corresponding goal
-    lemma_id: usize,
-    full_exp: Equation,
-    father: Option<WeakGoalRef>,
-    status: GoalNodeStatus,
-
-    connect_lemmas: Vec<usize>,
-    sub_goals: Vec<StrongGoalRef>
-}
-
-#[derive(Clone, Debug)]
-pub struct GoalIndex {
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
+pub struct GoalInfo {
     pub name: String,
     pub lemma_id: usize,
-    pub full_exp: Equation
+    pub full_exp: String,
+    pub size: usize
 }
 
-impl GoalIndex {
-    pub fn get_cost(&self) -> usize {
-        sexp_size(&self.full_exp.lhs) + sexp_size(&self.full_exp.rhs)
-    }
-    pub fn from_node(node: &GoalNode) -> GoalIndex {
-        GoalIndex {
-            name: node.name.clone(),
-            lemma_id: node.lemma_id,
-            full_exp: node.full_exp.clone()
-        }
-    }
-    pub fn from_goal(goal: &Goal, lemma_id: usize) -> GoalIndex {
-        GoalIndex {
+impl GoalInfo {
+    pub fn new(goal: &Goal, lemma_id: usize) -> Self{
+        GoalInfo {
             name: goal.name.clone(),
-            lemma_id, full_exp: goal.full_expr.clone()
+            lemma_id,
+            full_exp: goal.full_expr.to_string(),
+            size: sexp_size(&goal.full_expr.lhs) + sexp_size(&goal.full_expr.rhs)
         }
     }
+}
 
-    pub fn from_lemma(lemma_name: String, expr: Equation, lemma_id: usize) -> GoalIndex {
-        GoalIndex {
-            name: lemma_name, full_exp: expr, lemma_id
-        }
+impl PartialOrd for GoalInfo {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Reverse(self.size).partial_cmp(&Reverse(other.size))
     }
+}
+
+impl Ord for GoalInfo {
+    fn cmp(&self, other: &Self) -> Ordering {
+        Reverse(self.size).cmp(&Reverse(other.size))
+    }
+}
+
+pub struct GoalNode {
+    info: GoalInfo,
+    split_children: Option<Vec<GoalInfo>>,
+    father: Option<GoalInfo>,
+    pub status: GraphProveStatus,
+    related_lemmas: HashSet<usize>
 }
 
 impl GoalNode {
-    fn new(goal: &GoalIndex, father: Option<WeakGoalRef>) -> GoalNode {
+    fn new(info: &GoalInfo, father: Option<&GoalInfo>) -> GoalNode {
         GoalNode {
-            name: goal.name.clone(), lemma_id: goal.lemma_id,
-            full_exp: goal.full_exp.clone(),
-            father, status: GoalNodeStatus::Unknown,
-            connect_lemmas: Vec::new(), sub_goals: Vec::new()
+            info: info.clone(),
+            split_children: None,
+            father: father.cloned(),
+            status: GraphProveStatus::Unknown,
+            related_lemmas: HashSet::default()
         }
     }
 }
 
-pub struct LemmaInfo {
-    root: StrongGoalRef,
-    lemma_id: usize
+pub struct LemmaNode {
+    pub goals: Vec<GoalInfo>,
+    lemma_id: usize,
+    status: GraphProveStatus,
+    nodes: Option<(Id, Id)>
 }
 
-impl LemmaInfo {
-    fn new(root: StrongGoalRef, lemma_id: usize) -> LemmaInfo {
-        LemmaInfo {
-            root, lemma_id
+impl LemmaNode {
+    fn new(root: &GoalInfo, nodes: Option<(Id, Id)>) -> LemmaNode {
+        LemmaNode {
+            goals: vec![root.clone()],
+            lemma_id: root.lemma_id,
+            status: GraphProveStatus::Unknown,
+            nodes /* TODO: rewrite names of properties */
         }
     }
-
-    fn get_status(&self) -> GoalNodeStatus {
-        self.root.borrow().status
-    }
 }
 
+#[derive(Default)]
 pub struct GoalGraph {
-    lemma_map: HashMap<usize, LemmaInfo>,
-    goal_map: HashMap<String, StrongGoalRef>
+    goal_index_map: HashMap<GoalInfo, GoalNode>,
+    lemma_index_map: HashMap<usize, LemmaNode>,
+    egraph: EGraph<SymbolLang, ()>,
+    lemma_rewrites: Vec<Rewrite<SymbolLang, ()>>
 }
 
 impl GoalGraph {
-    pub fn new(root: &GoalIndex) -> GoalGraph{
-        let goal = Rc::new(RefCell::new(GoalNode::new(root, None)));
-        GoalGraph {
-            goal_map: HashMap::from([(root.name.clone(), Rc::clone(&goal))]),
-            lemma_map: HashMap::from([(root.lemma_id, LemmaInfo::new(goal, root.lemma_id))])
+    fn get_goal_mut(&mut self, info: &GoalInfo) -> &mut GoalNode {
+        self.goal_index_map.get_mut(info).unwrap()
+    }
+    fn get_lemma_mut(&mut self, id: usize) -> &mut LemmaNode {
+        self.lemma_index_map.get_mut(&id).unwrap()
+    }
+    pub fn get_goal(&self, info: &GoalInfo) -> &GoalNode {
+        self.goal_index_map.get(info).unwrap()
+    }
+    pub fn get_lemma(&self, id: usize) -> &LemmaNode {
+        self.lemma_index_map.get(&id).unwrap()
+    }
+
+    fn new_goal(&mut self, info: &GoalInfo, father: Option<&GoalInfo>)  {
+        self.goal_index_map.insert(
+            info.clone(),
+            GoalNode::new(info, father)
+        );
+    }
+
+    fn get_prop_id(&mut self, prop: &Prop) -> (Id, Id) {
+        let lhs = prop.eq.lhs.to_string().parse().unwrap();
+        let rhs = prop.eq.rhs.to_string().parse().unwrap();
+        (self.egraph.add_expr(&lhs), self.egraph.add_expr(&rhs))
+    }
+
+    fn saturate(&mut self) {
+        let runner = Runner::default().with_egraph(self.egraph.clone()).run(&self.lemma_rewrites);
+        self.egraph = runner.egraph;
+    }
+    pub fn new_lemma(&mut self, root: &GoalInfo, prop: Option<&Prop>) {
+        self.new_goal(root, None);
+        let prop_id = prop.map(|p| {self.get_prop_id(p)});
+        self.lemma_index_map.insert(
+            root.lemma_id,
+            LemmaNode::new(root, prop_id)
+        );
+    }
+    pub fn exclude_bid_reachable_lemmas(&mut self, prop_list: &Vec<(usize, Prop)>) -> Vec<(usize, Prop)> {
+        let id_list: Vec<_> = prop_list.iter().map(|(_,prop)| {self.get_prop_id(prop)}).collect();
+        self.saturate();
+
+        let mut visited = HashMap::new();
+        for (prop, (x, y)) in prop_list.iter().zip(id_list.iter()) {
+            let x = self.egraph.find(*x);
+            let y = self.egraph.find(*y);
+            let feature = if x < y {(x, y)} else {(y, x)};
+            match visited.get_mut(&feature) {
+                None => {
+                    visited.insert(feature, prop.clone());
+                },
+                Some(pre) => if prop.1.to_string().len() < pre.1.to_string().len() {*pre = prop.clone();}
+            }
+        }
+        visited.into_iter().map(|(a, b)| {b}).collect()
+    }
+
+    pub fn record_case_split(&mut self, from: &GoalInfo, to: &Vec<GoalInfo>) {
+        self.get_goal_mut(from).split_children = Some(to.clone());
+        for child in to.iter() {
+            self.new_goal(child, Some(from));
+            self.get_lemma_mut(from.lemma_id).goals.push(child.clone())
         }
     }
 
-    /* Record new results */
-    pub fn record_goal_result(&mut self, goal: &GoalIndex, res: GoalNodeStatus) {
-        match res {
-            GoalNodeStatus::Unknown => return,
-            _ => {
-                let goal_node = &self.goal_map[&goal.name];
-                goal_node.borrow_mut().status = res;
-                if let Some(father) = &goal_node.borrow().father {
-                    Self::propagate_goal_status(father.upgrade().unwrap().as_ref());
+    fn get_new_id(&self, id: (Id, Id)) -> (Id, Id){
+        let classes = (self.egraph.find(id.0), self.egraph.find(id.1));
+        if classes.0 > classes.1 {(classes.1, classes.0)} else {classes}
+    }
+
+    pub fn relink_related_lemmas(&mut self) {
+        self.saturate();
+
+        let mut repr_map = HashMap::new();
+        for lemma in self.lemma_index_map.values() {
+            if lemma.nodes.is_none() {continue;}
+            let nodes = lemma.nodes.unwrap();
+            let classes = self.get_new_id(nodes);
+            let start_size = lemma.goals.first().unwrap().size;
+
+            match repr_map.get_mut(&classes) {
+                None => {
+                    repr_map.insert(classes, lemma.lemma_id);
+                },
+                Some(id) => if *id > lemma.lemma_id {
+                    *id = lemma.lemma_id;
                 }
             }
         }
+
+        let mut repr_id_map = HashMap::new();
+        for lemma in self.lemma_index_map.values() {
+            if lemma.nodes.is_none() {
+                repr_id_map.insert(lemma.lemma_id, lemma.lemma_id);
+                continue;
+            }
+            let classes = self.get_new_id(lemma.nodes.unwrap());
+            repr_id_map.insert(lemma.lemma_id, repr_map[&classes]);
+        }
+
+        for goal in self.goal_index_map.values_mut() {
+            goal.related_lemmas = goal.related_lemmas.iter().map(
+                |lemma_id| {repr_id_map[lemma_id]}
+            ).collect();
+        }
     }
 
-    pub fn record_lemma_result(&mut self, lemma_id: usize, res: GoalNodeStatus) {
-        match res {
-            GoalNodeStatus::Unknown => return,
-            _ => {
-                let goal_node = &self.lemma_map[&lemma_id].root;
-                goal_node.borrow_mut().status = res;
-                if let Some(father) = &goal_node.borrow().father {
-                    Self::propagate_goal_status(father.upgrade().unwrap().as_ref());
+    pub fn add_bid_rewrites(&mut self, lhs: Rewrite<SymbolLang, ()>, rhs: Rewrite<SymbolLang, ()>) {
+        self.lemma_rewrites.push(lhs);
+        self.lemma_rewrites.push(rhs);
+        self.relink_related_lemmas();
+    }
+
+    pub fn record_related_lemmas(&mut self, from: &GoalInfo, lemmas: &Vec<(GoalInfo, Prop)>) {
+        for (lemma_root, prop) in lemmas.iter() {
+            if !self.lemma_index_map.contains_key(&lemma_root.lemma_id) {
+                self.new_lemma(lemma_root, Some(prop));
+            }
+        }
+        let node = self.get_goal_mut(from);
+        for (lemma_root, _) in lemmas.iter() {
+            node.related_lemmas.insert(lemma_root.lemma_id);
+        }
+        if CONFIG.exclude_bid_reachable {
+            self.relink_related_lemmas();
+        }
+    }
+
+    fn check_split_finished(&mut self, info: &GoalInfo) {
+        let node = self.get_goal(info);
+        if node.status != Unknown {return;}
+        let father = node.father.clone();
+        let children = node.split_children.clone().unwrap();
+
+        if children.into_iter().all(|child| self.get_goal(&child).status == GraphProveStatus::Valid) {
+            self.get_goal_mut(info).status = GraphProveStatus::Valid;
+            if father.is_some() {
+                self.check_split_finished(&father.unwrap());
+            }
+        }
+    }
+
+    pub fn record_node_status(&mut self, node: &GoalInfo, status: GraphProveStatus) {
+        assert!(status == GraphProveStatus::Valid || status == GraphProveStatus::Invalid);
+
+        if status == GraphProveStatus::Invalid {
+            self.get_lemma_mut(node.lemma_id).status = GraphProveStatus::Invalid;
+            return;
+        }
+
+        let goal_node = self.get_goal_mut(node);
+        if goal_node.status != Unknown {return;}
+        goal_node.status = status;
+
+        let mut queue = VecDeque::new();
+        queue.push_back(node.clone());
+
+        while let Some(info) = queue.pop_front() {
+            if let Some(children) = self.get_goal(&info).split_children.clone() {
+                for child in children {
+                    self.get_goal_mut(&child).status = Subsumed;
+                    queue.push_back(child);
                 }
             }
         }
+
+        if let Some(father) = self.get_goal(node).father.clone() {
+            self.check_split_finished(&father);
+        }
     }
 
-    fn propagate_goal_status(node: &RefCell<GoalNode>) {
-        let mut status = node.borrow().status;
-        if status != GoalNodeStatus::Unknown {return;}
-        let sub_status: Vec<_> = node.borrow().sub_goals.iter().map(
-            |sub_node| {sub_node.borrow().status}
-        ).collect();
-
-        if sub_status.iter().all(|s| *s == GoalNodeStatus::Valid) {
-            status = GoalNodeStatus::Valid;
-        }
-        if sub_status.iter().any(|s| *s == GoalNodeStatus::Invalid) {
-            status = GoalNodeStatus::Invalid;
-        }
-
-        if status != GoalNodeStatus::Unknown {
-            node.borrow_mut().status = status;
-            if let Some(father) = &node.borrow().father {
-                Self::propagate_goal_status(father.upgrade().unwrap().as_ref());
+    pub fn send_subsumed_check(&self) -> Vec<usize> {
+        self.lemma_index_map.iter().filter_map(
+            |(id, node)| {
+                if node.status == Unknown {Some(*id)} else {None}
             }
+        ).collect()
+    }
+
+    pub fn receive_subsumed_check(&mut self, subsumed_lemmas: Vec<usize>) {
+        for lemma_id in subsumed_lemmas {
+            self.get_lemma_mut(lemma_id).status = Subsumed;
         }
     }
 
-    pub fn record_case_split(&mut self, from: &GoalIndex, to: &Vec<GoalIndex>) {
-        let goal_node = self.goal_map.get(&from.name).unwrap();
-        let mut sub_goals = Vec::new();
-        for sub_goal in to {
-            let weak_goal: Weak<RefCell<GoalNode>> = Rc::downgrade(goal_node);
-            let sub_node = Rc::new(RefCell::new(GoalNode::new(sub_goal, Some(weak_goal))));
-            goal_node.borrow_mut().sub_goals.push(sub_node.clone());
-            sub_goals.push((sub_goal.name.clone(), sub_node));
-        }
-        self.goal_map.extend(sub_goals.into_iter());
-    }
-
-    pub fn record_connector_lemma(&mut self, from: &GoalIndex, root: &GoalIndex) {
-        if !self.lemma_map.contains_key(&root.lemma_id) {
-            let goal = Rc::new(RefCell::new(GoalNode::new(root, None)));
-            self.goal_map.insert(root.name.clone(), Rc::clone(&goal));
-            self.lemma_map.insert(root.lemma_id, LemmaInfo::new(goal, root.lemma_id));
-        }
-
-        let goal_node = self.goal_map.get(&from.name).unwrap();
-        goal_node.borrow_mut().connect_lemmas.push(root.lemma_id);
-    }
-
-    pub fn is_lemma_proven(&self, lemma_id: usize) -> bool {
-        let root = self.lemma_map.get(&lemma_id).unwrap();
-        root.get_status() == GoalNodeStatus::Valid
-    }
-
-    fn get_working_goals(&self) -> (Vec<StrongGoalRef>, Vec<StrongGoalRef>) {
+    fn get_working_goals(&self) -> (Vec<GoalInfo>, Vec<GoalInfo>) {
         let mut visited_lemmas = HashSet::new();
         let mut queue = VecDeque::new();
         let mut frontier_goals = Vec::new();
         let mut waiting_goals = Vec::new();
-
-        let start = self.lemma_map[&0usize].root.clone();
+        queue.push_back(self.get_lemma(0).goals[0].clone());
         visited_lemmas.insert(0usize);
-        queue.push_back(start);
 
         while let Some(current_goal) = queue.pop_front() {
-            let node = current_goal.borrow();
-
+            let node = self.get_goal(&current_goal);
+            // println!("goal [{}] {} {:?} {}", node.info.lemma_id, node.info.full_exp, node.status, node.split_children.is_none());
             if node.status != Unknown {continue;}
-            for related_lemma in node.connect_lemmas.iter() {
-                let lemma_info = self.lemma_map.get(related_lemma).unwrap();
-                if lemma_info.get_status() != Unknown || visited_lemmas.contains(related_lemma) {
+            for related_lemma in node.related_lemmas.iter() {
+                let lemma_node = self.get_lemma(*related_lemma);
+                if lemma_node.status != Unknown || visited_lemmas.contains(related_lemma) {
                     continue;
                 }
                 visited_lemmas.insert(*related_lemma);
-                queue.push_back(self.lemma_map[related_lemma].root.clone());
+                queue.push_back(lemma_node.goals[0].clone());
             }
-
-            if node.sub_goals.is_empty() {
-                frontier_goals.push(current_goal.clone());
+            if node.split_children.is_none() {
+                frontier_goals.push(current_goal);
             } else {
-                waiting_goals.push(current_goal.clone());
-                for child in node.sub_goals.iter() {
-                    queue.push_back(child.clone());
+                waiting_goals.push(current_goal);
+                for child in node.split_children.as_ref().unwrap() {
+                    queue.push_back(child.clone())
                 }
             }
         }
         (waiting_goals, frontier_goals)
     }
-    pub fn get_frontier_goals(&self) -> Vec<GoalIndex> {
-        self.get_working_goals().1.iter().map(
-            |raw_node| {
-                let node = raw_node.borrow();
-                GoalIndex::from_node(&node)
-            }
-        ).collect()
+
+    pub fn is_root(&self, info: &GoalInfo) -> bool {
+        let lemma_node = self.get_lemma(info.lemma_id);
+        let root_goal = lemma_node.goals.first().unwrap();
+        info.full_exp == root_goal.full_exp
+    }
+    pub fn get_frontier_goals(&self) -> Vec<GoalInfo> {
+        self.get_working_goals().1
     }
 
-    pub fn get_waiting_goals(&self, raw_active_lemmas: Option<&HashSet<usize>>) -> Vec<GoalIndex> {
-        let mut res = self.get_working_goals().0;
+    pub fn get_waiting_goals(&self, raw_active_lemmas: Option<&HashSet<usize>>) -> Vec<GoalInfo> {
+        let raw_res = self.get_working_goals().0;
         if CONFIG.saturate_only_parent {
             if let Some(active_lemmas) = raw_active_lemmas {
-                res = res.clone().into_iter().filter(|info| {
-                    info.borrow().connect_lemmas.iter().any(|w| {active_lemmas.contains(w)})
-                }).collect();
+                let mut res = Vec::new();
+                for info in raw_res {
+                    if self.get_goal(&info).related_lemmas.iter().any(|w| { active_lemmas.contains(w) }) {
+                        res.push(info);
+                    }
+                }
+                return res;
             }
         }
-        res.iter().map(|raw_node| {
-            let node = raw_node.borrow();
-            GoalIndex::from_node(&node)
-        }).collect()
+        raw_res
+    }
+
+    pub fn is_lemma_proved(&self, lemma_id: usize) -> bool {
+        let root_info = &self.get_lemma(lemma_id).goals[0];
+        self.get_goal(root_info).status == Valid
+        /*let mut queue = VecDeque::new();
+        queue.push_back(&self.get_lemma(lemma_id).goals[0]);
+
+        while let Some(info) = queue.pop_front() {
+            let goal_node = self.get_goal(info);
+            if goal_node.status == Unknown {
+                if goal_node.split_children.is_none() {return false;}
+                for child in goal_node.split_children.as_ref().unwrap() {
+                    queue.push_back(child);
+                }
+            } else if goal_node.status == GraphProveStatus::Valid {
+                continue;
+            } else {
+                return false;
+            }
+        }
+        return true;*/
+    }
+
+    pub fn set_lemma_res(&mut self, lemma_id: usize, status: GraphProveStatus) {
+        self.get_lemma_mut(lemma_id).status = status;
     }
 }
