@@ -1,7 +1,7 @@
 use colored::Colorize;
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::analysis::{CycleggAnalysis};
+use crate::analysis::CycleggAnalysis;
 use egg::*;
 use itertools::Itertools;
 use log::warn;

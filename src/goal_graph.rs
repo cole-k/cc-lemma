@@ -3,7 +3,6 @@ use crate::config::CONFIG;
 use crate::goal::Goal;
 use crate::goal_graph::GraphProveStatus::{Subsumed, Unknown, Valid};
 use egg::{EGraph, Id, Rewrite, Runner, SymbolLang};
-
 use std::cmp::{Ordering, Reverse};
 use std::collections::{HashMap, HashSet, VecDeque};
 
