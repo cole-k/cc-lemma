@@ -52,12 +52,11 @@ where
   let (dt_name, arg_types) = ty.datatype().unwrap();
   let (vars, cons) = env
     .get(&Symbol::from_str(dt_name).unwrap())
-    .or_else(|| {
+    .unwrap_or_else(|| {
       // this should be a type variable we can't look up
       assert!(dt_name.starts_with(char::is_lowercase));
-      env.get(&Symbol::from_str(&mangle_name("Bool")).unwrap())
-    })
-    .unwrap();
+      env.get(&Symbol::new(&mangle_name("Bool"))).expect("ERROR: Bool is not defined in your file. In order to assign random concrete values to a type we don't know anything about, we implicitly use Bool. Please define Bool using its standard definition (see the docs or examples).")
+    });
   let type_var_map: SSubst = zip(
     vars.iter().cloned(),
     arg_types.iter().map(|arg_type| arg_type.repr.clone()),
@@ -552,7 +551,6 @@ impl CanonicalFormAnalysis {
       _ => None,
     }
   }
-
 }
 
 #[derive(Debug, Clone, Default)]

@@ -2755,7 +2755,6 @@ impl<'a> ProofState<'a> {
       }
     }
   }
-
 }
 
 trait BreadthFirstScheduler {
@@ -2858,7 +2857,6 @@ impl GoalLevelPriorityQueue {
       .collect();
     self.goal_graph.receive_subsumed_check(subsumed_lemmas);
   }
-
 }
 
 impl BreadthFirstScheduler for GoalLevelPriorityQueue {
