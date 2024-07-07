@@ -46,7 +46,6 @@ impl Ord for GoalInfo {
 }
 
 pub struct GoalNode {
-  info: GoalInfo,
   split_children: Option<Vec<GoalInfo>>,
   father: Option<GoalInfo>,
   pub status: GraphProveStatus,
@@ -54,9 +53,8 @@ pub struct GoalNode {
 }
 
 impl GoalNode {
-  fn new(info: &GoalInfo, father: Option<&GoalInfo>) -> GoalNode {
+  fn new(father: Option<&GoalInfo>) -> GoalNode {
     GoalNode {
-      info: info.clone(),
       split_children: None,
       father: father.cloned(),
       status: GraphProveStatus::Unknown,
@@ -108,7 +106,7 @@ impl GoalGraph {
   fn new_goal(&mut self, info: &GoalInfo, father: Option<&GoalInfo>) {
     self
       .goal_index_map
-      .insert(info.clone(), GoalNode::new(info, father));
+      .insert(info.clone(), GoalNode::new(father));
   }
 
   fn get_prop_id(&mut self, prop: &Prop) -> (Id, Id) {

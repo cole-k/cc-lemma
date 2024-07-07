@@ -2859,15 +2859,6 @@ impl GoalLevelPriorityQueue {
     self.goal_graph.receive_subsumed_check(subsumed_lemmas);
   }
 
-  fn re_extract_lemmas(&mut self, proof_state: &mut ProofState<'_>) {
-    let waiting_goals = self.goal_graph.get_waiting_goals(None);
-    for info in waiting_goals.iter() {
-      let state = proof_state.lemma_proofs.get_mut(&info.lemma_id).unwrap();
-      let new_lemmas =
-        state.extract_lemmas(info, &proof_state.timer, &mut proof_state.lemmas_state);
-      self.add_lemmas_for(info, new_lemmas, proof_state);
-    }
-  }
 }
 
 impl BreadthFirstScheduler for GoalLevelPriorityQueue {
