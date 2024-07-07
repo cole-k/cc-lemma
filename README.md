@@ -207,10 +207,10 @@ and of course `--help` will give the full list of options.
 
 # Addendum: evaluating TheSy's results
 
-We did not include in this artifact the necessary pieces to construct a graph of
-TheSy's results. We had to write a lot of ad-hoc code to parse and build up the
-results CSVs we use to create our graphs and we didn't deem it worth the effort
-to modularize this code for TheSy given its performance.
+TheSy support in the plot generation is experimental (I only tested for the
+IsaPlanner suite), but should work; we do not guarantee that it is accurate to
+the results in the paper. Below are instructions for manually verifying TheSy's
+results should the plot generation fail or produce unexpected results.
 
 To quickly get a sense of how many properties TheSy proves, you can use this
 one-liner (assuming you're in the root of `cc-lemma`). Change `isaplanner` to

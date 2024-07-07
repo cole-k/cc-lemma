@@ -1,7 +1,6 @@
 import os
 import scripts.config as config
 import scripts.thesy_stats_processor as stats_processor
-import scripts.thesy_stats_postprocessor as stats_postprocessor
 import scripts.util as util
 import time
 import json
