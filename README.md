@@ -22,6 +22,12 @@ on Peano numbers.
 
 There will be several lemmas proved for some which are also output.
 
+```
+$ cargo run --release -- examples/mtp.ceg
+```
+
+This will run the motivating example from the paper (maximum tail product).
+
 # Pre-requisites
 
 Below we list instructions for installing and building all of the other tools,
@@ -147,11 +153,13 @@ $ python3 generate-plots.py precomputed-results --exclude-tools hipspec cvc4 the
 
 you should get plots that match those in our paper.
 
-Note that there is one datapoint which does appear for any tool but C.C. Lemma
-among this data: `mtp-base`, which corresponds to the motivating example in
-section 1 of our paper. We ran it individually for each tool and none could
-solve it but C.C. Lemma, so we copied just its result into C.C. Lemma's results
-for the optimization benchmarks.
+Note that there is one datapoint which does not appear for any tool but C.C.
+Lemma among the precomputed data: `mtp-base`, which corresponds to the
+motivating example in section 1 of our paper. Due to how we ran the evaluation,
+we didn't record its results for any tool but C.C. Lemma. We include `mtp-base`
+for all other tools in the benchmarks, so you should be able to reproduce our
+results by running yourself: none other than C.C. Lemma should be able to prove
+it within the parameters of our evaluation.
 
 ## Configuring the runner
 
