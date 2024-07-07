@@ -52,7 +52,7 @@ def _run_thesy(task_name, inp_file, output_path, extra_flag):
 def _collect_result(output_dir, summary_path, dataset):
     stats_processor.write_stats(output_dir)
     outfile_prefix = os.path.join(summary_path, dataset)
-    stats_postprocessor.postprocess_stats(output_dir + "stats.csv", outfile_prefix)
+    stats_postprocessor.postprocess_stats(os.path.join(output_dir, "stats.csv"), outfile_prefix)
 
 def get_runner():
     return {"dataset": _get_dataset, "runner": _run_thesy, "post": _collect_result, "name": "thesy"}
