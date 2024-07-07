@@ -27,8 +27,9 @@ There will be several lemmas proved for some which are also output.
 Below we list instructions for installing and building all of the other tools,
 but this has already been done in the artifact.
 
-After installing a tool, configure `scripts/config.py` to add its path (C.C.
-Lemma is not exempt; the dataset root is C.C. Lemma's `benchmarks` folder).
+After installing a tool, configure [scripts/config.py](./scripts/config.py) to
+add its path (C.C. Lemma is not exempt; the dataset root is C.C. Lemma's
+`benchmarks` folder).
 
 ## C.C. Lemma
 
@@ -183,7 +184,7 @@ If you want to try it on your own examples, please see refer to existing
 examples and the [docs](./docs/file-format.md).
 
 There are also many feature flags supported, most of which are for
-debugging/ablations. [scripts/config.py][./scripts/config.py], which contains
+debugging/ablations. [scripts/config.py](./scripts/config.py), which contains
 the flags we use for our evaluation, should contain
 
 ```
