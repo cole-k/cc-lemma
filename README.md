@@ -95,7 +95,8 @@ to run.
 
 Make sure to include `--release` otherwise it will be much slower.
 
-The artifact comes with the code already built. To build it yourself, run
+The artifact comes with the code for all tools already built. To rebuild C.C.
+Lemma, first run
 
 ```
 $ cargo clean
