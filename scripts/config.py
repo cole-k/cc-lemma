@@ -1,12 +1,12 @@
 timeout = 2
 memory_limit = 16
 
-dataset_root = "/home/cole/research/cc-lemma/benchmarks"
-cclemma_path = "/home/cole/research/cc-lemma"
-hipspec_path = "PATH/TO/HIPSPEC"
-thesy_path = "PATH/TO/THESY"
+dataset_root = "/home/artifact/cc-lemma/benchmarks"
+cclemma_path = "/home/artifact/cc-lemma"
+hipspec_path = "/home/artifact/hipspec"
+thesy_path = "/home/artifact/TheSy"
 cvc4_bin_name = "cvc4-vmcai2015"
-output_path = "/home/cole/research/cc-lemma/results"
+output_path = "/home/artifact/cc-lemma/results"
 
 hipspec_expensive_props = {
     "clam": [81],

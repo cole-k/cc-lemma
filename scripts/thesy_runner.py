@@ -1,5 +1,7 @@
 import os
 import scripts.config as config
+import scripts.thesy_stats_processor as stats_processor
+import scripts.thesy_stats_postprocessor as stats_postprocessor
 import scripts.util as util
 import time
 import json
@@ -47,5 +49,10 @@ def _run_thesy(task_name, inp_file, output_path, extra_flag):
         return False, None
     return True, res["total_time"]["secs"] + res["total_time"]["nanos"] * (10 ** -9)
 
+def _collect_result(output_dir, summary_path, dataset):
+    stats_processor.write_stats(output_dir)
+    outfile_prefix = os.path.join(summary_path, dataset)
+    stats_postprocessor.postprocess_stats(output_dir + "stats.csv", outfile_prefix)
+
 def get_runner():
-    return {"dataset": _get_dataset, "runner": _run_thesy, "name": "thesy"}
+    return {"dataset": _get_dataset, "runner": _run_thesy, "post": _collect_result, "name": "thesy"}

@@ -24,14 +24,49 @@ There will be several lemmas proved for some which are also output.
 
 # Pre-requisites
 
+Below we list instructions for installing and building all of the other tools,
+but this has already been done in the artifact.
+
+After installing a tool, configure `scripts/config.py` to add its path (C.C.
+Lemma is not exempt; the dataset root is C.C. Lemma's `benchmarks` folder).
+
+## C.C. Lemma
+
 Install `cargo` and Rust using [rustup](https://rustup.rs/).
 
 For running the experiments, we expect an enviroment and shell that supports
 typical commands (`cd`, `rm`, `ulimit`, and `timeout`). This is true of most
 Unix distributions.
 
-If building another tool, you will also need to follow its respective
-installation guide.
+## CVC4
+
+A prebuilt binary from the 2015 VMCAI paper is included. We don't know how to
+build this version.
+
+## HipSpec
+
+Clone [https://github.com/cole-k/hipspec](https://github.com/cole-k/hipspec) and
+follow its installation instructions (noting that you need to install an older
+version of stack; we assume it is named `stack-1.9.3`).
+
+## TheSy
+
+Clone
+[https://github.com/eytans/TheSy/tree/releases/cav2021](https://github.com/eytans/TheSy/tree/releases/cav2021)
+and follow its installation instructions.
+
+Build it using
+
+```
+$ cargo fix --bin TheSy
+$ cargo build --release --features "stats"
+```
+
+The first command is due to a breaking change in compiler versions since TheSy's
+release.
+
+The stats flag in the second one is so that we can collect stats for TheSy
+(instead of having a runtime flag it is a compile-time flag).
 
 # Building
 
