@@ -42,13 +42,14 @@ def create_stats(path):
     return res
 
 
-def write_stats(path):
+def write_stats(path, outfile):
     res = create_stats(path)
-    res.to_csv(os.path.join(path, 'stats.csv'))
+    res.to_csv(os.path.join(path, outfile))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('path')
+    parser.add_argument('outfile')
     args = parser.parse_args()
-    write_stats(args.path)
+    write_stats(args.path, args.outfile)

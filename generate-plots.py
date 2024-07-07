@@ -36,7 +36,17 @@ def read_hipspec_results(filename, prefix='prop_', timeout=60.0):
     df.loc[df['result'] == False, 'time'] = df.loc[df['result'] == False, 'time'].replace(0.0, timeout)
     return df
 
-def read_thesy_results(filename, test_suite, prefix='goal', suffix='.smt2.stats.json'):
+def read_thesy_results(filename, prefix='goal', suffix='.stats.json'):
+    thesy_df = pd.read_csv(filename)
+    # remove prefix/suffix
+    thesy_df['name'] = thesy_df['file_name'].str[len(prefix):].str.removesuffix(suffix)
+    thesy_df['result'] = thesy_df['success']
+    # not available
+    thesy_df['num_lemmas'] = -1
+    thesy_df['num_lemmas_proven'] = thesy_df['lemma_count']
+    return thesy_df
+
+def read_thesy_results_precomputed(filename, test_suite, prefix='goal', suffix='.smt2.stats.json'):
     thesy_df = pd.read_csv(filename)
     # filter to the test suite
     thesy_df = thesy_df[thesy_df['test_suite'] == test_suite]
@@ -298,7 +308,7 @@ def make_plot(dir, dataset, dataset_name, cclemma_prefix, output_dir,
     '''
 
     tool_res = []
-    for tool in ['cclemma', 'hipspec', 'cvc4', 'thesy']:
+    for tool in ['cclemma', 'hipspec', 'cvc4', 'thesy', 'thesy-precomputed']:
         if tool in exclude:
             continue
         res = None
@@ -309,17 +319,19 @@ def make_plot(dir, dataset, dataset_name, cclemma_prefix, output_dir,
         if tool == 'cvc4':
                 res = read_cvc4_results(dir + '/cvc4/' + dataset.lower() + '.csv')
         if tool == 'thesy':
+                res = read_thesy_results(dir + '/thesy/' + dataset.lower() + '.csv')
+        if tool == 'thesy-precomputed':
                 # Yes, there is a lot of special-casing...
                 if dataset == 'clam':
-                    res = read_thesy_results(dir + '/thesy-no-expl-proofs.csv', test_suite='clam_trimmed')
+                    res = read_thesy_results_precomputed(dir + '/thesy-no-expl-proofs.csv', test_suite='clam_trimmed')
                 elif dataset == 'optimization':
-                    res = read_thesy_results(dir + '/thesy-no-expl-proofs.csv', test_suite=dataset.lower(), prefix='', suffix='.stats.json')
+                    res = read_thesy_results_precomputed(dir + '/thesy-no-expl-proofs.csv', test_suite=dataset.lower(), prefix='', suffix='.stats.json')
                 else:
-                    res = read_thesy_results(dir + '/thesy-no-expl-proofs.csv', test_suite=dataset.lower())
+                    res = read_thesy_results_precomputed(dir + '/thesy-no-expl-proofs.csv', test_suite=dataset.lower())
         if dataset == 'clam':
             clam_lemma_props = make_clam_lemma_props()
             # TheSy will sometimes have missing entries if it fails, so we ignore missing data on it.
-            res = filter_clam_results(res, 'name', '', clam_lemma_props, ignore_missing= tool == 'thesy')
+            res = filter_clam_results(res, 'name', '', clam_lemma_props, ignore_missing= tool == 'thesy' or tool == 'thesy-precomputed')
         assert(res is not None)
         tool_res.append((tool, res))
 
@@ -338,7 +350,7 @@ def make_plot(dir, dataset, dataset_name, cclemma_prefix, output_dir,
             names = set(res['name'])
             if any(name not in names for name in missing_names):
                 print(tool, f'is missing {len(missing_names - names)} entries for {dataset}')
-                if tool == 'thesy':
+                if tool == 'thesy' or tool == 'thesy-precomputed':
                     print('Note: TheSy will sometimes have missing entries if it cannot prove a property.')
                 print(list(sorted(missing_names - names)))
                 print()
@@ -346,7 +358,8 @@ def make_plot(dir, dataset, dataset_name, cclemma_prefix, output_dir,
     names_map = {'cclemma': 'CCLemma',
                  'hipspec': 'HipSpec',
                  'cvc4': 'CVC4',
-                 'thesy': 'TheSy'}
+                 'thesy': 'TheSy',
+                 'thesy-precomputed': 'TheSy'}
     times = [ normalized_df_valid_times(res) for _, res in tool_res ]
     names = [ names_map[tool] for tool, _ in tool_res ]
     if no_zoom:
@@ -378,6 +391,8 @@ def parse_arguments():
     List of tools to exclude from plotting the results. Any number of cclemma,
     thesy, hipspec, cvc4. Excluding cclemma will change how the comparison
     tables are generated. Not sure why you would exclude cclemma though.''')
+    parser.add_argument('-p', '--precomputed', action='store_true',
+                        default=False, help='Use precomputed results (only relevant for TheSy)')
 
     return parser.parse_args()
 
@@ -387,6 +402,15 @@ if __name__ == '__main__':
     if not os.path.isdir(args.results_dir):
         print(f"Error: The directory {args.results_dir} does not exist.")
         sys.exit(1)
+
+    # By default exclude thesy precomputed
+    args.exclude_tools.append('thesy-precomputed')
+
+    if args.precomputed:
+        # if we aren't skipping thesy, replace it with the precomputed version
+        if 'thesy' not in args.exclude_tools:
+            args.exclude_tools.append('thesy')
+            args.exclude_tools.remove('thesy-precomputed')
 
     # If you want to create plots for custom results, you will need to modify
     # the below code.
